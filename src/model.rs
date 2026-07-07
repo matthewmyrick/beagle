@@ -210,6 +210,11 @@ pub struct RcaMeta {
     /// Free-form tags for grouping and search.
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Pull requests remediating this incident, as URLs. Attach with
+    /// `beagle pr add`; the TUI shows live merge status when `gh` is
+    /// available. Omitted from the manifest while empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prs: Vec<String>,
 }
 
 /// A workspace as listed in the sidebar: identity plus manifest, no section
@@ -380,6 +385,27 @@ mod tests {
     }
 
     #[test]
+    fn manifest_prs_parse_and_are_omitted_when_empty() {
+        let toml_src = r#"
+            title = "t"
+            severity = "high"
+            status = "identified"
+            created = "2026-07-05T14:32:00Z"
+            prs = ["https://github.com/o/r/pull/9"]
+        "#;
+        let meta: RcaMeta = toml::from_str(toml_src).expect("prs parse");
+        assert_eq!(meta.prs, ["https://github.com/o/r/pull/9"]);
+
+        let mut without = meta.clone();
+        without.prs.clear();
+        let serialized = toml::to_string(&without).expect("serializes");
+        assert!(
+            !serialized.contains("prs"),
+            "empty prs omitted so old binaries keep parsing: {serialized}"
+        );
+    }
+
+    #[test]
     fn sort_key_puts_active_severe_recent_first() {
         let mk = |status, severity, ts| RcaSummary {
             id: RcaId::new("x").expect("valid test id"),
@@ -391,6 +417,7 @@ mod tests {
                 updated: None,
                 systems: Vec::new(),
                 tags: Vec::new(),
+                prs: Vec::new(),
             },
         };
         let resolved = mk(Status::Resolved, Severity::Critical, 100);

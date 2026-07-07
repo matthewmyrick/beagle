@@ -47,8 +47,69 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     if app.toolbox().is_some() {
         draw_toolbox(frame, app, frame.area());
     }
+    draw_links(frame, app, frame.area());
     if app.help_visible() {
         draw_help(frame, frame.area());
+    }
+}
+
+/// The `o` popup: attached PRs (with live state glyphs when known) plus
+/// URLs found on the current tab. Enter opens in the browser.
+fn draw_links(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(popup) = app.links() else { return };
+    let width = area.width.saturating_sub(6).clamp(20, 100);
+    let height = u16::try_from(popup.items.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(2)
+        .min(area.height.saturating_sub(2));
+    let rect = center(area, width, height);
+
+    let items: Vec<ListItem<'_>> = popup
+        .items
+        .iter()
+        .map(|url| {
+            let mut spans = Vec::new();
+            if let Some(state) = app.pr_state(url) {
+                spans.push(Span::styled(
+                    format!(" {} {} ", state.glyph(), state.label()),
+                    Style::default().fg(pr_color(state)),
+                ));
+            } else {
+                spans.push(Span::raw(" "));
+            }
+            spans.push(Span::raw(truncate(
+                url,
+                usize::from(width).saturating_sub(14),
+            )));
+            ListItem::new(Line::from(spans))
+        })
+        .collect();
+    let block = Block::default()
+        .title(" links — enter open · j/k move · esc close ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(40, 44, 60))
+            .add_modifier(Modifier::BOLD),
+    );
+    let mut state = ListState::default();
+    state.select(Some(popup.selected));
+    frame.render_widget(Clear, rect);
+    frame.render_stateful_widget(list, rect, &mut state);
+}
+
+/// Display color for a PR state: merged = done, open = attention,
+/// draft = quiet, closed-unmerged = warning.
+fn pr_color(state: crate::prs::PrState) -> Color {
+    use crate::prs::PrState;
+    match state {
+        PrState::Merged => Color::Green,
+        PrState::Open => Color::Yellow,
+        PrState::Draft => Color::Gray,
+        PrState::Closed => Color::LightRed,
     }
 }
 
@@ -186,7 +247,13 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
     // Header and tab bar heights are computed from the actual width so
     // nothing is ever cut off on narrow terminals — both flow onto extra
     // lines instead of truncating.
-    let header = header_paragraph(&rca, app.tick());
+    let prs: Vec<(String, Option<crate::prs::PrState>)> = rca
+        .meta
+        .prs
+        .iter()
+        .map(|url| (url.clone(), app.pr_state(url)))
+        .collect();
+    let header = header_paragraph(&rca, app.tick(), &prs);
     let header_width = head_width.saturating_sub(1).max(1); // inset by 1 below
     let header_height = u16::try_from(header.line_count(header_width))
         .unwrap_or(2)
@@ -266,7 +333,11 @@ fn flow_tabs(selected: Tab, width: u16, unread: &[bool]) -> Vec<Line<'static>> {
     lines
 }
 
-fn header_paragraph(rca: &RcaSummary, tick: usize) -> Paragraph<'static> {
+fn header_paragraph(
+    rca: &RcaSummary,
+    tick: usize,
+    prs: &[(String, Option<crate::prs::PrState>)],
+) -> Paragraph<'static> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
     let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
 
@@ -305,14 +376,39 @@ fn header_paragraph(rca: &RcaSummary, tick: usize) -> Paragraph<'static> {
         ));
     }
 
-    Paragraph::new(vec![
+    let mut lines = vec![
         Line::styled(
             rca.meta.title.clone(),
             Style::default().add_modifier(Modifier::BOLD),
         ),
         Line::from(meta_spans),
-    ])
-    .wrap(Wrap { trim: false })
+    ];
+    if !prs.is_empty() {
+        lines.push(pr_line(prs));
+    }
+    Paragraph::new(lines).wrap(Wrap { trim: false })
+}
+
+/// The attached-PRs header line: `fixes: ✓ #12 merged · ○ #13 open`.
+/// PRs without a polled state (no `gh`, or not yet fetched) render as their
+/// short label only — degraded, never broken.
+fn pr_line(prs: &[(String, Option<crate::prs::PrState>)]) -> Line<'static> {
+    let dim = Style::default().fg(Color::DarkGray);
+    let mut spans = vec![Span::styled("fixes: ", dim)];
+    for (i, (url, state)) in prs.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled("  ·  ", dim));
+        }
+        let label = crate::prs::short_label(url);
+        match state {
+            Some(state) => spans.push(Span::styled(
+                format!("{} {label} {}", state.glyph(), state.label()),
+                Style::default().fg(pr_color(*state)),
+            )),
+            None => spans.push(Span::styled(label, Style::default().fg(Color::Gray))),
+        }
+    }
+    Line::from(spans)
 }
 
 fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -440,7 +536,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 "  j/k select · enter open · ←/→ tabs · / filter · T toolbox · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
-                "  j/k scroll · ←/→ tabs · h/l pan · f follow · c copy · b back · ? help · Q quit"
+                "  j/k scroll · ←/→ tabs · h/l pan · f follow · o links · c copy · b back · ? help · Q quit"
             }
         },
         Style::default().fg(Color::DarkGray),
@@ -466,7 +562,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_help(frame: &mut Frame, area: Rect) {
     let width = 62.min(area.width.saturating_sub(4));
-    let height = 20.min(area.height.saturating_sub(2));
+    let height = 21.min(area.height.saturating_sub(2));
     let popup = center(area, width, height);
 
     let rows = [
@@ -483,6 +579,7 @@ fn draw_help(frame: &mut Frame, area: Rect) {
             "export RCA to exports/<id>.md (frontmatter + all tabs)",
         ),
         ("T", "toolbox: toolbox.md + systems/ context"),
+        ("o", "links: open attached PRs / URLs on this tab"),
         ("n / p", "next / previous diagram"),
         ("h / l, ← / →", "pan diagrams horizontally"),
         ("space / pgdn / pgup", "page through content"),

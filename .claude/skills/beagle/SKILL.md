@@ -82,6 +82,9 @@ Edit `rca.toml` as the investigation progresses:
   index directly. Tag the failure class and the technologies involved, not
   the incident specifics.
 - Unknown fields are rejected by the TUI — don't invent new ones.
+- **When remediation lands as a PR**, attach it:
+  `beagle pr add <slug> <url>` — the TUI then tracks its merge status live
+  (via `gh`) in the workspace header. Attach every fix PR you open or find.
 
 ## Exporting (deterministic, no LLM involved)
 

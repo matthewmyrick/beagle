@@ -66,6 +66,8 @@ beagle list --status investigating --severity high       # filtered
 beagle new <slug> --title "..." [--severity high] [--system payments-api]...
 beagle status <slug> investigating   # flip status; a running TUI updates live
 beagle log <slug> "checking redis pool"  # append to the live Log tab
+beagle pr add <slug> https://github.com/org/repo/pull/123  # attach a fix PR
+beagle pr list <slug>     # attached PRs, with live state when gh is available
 beagle export <slug>      # one markdown file → exports/<slug>.md
 beagle export <slug> --out ~/vault/incidents/<slug>.md   # e.g. an Obsidian vault
 beagle banner             # print the BEAGLE banner
@@ -114,9 +116,18 @@ prebuilt binaries, update via `cargo install` instead.
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
 `1`–`8` switch tabs · `/` fuzzy-filter incidents · `T` toolbox · `f` follow
-(tail -f) · `c` copy tab / `C` copy whole RCA (pbcopy or OSC 52) · `e` export
-to `exports/<slug>.md` · `n/p` cycle diagrams · `h/l` pan diagrams · `r`
-reload · `?` help · `Q` / `ctrl-c` quit.
+(tail -f) · `o` open links/PRs · `c` copy tab / `C` copy whole RCA (pbcopy or
+OSC 52) · `e` export to `exports/<slug>.md` · `n/p` cycle diagrams · `h/l`
+pan diagrams · `r` reload · `?` help · `Q` / `ctrl-c` quit.
+
+## Track the fix: attached PRs
+
+Remediation lands as pull requests, and an RCA isn't really resolved until
+they merge. `beagle pr add <slug> <url>` attaches a PR to the manifest; the
+workspace header then shows `fixes: ○ #123 open · ✓ #124 merged`, refreshed
+by a background `gh` poll every 30 minutes (plus whenever the set changes).
+No `gh` installed? The links still show — just without live state. Press `o`
+to open any attached PR or any URL on the current tab in your browser.
 
 ## Export
 
@@ -154,6 +165,7 @@ status = "identified"      # investigating | identified | monitoring | resolved
 created = "2026-07-05T14:32:00Z"   # RFC 3339, quoted
 systems = ["payments-api", "redis-sessions"]
 tags = ["latency"]
+prs = ["https://github.com/org/repo/pull/123"]   # optional; `beagle pr add`
 ```
 
 Any section may be absent (the tab shows a hint instead); a corrupt manifest
