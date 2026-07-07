@@ -252,17 +252,21 @@ pub enum SectionKind {
     Remediation,
     /// Raw evidence, queries, links, and loose ends.
     Notes,
+    /// Append-only investigation log: what the investigator did, when.
+    /// The live "watch the agent think" stream.
+    Log,
 }
 
 impl SectionKind {
     /// Every section, in tab order.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Summary,
         Self::Timeline,
         Self::RootCause,
         Self::Impact,
         Self::Remediation,
         Self::Notes,
+        Self::Log,
     ];
 
     /// The file name backing this section inside the workspace directory.
@@ -275,6 +279,7 @@ impl SectionKind {
             Self::Impact => "impact.md",
             Self::Remediation => "remediation.md",
             Self::Notes => "notes.md",
+            Self::Log => "log.md",
         }
     }
 
@@ -288,6 +293,7 @@ impl SectionKind {
             Self::Impact => "Impact",
             Self::Remediation => "Fix",
             Self::Notes => "Notes",
+            Self::Log => "Log",
         }
     }
 }

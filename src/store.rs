@@ -23,6 +23,7 @@
 use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
@@ -239,6 +240,50 @@ impl Store {
 }
 
 impl Store {
+    /// Appends a timestamped `- **HH:MM UTC** — message` bullet to the
+    /// workspace's `log.md`, creating the file (with a heading) if absent.
+    /// The write is atomic, so a watching TUI never sees a torn line.
+    ///
+    /// # Errors
+    /// Fails if the workspace does not exist (manifest unreadable) or on
+    /// write failure.
+    pub fn append_log(&self, id: &RcaId, message: &str) -> Result<PathBuf> {
+        let meta = self.read_meta(id)?; // proves the workspace exists
+        let path = self.workspace_dir(id).join(SectionKind::Log.file_name());
+        let mut content = read_optional(&path)?
+            .unwrap_or_else(|| format!("# {} — {}\n", SectionKind::Log.title(), meta.title));
+        if !content.ends_with('\n') {
+            content.push('\n');
+        }
+        let stamp = OffsetDateTime::now_utc()
+            .format(time::macros::format_description!("[hour]:[minute] UTC"))
+            .unwrap_or_else(|_| "??:?? UTC".to_owned());
+        let _ = std::fmt::Write::write_fmt(
+            &mut content,
+            format_args!("- **{stamp}** — {}\n", message.trim()),
+        );
+        write_atomic(&path, &content)?;
+        Ok(path)
+    }
+
+    /// Modification times of every section file present on disk, for
+    /// change/unread tracking. Sections without a file are simply absent
+    /// from the map; metadata errors are skipped (a vanished file is not
+    /// worth failing a listing over).
+    #[must_use]
+    pub fn section_mtimes(&self, id: &RcaId) -> std::collections::HashMap<SectionKind, SystemTime> {
+        let dir = self.workspace_dir(id);
+        SectionKind::ALL
+            .into_iter()
+            .filter_map(|kind| {
+                let modified = fs::metadata(dir.join(kind.file_name()))
+                    .and_then(|m| m.modified())
+                    .ok()?;
+                Some((kind, modified))
+            })
+            .collect()
+    }
+
     /// Reads the root `toolbox.md` — the investigation context agents read
     /// before starting. `Ok(None)` when it does not exist.
     ///
@@ -510,6 +555,10 @@ fn section_template(kind: SectionKind, title: &str) -> String {
             "How to fix it. Immediate mitigation first, then the durable fix."
         }
         SectionKind::Notes => "Raw evidence: queries, log excerpts, links, and open questions.",
+        SectionKind::Log => {
+            "What the investigation did, when — appended live, one \
+             `- **HH:MM UTC** — step` bullet at a time (`beagle log <slug> \"...\"`)."
+        }
     };
     format!("# {heading} — {title}\n\n> _{hint}_\n")
 }
@@ -790,6 +839,64 @@ mod tests {
         let custom_path = store.export_to(&id, Some(&custom)).expect("custom export");
         assert_eq!(custom_path, custom);
         assert!(custom.is_file(), "parent dirs created");
+    }
+
+    #[test]
+    fn append_log_creates_then_appends_timestamped_bullets() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+        let id = test_id("logged");
+        store
+            .scaffold(&id, &test_meta("Logged", Severity::Low))
+            .expect("scaffold");
+
+        store
+            .append_log(&id, "checked p99 dashboard")
+            .expect("append");
+        store
+            .append_log(&id, "  querying loki  ")
+            .expect("append again");
+        let content = store
+            .read_section(&id, SectionKind::Log)
+            .expect("read")
+            .expect("present");
+        let bullets: Vec<&str> = content.lines().filter(|l| l.starts_with("- **")).collect();
+        assert_eq!(bullets.len(), 2);
+        assert!(bullets[0].contains("UTC** — checked p99 dashboard"));
+        assert!(
+            bullets[1].ends_with("— querying loki"),
+            "message trimmed: {}",
+            bullets[1]
+        );
+    }
+
+    #[test]
+    fn append_log_requires_an_existing_workspace() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+        assert!(store.append_log(&test_id("ghost"), "hello").is_err());
+    }
+
+    #[test]
+    fn section_mtimes_cover_scaffolded_sections_and_skip_absent_ones() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+        let id = test_id("mtimes");
+        store
+            .scaffold(&id, &test_meta("Mtimes", Severity::Low))
+            .expect("scaffold");
+
+        let mtimes = store.section_mtimes(&id);
+        assert_eq!(mtimes.len(), SectionKind::ALL.len());
+
+        fs::remove_file(
+            store
+                .workspace_dir(&id)
+                .join(SectionKind::Notes.file_name()),
+        )
+        .expect("remove");
+        let mtimes = store.section_mtimes(&id);
+        assert!(!mtimes.contains_key(&SectionKind::Notes));
     }
 
     #[test]

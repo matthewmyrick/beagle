@@ -46,6 +46,17 @@ beagle new <slug> --title "One-line incident title" --severity <sev> \
 
 All files live in `rcas/<slug>/`. Update them as evidence arrives.
 
+**Narrate as you go:** append one line to `log.md` at every investigation
+step — what you're about to check, then what you found:
+
+```sh
+beagle log <slug> "p99 dashboard normal; checking Redis pool saturation"
+```
+
+This is the user's live view of what you're doing (the Log tab; they often
+sit on it in follow mode). A silent minute looks like a stuck agent — log
+before long queries. Then the sections:
+
 1. `summary.md` — what broke in ≤3 sentences + current state. **Write first,
    keep it current**; it's the tab responders read.
 2. `timeline.md` — `- **HH:MM UTC** — event` bullets from telemetry. Include

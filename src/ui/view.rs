@@ -133,7 +133,7 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     let tick = app.tick();
     let items: Vec<ListItem<'_>> = app
         .visible_rcas()
-        .map(|rca| rca_list_item(rca, tick))
+        .map(|rca| rca_list_item(rca, tick, app.has_unread(&rca.id)))
         .collect();
     let list = List::new(items).block(block).highlight_style(
         Style::default()
@@ -148,7 +148,7 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, area, &mut state);
 }
 
-fn rca_list_item(rca: &RcaSummary, tick: usize) -> ListItem<'static> {
+fn rca_list_item(rca: &RcaSummary, tick: usize, has_unread: bool) -> ListItem<'static> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
     let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
     let title = Line::from(vec![
@@ -156,15 +156,18 @@ fn rca_list_item(rca: &RcaSummary, tick: usize) -> ListItem<'static> {
         Span::raw(" "),
         Span::raw(truncate(&rca.meta.title, SIDEBAR_WIDTH as usize - 10)),
     ]);
-    let detail = Line::from(vec![
+    let mut detail_spans = vec![
         Span::styled(format!("  {symbol} "), symbol_style),
         Span::styled(rca.meta.status.to_string(), symbol_style),
         Span::styled(
             format!("  {}", truncate(rca.id.as_str(), 20)),
             Style::default().fg(Color::DarkGray),
         ),
-    ]);
-    ListItem::new(vec![title, detail])
+    ];
+    if has_unread {
+        detail_spans.push(Span::styled(" ●", Style::default().fg(Color::LightYellow)));
+    }
+    ListItem::new(vec![title, Line::from(detail_spans)])
 }
 
 fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -189,7 +192,11 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
         .unwrap_or(2)
         .min(6);
 
-    let tab_lines = flow_tabs(app.tab(), head_width);
+    let unread: Vec<bool> = Tab::ALL
+        .iter()
+        .map(|tab| app.is_unread(&rca.id, *tab))
+        .collect();
+    let tab_lines = flow_tabs(app.tab(), head_width, &unread);
     let tab_height = u16::try_from(tab_lines.len()).unwrap_or(1);
 
     let banner_height = if banner_cols > 0 {
@@ -215,21 +222,28 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
     draw_content(frame, app, body);
 }
 
-/// Lays the seven tab labels out left to right, flowing onto additional
-/// lines when the width runs out — never truncating a label.
-fn flow_tabs(selected: Tab, width: u16) -> Vec<Line<'static>> {
+/// Lays the eight tab labels out left to right, flowing onto additional
+/// lines when the width runs out — never truncating a label. `unread[i]`
+/// marks tab `i` with a dot: its file changed on disk since last viewed.
+fn flow_tabs(selected: Tab, width: u16, unread: &[bool]) -> Vec<Line<'static>> {
     let width = usize::from(width.max(1));
     let mut lines = Vec::new();
     let mut spans: Vec<Span<'static>> = Vec::new();
     let mut used = 0usize;
 
     for (i, tab) in Tab::ALL.iter().enumerate() {
-        let label = format!(" {} {} ", i + 1, tab.title());
+        let is_unread = unread.get(i).copied().unwrap_or(false);
+        let dot = if is_unread { "●" } else { "" };
+        let label = format!(" {} {}{dot} ", i + 1, tab.title());
         let label_width = label.chars().count();
         let style = if *tab == selected {
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD)
+        } else if is_unread {
+            // Changed since last viewed: brighter than the idle gray so the
+            // dot has somewhere to point.
+            Style::default().fg(Color::LightYellow)
         } else {
             Style::default().fg(Color::DarkGray)
         };
@@ -264,13 +278,25 @@ fn header_paragraph(rca: &RcaSummary, tick: usize) -> Paragraph<'static> {
         ))
         .unwrap_or_else(|_| rca.meta.created.to_string());
 
-    let mut meta_spans = vec![
-        Span::styled(format!("{symbol} {}", rca.meta.status), symbol_style),
+    let mut meta_spans = vec![Span::styled(
+        format!("{symbol} {}", rca.meta.status),
+        symbol_style,
+    )];
+    if rca.meta.status == Status::Investigating {
+        // Ticking "how long has this been open" — the redraw cadence that
+        // drives the spinner keeps this current too.
+        let elapsed = elapsed_label(rca.meta.created, time::OffsetDateTime::now_utc());
+        meta_spans.push(Span::styled(
+            format!(" · {elapsed}"),
+            Style::default().fg(Color::Gray),
+        ));
+    }
+    meta_spans.extend([
         Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
         Span::styled(format!(" {badge} "), badge_style),
         Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("opened {opened}"), Style::default().fg(Color::Gray)),
-    ];
+    ]);
     if !rca.meta.systems.is_empty() {
         meta_spans.push(Span::styled("  ·  ", Style::default().fg(Color::DarkGray)));
         meta_spans.push(Span::styled(
@@ -366,6 +392,18 @@ fn draw_welcome(frame: &mut Frame, area: Rect) {
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
+/// Human elapsed time since `from`: `3m`, `1h 05m`, `2d 4h`.
+fn elapsed_label(from: time::OffsetDateTime, now: time::OffsetDateTime) -> String {
+    let minutes = (now - from).whole_minutes().max(0);
+    if minutes < 60 {
+        format!("{minutes}m")
+    } else if minutes < 24 * 60 {
+        format!("{}h {:02}m", minutes / 60, minutes % 60)
+    } else {
+        format!("{}d {}h", minutes / (24 * 60), (minutes % (24 * 60)) / 60)
+    }
+}
+
 fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     if app.search_active() {
         let line = Line::from(vec![
@@ -402,11 +440,17 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 "  j/k select · enter open · ←/→ tabs · / filter · T toolbox · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
-                "  j/k scroll · ←/→ tabs · h/l pan · c copy · b back · ? help · Q quit"
+                "  j/k scroll · ←/→ tabs · h/l pan · f follow · c copy · b back · ? help · Q quit"
             }
         },
         Style::default().fg(Color::DarkGray),
     )];
+    if app.follow() {
+        spans.push(Span::styled(
+            "  ·  following",
+            Style::default().fg(Color::LightYellow),
+        ));
+    }
     if !app.warnings().is_empty() {
         spans.push(Span::styled(
             format!(
@@ -422,7 +466,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_help(frame: &mut Frame, area: Rect) {
     let width = 62.min(area.width.saturating_sub(4));
-    let height = 19.min(area.height.saturating_sub(2));
+    let height = 20.min(area.height.saturating_sub(2));
     let popup = center(area, width, height);
 
     let rows = [
@@ -430,7 +474,8 @@ fn draw_help(frame: &mut Frame, area: Rect) {
         ("enter / l", "focus the content pane"),
         ("b / esc", "back to the incident list"),
         ("tab / [ / ], ← / →", "cycle tabs"),
-        ("1–7", "jump to a tab"),
+        ("1–8", "jump to a tab"),
+        ("f", "follow: reloads stick to the bottom (tail -f)"),
         ("/", "fuzzy-filter incidents (esc clears)"),
         ("c / C", "copy this tab / whole RCA to clipboard"),
         (
@@ -589,13 +634,13 @@ mod tests {
 
     #[test]
     fn tabs_fit_on_one_line_when_wide() {
-        let lines = flow_tabs(Tab::Summary, 200);
+        let lines = flow_tabs(Tab::Summary, 200, &[false; 8]);
         assert_eq!(lines.len(), 1);
     }
 
     #[test]
     fn tabs_flow_to_more_lines_when_narrow_and_keep_every_label() {
-        let lines = flow_tabs(Tab::Notes, 40);
+        let lines = flow_tabs(Tab::Notes, 40, &[false; 8]);
         assert!(lines.len() > 1, "40 cols cannot fit all seven tabs");
         let all: String = rendered(&lines).join("");
         for (i, tab) in Tab::ALL.iter().enumerate() {
@@ -606,7 +651,7 @@ mod tests {
 
     #[test]
     fn tabs_survive_absurdly_narrow_width() {
-        let lines = flow_tabs(Tab::Summary, 1);
+        let lines = flow_tabs(Tab::Summary, 1, &[false; 8]);
         assert_eq!(lines.len(), Tab::ALL.len(), "one label per line");
     }
 
@@ -708,9 +753,39 @@ mod tests {
     }
 
     #[test]
+    fn unread_tabs_get_a_dot() {
+        let mut unread = [false; 8];
+        unread[7] = true; // Log
+        let lines = flow_tabs(Tab::Summary, 200, &unread);
+        let all: String = rendered(&lines).join("");
+        assert!(all.contains(" 8 Log● "), "dot on the unread tab: {all}");
+        assert!(!all.contains("Summary●"), "read tabs stay plain");
+    }
+
+    #[test]
+    fn elapsed_label_formats_minutes_hours_days() {
+        use time::OffsetDateTime;
+        let base = OffsetDateTime::from_unix_timestamp(1_780_000_000).expect("ts");
+        let mins = |m: i64| base + time::Duration::minutes(m);
+        assert_eq!(elapsed_label(base, mins(0)), "0m");
+        assert_eq!(elapsed_label(base, mins(23)), "23m");
+        assert_eq!(elapsed_label(base, mins(65)), "1h 05m");
+        assert_eq!(elapsed_label(base, mins(26 * 60 + 30)), "1d 2h");
+        assert_eq!(
+            elapsed_label(mins(10), base),
+            "0m",
+            "clock skew clamps to 0"
+        );
+    }
+
+    #[test]
     fn no_line_exceeds_the_given_width_when_labels_fit() {
         let width: usize = 30;
-        let lines = flow_tabs(Tab::Impact, u16::try_from(width).expect("fits"));
+        let lines = flow_tabs(
+            Tab::Impact,
+            u16::try_from(width).expect("fits"),
+            &[false; 8],
+        );
         for line in rendered(&lines) {
             assert!(
                 line.chars().count() <= width,

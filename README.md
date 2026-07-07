@@ -32,10 +32,13 @@ the TUI is how it explains itself.
 3. You keep `beagle` open in a terminal. It **watches the filesystem** and
    re-renders live as the investigation is written — no refresh needed.
 
-Every RCA gets seven tabs: **Summary · Timeline · Root Cause · Impact · Fix ·
-Diagrams · Notes**. Workspaces in `investigating` status show a live spinner
-in the sidebar and header — flip one with
-`beagle status <slug> investigating` and watch it start turning.
+Every RCA gets eight tabs: **Summary · Timeline · Root Cause · Impact · Fix ·
+Diagrams · Notes · Log**. The Log tab is the live investigation stream — the
+agent appends a timestamped line at every step (`beagle log <slug> "..."`),
+and `f` (follow mode) keeps the tab pinned to the newest line, tail-f style.
+Tabs whose files changed since you last looked get a `●` marker, workspaces
+in `investigating` status show a live spinner with ticking elapsed time, and
+new workspaces announce themselves in the status bar as agents scaffold them.
 
 ## Install & run
 
@@ -62,6 +65,7 @@ beagle list               # print workspaces to stdout
 beagle list --status investigating --severity high       # filtered
 beagle new <slug> --title "..." [--severity high] [--system payments-api]...
 beagle status <slug> investigating   # flip status; a running TUI updates live
+beagle log <slug> "checking redis pool"  # append to the live Log tab
 beagle export <slug>      # one markdown file → exports/<slug>.md
 beagle export <slug> --out ~/vault/incidents/<slug>.md   # e.g. an Obsidian vault
 beagle banner             # print the BEAGLE banner
@@ -109,9 +113,10 @@ marked); pick one with `j`/`k` + enter to install it. On platforms without
 prebuilt binaries, update via `cargo install` instead.
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
-`1`–`7` switch tabs · `/` fuzzy-filter incidents · `T` toolbox · `c` copy tab / `C` copy
-whole RCA (pbcopy or OSC 52) · `e` export to `exports/<slug>.md` · `n/p` cycle
-diagrams · `h/l` pan diagrams · `r` reload · `?` help · `Q` / `ctrl-c` quit.
+`1`–`8` switch tabs · `/` fuzzy-filter incidents · `T` toolbox · `f` follow
+(tail -f) · `c` copy tab / `C` copy whole RCA (pbcopy or OSC 52) · `e` export
+to `exports/<slug>.md` · `n/p` cycle diagrams · `h/l` pan diagrams · `r`
+reload · `?` help · `Q` / `ctrl-c` quit.
 
 ## Export
 
