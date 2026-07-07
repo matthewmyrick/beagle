@@ -164,6 +164,13 @@ pub struct App {
     /// Animation counter, advanced once per event-loop turn (the loop wakes
     /// at least every 250 ms). Drives the `investigating` spinner.
     tick: usize,
+    /// Rendered toolbox overlay content; `Some` while the overlay is open.
+    toolbox: Option<Text<'static>>,
+    /// Vertical scroll of the toolbox overlay.
+    toolbox_scroll: u16,
+    /// Geometry of the toolbox overlay fed back by the draw pass, for
+    /// scroll clamping: (total wrapped lines, visible height).
+    pub(crate) toolbox_viewport: (u16, u16),
     /// Set by the draw pass; used to clamp scrolling to real content height.
     pub(crate) viewport: ViewportInfo,
 }
@@ -210,6 +217,9 @@ impl App {
             status: None,
             pane: None,
             tick: 0,
+            toolbox: None,
+            toolbox_scroll: 0,
+            toolbox_viewport: (0, 0),
             viewport: ViewportInfo::default(),
         })
     }
@@ -444,6 +454,10 @@ impl App {
             self.handle_search_key(key.code);
             return Flow::Continue;
         }
+        if self.toolbox.is_some() {
+            self.handle_toolbox_key(key.code);
+            return Flow::Continue;
+        }
         if self.show_help {
             self.show_help = false;
             return Flow::Continue;
@@ -453,6 +467,7 @@ impl App {
             // by accident too easily. Ctrl-C is handled above.
             KeyCode::Char('Q') => return Flow::Quit,
             KeyCode::Char('?') => self.show_help = true,
+            KeyCode::Char('T') => self.open_toolbox(),
             KeyCode::Char('/') => self.search_active = true,
             KeyCode::Char('b') => self.focus = Focus::List,
             KeyCode::Char('c') => self.copy_current_tab(),
@@ -483,6 +498,109 @@ impl App {
             },
         }
         Flow::Continue
+    }
+
+    /// Builds and opens the toolbox overlay: the root `toolbox.md` followed
+    /// by the `systems/*.md` docs matching the selected workspace's systems
+    /// (all of them when nothing is selected or the workspace lists none).
+    fn open_toolbox(&mut self) {
+        use ratatui::style::{Color, Style};
+        use ratatui::text::Line;
+
+        let dim = Style::default().fg(Color::DarkGray);
+        let mut lines: Vec<ratatui::text::Line<'static>> = Vec::new();
+        match self.store.read_toolbox() {
+            Ok(Some(content)) => lines.extend(markdown::to_text(&content).lines),
+            Ok(None) => lines.push(Line::styled(
+                "No toolbox.md yet — run `beagle init` to scaffold the \
+                 investigation context (toolbox.md + systems/).",
+                dim,
+            )),
+            Err(e) => lines.push(Line::styled(
+                format!("toolbox load error: {e}"),
+                Style::default().fg(Color::Red),
+            )),
+        }
+
+        let docs = match self.store.list_system_docs() {
+            Ok(docs) => docs,
+            Err(e) => {
+                lines.push(Line::styled(
+                    format!("systems/ load error: {e}"),
+                    Style::default().fg(Color::Red),
+                ));
+                Vec::new()
+            }
+        };
+        let wanted: Vec<String> = self
+            .selected_rca()
+            .map(|rca| rca.meta.systems.clone())
+            .unwrap_or_default();
+        let shown = docs
+            .iter()
+            .filter(|doc| wanted.is_empty() || wanted.contains(&doc.name));
+        for doc in shown {
+            lines.push(Line::from(""));
+            lines.push(Line::styled(
+                format!("─── systems/{}.md ───", doc.name),
+                dim,
+            ));
+            lines.push(Line::from(""));
+            match self.store.read_system_doc(doc) {
+                Ok(Some(content)) => lines.extend(markdown::to_text(&content).lines),
+                Ok(None) => {}
+                Err(e) => lines.push(Line::styled(
+                    format!("load error: {e}"),
+                    Style::default().fg(Color::Red),
+                )),
+            }
+        }
+        if !wanted.is_empty() && !docs.iter().any(|d| wanted.contains(&d.name)) {
+            lines.push(Line::from(""));
+            lines.push(Line::styled(
+                format!(
+                    "(no systems/ docs for: {} — add systems/<name>.md to give \
+                     agents per-system context)",
+                    wanted.join(", ")
+                ),
+                dim,
+            ));
+        }
+
+        self.toolbox = Some(Text::from(lines));
+        self.toolbox_scroll = 0;
+    }
+
+    /// Keystrokes while the toolbox overlay is open: scroll or close.
+    fn handle_toolbox_key(&mut self, code: KeyCode) {
+        let (content_lines, height) = self.toolbox_viewport;
+        let max = content_lines.saturating_sub(height);
+        let page = height.saturating_sub(1).max(1);
+        match code {
+            KeyCode::Esc | KeyCode::Char('q' | 'T') => self.toolbox = None,
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.toolbox_scroll = self.toolbox_scroll.saturating_add(1).min(max);
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.toolbox_scroll = self.toolbox_scroll.saturating_sub(1);
+            }
+            KeyCode::Char(' ') | KeyCode::PageDown => {
+                self.toolbox_scroll = self.toolbox_scroll.saturating_add(page).min(max);
+            }
+            KeyCode::PageUp => self.toolbox_scroll = self.toolbox_scroll.saturating_sub(page),
+            KeyCode::Char('g') | KeyCode::Home => self.toolbox_scroll = 0,
+            KeyCode::Char('G') | KeyCode::End => self.toolbox_scroll = max,
+            _ => {}
+        }
+    }
+
+    /// The toolbox overlay content, when open.
+    pub(crate) fn toolbox(&self) -> Option<&Text<'static>> {
+        self.toolbox.as_ref()
+    }
+
+    pub(crate) fn toolbox_scroll(&self) -> u16 {
+        self.toolbox_scroll
     }
 
     /// Keystrokes while the `/` filter is capturing input. Plain characters
@@ -870,6 +988,55 @@ mod tests {
         press(&mut app, KeyCode::Char('6'));
         app.ensure_pane();
         assert!(matches!(app.pane(), Some(Pane::Empty(_))));
+    }
+
+    #[test]
+    fn toolbox_opens_scrolls_and_closes_without_leaking_keys() {
+        let mut app = app_with(1);
+        assert!(app.toolbox().is_none());
+        press(&mut app, KeyCode::Char('T'));
+        assert!(app.toolbox().is_some(), "T opens the overlay");
+
+        // With no toolbox.md on disk, the overlay shows the init hint.
+        let text = app.toolbox().expect("open").clone();
+        let flat: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(flat.contains("beagle init"), "hint present: {flat}");
+
+        // Keys scroll the overlay instead of the app; q closes instead of
+        // typing/quitting.
+        app.toolbox_viewport = (50, 10);
+        press(&mut app, KeyCode::Char('j'));
+        assert_eq!(app.toolbox_scroll(), 1);
+        press(&mut app, KeyCode::Char('G'));
+        assert_eq!(app.toolbox_scroll(), 40, "clamped to content bottom");
+        assert_eq!(press(&mut app, KeyCode::Char('q')), Flow::Continue);
+        assert!(app.toolbox().is_none(), "q closes the overlay");
+    }
+
+    #[test]
+    fn toolbox_renders_toolbox_md_and_matching_system_docs() {
+        let mut app = app_with(1); // workspace has no systems → all docs shown
+        let root = app.store.root().to_owned();
+        std::fs::write(root.join("toolbox.md"), "# Toolbox\n\n- grafana\n").expect("write");
+        std::fs::create_dir_all(root.join("systems")).expect("mkdir");
+        std::fs::write(root.join("systems/api.md"), "# api\n").expect("write");
+
+        press(&mut app, KeyCode::Char('T'));
+        let text = app.toolbox().expect("open").clone();
+        let flat: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(flat.contains("Toolbox"));
+        assert!(flat.contains("grafana"));
+        assert!(flat.contains("systems/api.md"), "doc separator shown");
     }
 
     #[test]

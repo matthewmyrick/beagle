@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Investigation context for agents: `toolbox.md` (available telemetry, CLIs,
+  runbooks) and `systems/<name>.md` (per-system dashboards, dependencies,
+  known failure modes) at the store root. `beagle init` scaffolds templates;
+  `T` in the TUI shows the toolbox plus the systems docs matching the
+  selected incident.
+
+### Changed
+
+- The Claude Code skill is now `/beagle` (was `/rca`) and instructs agents
+  to read the toolbox/systems context before investigating and to keep it
+  updated.
+
 ## [0.2.0] - 2026-07-07
 
 The first published release — v0.1.0 was tagged in `Cargo.toml` only and

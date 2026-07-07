@@ -33,6 +33,8 @@ USAGE:
                                             (investigating|identified|monitoring|resolved)
     beagle export <id> [--out <file>]     export one RCA as a single markdown
                   [--root <dir>]            document (default: exports/<id>.md)
+    beagle init [--root <dir>]            scaffold toolbox.md + systems/ agent
+                                            context templates at the root
     beagle config                         edit the config file and validate it
     beagle update [--version <ver>]       install the latest release, or move
                                             to <ver> (upgrade or downgrade)
@@ -74,6 +76,9 @@ enum Command {
         root: Option<PathBuf>,
         id: RcaId,
         out: Option<PathBuf>,
+    },
+    Init {
+        root: Option<PathBuf>,
     },
     Config,
     Update {
@@ -163,6 +168,19 @@ fn run(command: Command) -> Result<(), Error> {
             let store = Store::open(&effective_root(root)?)?;
             store.set_status(&id, status)?;
             println!("{id}: status → {status}");
+            Ok(())
+        }
+        Command::Init { root } => {
+            let store = Store::open(&effective_root(root)?)?;
+            let created = store.init_context()?;
+            if created.is_empty() {
+                println!("toolbox.md and systems/ already present; nothing created");
+            } else {
+                for path in created {
+                    println!("created {}", path.display());
+                }
+                println!("fill these in — agents read them before every investigation (T shows them in the TUI)");
+            }
             Ok(())
         }
         Command::Config => run_config(),
@@ -342,6 +360,10 @@ fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String> {
         Some("status") => parse_status(&mut args, root),
         Some("export") => parse_export(&mut args, root),
         Some("new") => parse_new(&mut args, root),
+        Some("init") => {
+            parse_common_flags(&mut args, &mut root)?;
+            Ok(Command::Init { root })
+        }
         Some("config") => no_arguments(&mut args, "config", Command::Config),
         Some("update") => parse_update(&mut args),
         Some("version") => match args.next().as_deref() {
@@ -641,6 +663,16 @@ mod tests {
     fn config_parses_and_rejects_arguments() {
         assert!(matches!(parse(&["config"]), Ok(Command::Config)));
         assert!(parse(&["config", "extra"]).is_err());
+    }
+
+    #[test]
+    fn init_parses_with_optional_root() {
+        assert!(matches!(parse(&["init"]), Ok(Command::Init { root: None })));
+        assert!(matches!(
+            parse(&["init", "--root", "/x"]),
+            Ok(Command::Init { root: Some(_) })
+        ));
+        assert!(parse(&["init", "--frob"]).is_err());
     }
 
     #[test]
