@@ -1,0 +1,32 @@
+FAILURE PATH — one env var, keys that never match
+==================================================
+
+  ┌────────────────────────── SendGrid ──────────────────────────┐
+  │                                                              │
+  │  webhook config A                    webhook config B        │
+  │  "magic link bounce"                 "email delivery"        │
+  │  signs with keypair A ──┐            signs with keypair B ─┐ │
+  └─────────────────────────┼──────────────────────────────────┼─┘
+                            │ POST (signed A)                  │ POST (signed B)
+                            ▼                                  ▼
+  ┌──────────────────────────────── hadrius-backend ──────────────────────────────┐
+  │                                                                               │
+  │   /webhook/magic_link_bounce/            /webhook/email_delivery/             │
+  │            │                                       │                          │
+  │            └──────────────┬────────────────────────┘                          │
+  │                           ▼                                                   │
+  │            verify_webhook_signature()                                         │
+  │            SENDGRID_WEBHOOK_VERIFICATION_KEY  ◀── [1;31mBUG: one key, matches[0m       │
+  │                           │                       [1;31mneither keypair A nor B[0m     │
+  │                           ▼                                                   │
+  │                 [1;31mECDSA verify: FAIL (100%)[0m                                     │
+  │                           │                                                   │
+  │                           ▼                                                   │
+  │                      [31mHTTP 403[0m ──────▶ SendGrid retries ≤24h, then [1;31mDROPS[0m       │
+  └───────────────────────────────────────────────────────────────────────────────┘
+
+  since 2026-03-18 (bounce): 129,558 rejected     since ~2026-06-30 (delivery): 138,990 rejected
+
+  What never happens downstream:
+    OutboundEmail:   SENT ──[31m✗[0m──▶ delivered / opened / bounced (+ reason)
+    OAuthMagicLink:  SENT ──[31m✗[0m──▶ BOUNCED   (bad-address users never flagged)

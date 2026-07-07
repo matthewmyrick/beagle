@@ -1,0 +1,22 @@
+FIX — per-endpoint keys + fail closed + alert
+==============================================
+
+  [1;31mBEFORE (incident)[0m                        [1;32mAFTER[0m
+  [31m─────────────────[0m                        [32m─────[0m
+
+  one env var                              SENDGRID_BOUNCE_WEBHOOK_KEY   = key A
+  SENDGRID_WEBHOOK_VERIFICATION_KEY        SENDGRID_DELIVERY_WEBHOOK_KEY = key B
+        │                                        │
+        ├─ matches neither config               ├─ each endpoint verifies against
+        │  → [31m403 everything, forever[0m            │  its own config's public key
+        │                                        │
+  empty key → verification [1;31mSKIPPED[0m         empty key in production → [1;32mREFUSE BOOT[0m
+  (staging silently "works")               (staging must carry a real key,
+        │                                   so verification is exercised pre-prod)
+        ▼                                        ▼
+  [31mfailures invisible for 3.5 months[0m        alert: signature failures >10/min
+  no alert, Sentry noise only              for 15 min → [32mpage[0m
+
+  Backfill: SendGrid Email Activity API (~30d retention)
+    → reconcile OutboundEmail stuck at SENT
+    → sweep OAuthMagicLink SENT+PENDING for missed bounces

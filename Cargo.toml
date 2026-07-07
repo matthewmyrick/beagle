@@ -1,0 +1,36 @@
+[package]
+name = "beagle"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.79"
+description = "A TUI for root-cause analysis workspaces: notes, timelines, and diagrams that explain what broke, why, and how to fix it."
+license = "MIT"
+repository = "https://github.com/matthewmyrick/telemetry"
+
+[dependencies]
+crossterm = "0.28"
+notify = "7"
+ratatui = { version = "0.29", features = ["unstable-rendered-line-info"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+time = { version = "0.3", features = ["formatting", "macros", "parsing", "serde-well-known"] }
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
