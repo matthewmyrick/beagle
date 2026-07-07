@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Pressing `T` with no toolbox scaffolds it on the spot (same as `beagle
+  init`) and shows the fresh templates — no round-trip to the CLI.
 - Investigation context for agents: `toolbox.md` (available telemetry, CLIs,
   runbooks) and `systems/<name>.md` (per-system dashboards, dependencies,
   known failure modes) at the store root. `beagle init` scaffolds templates;
