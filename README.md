@@ -40,14 +40,14 @@ Diagrams · Notes**.
 From a release binary (macOS arm64/x86_64, Linux x86_64 — static musl):
 
 ```sh
-curl -fsSL https://github.com/matthewmyrick/telemetry/releases/latest/download/beagle-aarch64-apple-darwin.tar.gz \
+curl -fsSL https://github.com/matthewmyrick/beagle/releases/latest/download/beagle-aarch64-apple-darwin.tar.gz \
   | tar xz && mv beagle-*/beagle /usr/local/bin/
 ```
 
 Or with cargo:
 
 ```sh
-cargo install --git https://github.com/matthewmyrick/telemetry   # from GitHub
+cargo install --git https://github.com/matthewmyrick/beagle   # from GitHub
 cargo install --path .                                           # from a checkout
 ```
 

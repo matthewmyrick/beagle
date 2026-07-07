@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.79"
 description = "A TUI for root-cause analysis workspaces: notes, timelines, and diagrams that explain what broke, why, and how to fix it."
 license = "MIT"
-repository = "https://github.com/matthewmyrick/telemetry"
+repository = "https://github.com/matthewmyrick/beagle"
 
 [dependencies]
 crossterm = "0.28"
