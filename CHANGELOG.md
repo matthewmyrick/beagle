@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-07
+
+The first published release — v0.1.0 was tagged in `Cargo.toml` only and
+never had binaries built, so this is the earliest version `beagle update`
+can install.
+
 ### Added
 
 - Animated spinner for `investigating` workspaces in the sidebar and header,
@@ -52,5 +58,6 @@ Initial release.
   every exit path.
 - `/rca` Claude Code skill documenting the authoring workflow.
 
-[Unreleased]: https://github.com/matthewmyrick/beagle/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/matthewmyrick/beagle/releases/tag/v0.1.0
+[Unreleased]: https://github.com/matthewmyrick/beagle/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/matthewmyrick/beagle/releases/tag/v0.2.0
+[0.1.0]: https://github.com/matthewmyrick/beagle/commit/fceb9d4
