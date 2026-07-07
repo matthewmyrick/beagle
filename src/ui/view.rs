@@ -20,20 +20,68 @@ use super::{App, Focus, Pane, Tab};
 
 const SIDEBAR_WIDTH: u16 = 34;
 
+/// Spinner frames for [`Status::Investigating`], advanced by the app tick.
+/// Braille dots: distinct at 4 fps and exactly one cell wide, so the sidebar
+/// and header never shift as it animates.
+const INVESTIGATING_FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
 pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     let [main, status_bar] = vertical(frame.area(), &[Constraint::Min(0), Constraint::Length(1)]);
-    let [sidebar, content] = horizontal(
+    let [sidebar, right] = horizontal(
         main,
         &[Constraint::Length(SIDEBAR_WIDTH), Constraint::Min(0)],
     );
+    let banner_height = banner_height(right);
+    let [banner, content] = vertical(
+        right,
+        &[Constraint::Length(banner_height), Constraint::Min(0)],
+    );
 
     draw_sidebar(frame, app, sidebar);
+    if banner_height > 0 {
+        draw_banner(frame, banner);
+    }
     draw_workspace(frame, app, content);
     draw_status_bar(frame, app, status_bar);
 
     if app.help_visible() {
         draw_help(frame, frame.area());
     }
+}
+
+/// Height of the top-right banner strip: the art plus a version line, or 0
+/// when the pane is too small for it to render without wrapping or crowding
+/// out the content.
+fn banner_height(area: Rect) -> u16 {
+    let fits = area.width >= crate::banner::WIDTH + 2 && area.height >= 24;
+    if fits {
+        crate::banner::HEIGHT + 1
+    } else {
+        0
+    }
+}
+
+fn draw_banner(frame: &mut Frame, area: Rect) {
+    let mut lines: Vec<Line<'static>> = crate::banner::BANNER
+        .lines()
+        .map(|l| {
+            Line::styled(
+                l.to_owned(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+        })
+        .collect();
+    lines.push(Line::styled(
+        format!(
+            "v{} · what broke, why, and the fix ",
+            env!("CARGO_PKG_VERSION")
+        ),
+        Style::default().fg(Color::DarkGray),
+    ));
+    let paragraph = Paragraph::new(lines).alignment(Alignment::Right);
+    frame.render_widget(paragraph, inset_right(area, 1));
 }
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
@@ -50,7 +98,11 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     };
     let block = pane_block(title, focused);
 
-    let items: Vec<ListItem<'_>> = app.visible_rcas().map(rca_list_item).collect();
+    let tick = app.tick();
+    let items: Vec<ListItem<'_>> = app
+        .visible_rcas()
+        .map(|rca| rca_list_item(rca, tick))
+        .collect();
     let list = List::new(items).block(block).highlight_style(
         Style::default()
             .bg(Color::Rgb(40, 44, 60))
@@ -64,9 +116,9 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, area, &mut state);
 }
 
-fn rca_list_item(rca: &RcaSummary) -> ListItem<'static> {
+fn rca_list_item(rca: &RcaSummary, tick: usize) -> ListItem<'static> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
-    let (symbol, symbol_style) = status_symbol(rca.meta.status);
+    let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
     let title = Line::from(vec![
         Span::styled(format!(" {badge} "), badge_style),
         Span::raw(" "),
@@ -92,7 +144,7 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
     // Header and tab bar heights are computed from the actual width so
     // nothing is ever cut off on narrow terminals — both flow onto extra
     // lines instead of truncating.
-    let header = header_paragraph(&rca);
+    let header = header_paragraph(&rca, app.tick());
     let header_width = area.width.saturating_sub(1).max(1); // inset by 1 below
     let header_height = u16::try_from(header.line_count(header_width))
         .unwrap_or(2)
@@ -153,9 +205,9 @@ fn flow_tabs(selected: Tab, width: u16) -> Vec<Line<'static>> {
     lines
 }
 
-fn header_paragraph(rca: &RcaSummary) -> Paragraph<'static> {
+fn header_paragraph(rca: &RcaSummary, tick: usize) -> Paragraph<'static> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
-    let (symbol, symbol_style) = status_symbol(rca.meta.status);
+    let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
 
     let opened = rca
         .meta
@@ -406,9 +458,15 @@ fn severity_badge(severity: Severity) -> (&'static str, Style) {
     }
 }
 
-fn status_symbol(status: Status) -> (&'static str, Style) {
+/// The one-cell status marker. `investigating` animates — a live spinner is
+/// the "we're on it" signal — driven by `tick`; every other status is a
+/// fixed glyph, so `tick` is ignored for them.
+fn status_symbol(status: Status, tick: usize) -> (&'static str, Style) {
     match status {
-        Status::Investigating => ("●", Style::default().fg(Color::LightRed)),
+        Status::Investigating => (
+            INVESTIGATING_FRAMES[tick % INVESTIGATING_FRAMES.len()],
+            Style::default().fg(Color::LightRed),
+        ),
         Status::Identified => ("◐", Style::default().fg(Color::Yellow)),
         Status::Monitoring => ("◒", Style::default().fg(Color::LightBlue)),
         Status::Resolved => ("✔", Style::default().fg(Color::Green)),
@@ -459,6 +517,13 @@ fn inset(area: Rect, left: u16) -> Rect {
     }
 }
 
+fn inset_right(area: Rect, right: u16) -> Rect {
+    Rect {
+        width: area.width.saturating_sub(right),
+        ..area
+    }
+}
+
 fn center(area: Rect, width: u16, height: u16) -> Rect {
     Rect {
         x: area.x + area.width.saturating_sub(width) / 2,
@@ -502,6 +567,38 @@ mod tests {
     fn tabs_survive_absurdly_narrow_width() {
         let lines = flow_tabs(Tab::Summary, 1);
         assert_eq!(lines.len(), Tab::ALL.len(), "one label per line");
+    }
+
+    #[test]
+    fn investigating_symbol_animates_and_others_stay_fixed() {
+        let (frame0, _) = status_symbol(Status::Investigating, 0);
+        let (frame1, _) = status_symbol(Status::Investigating, 1);
+        assert_ne!(frame0, frame1, "investigating must animate");
+        let (wrapped, _) = status_symbol(Status::Investigating, INVESTIGATING_FRAMES.len());
+        assert_eq!(wrapped, frame0, "frames cycle");
+
+        for status in [Status::Identified, Status::Monitoring, Status::Resolved] {
+            let (a, _) = status_symbol(status, 0);
+            let (b, _) = status_symbol(status, 7);
+            assert_eq!(a, b, "{status} must not animate");
+        }
+    }
+
+    #[test]
+    fn every_spinner_frame_is_one_cell_wide() {
+        for frame in INVESTIGATING_FRAMES {
+            assert_eq!(frame.chars().count(), 1, "frame `{frame}` shifts layout");
+        }
+    }
+
+    #[test]
+    fn banner_shows_only_when_the_pane_is_big_enough() {
+        let big = Rect::new(0, 0, 80, 40);
+        assert_eq!(banner_height(big), crate::banner::HEIGHT + 1);
+        let narrow = Rect::new(0, 0, crate::banner::WIDTH + 1, 40);
+        assert_eq!(banner_height(narrow), 0, "too narrow: banner would wrap");
+        let short = Rect::new(0, 0, 80, 20);
+        assert_eq!(banner_height(short), 0, "too short: content comes first");
     }
 
     #[test]

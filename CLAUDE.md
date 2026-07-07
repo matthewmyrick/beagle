@@ -26,7 +26,8 @@ One workspace per debugged system/incident — it is the whole debug flow's home
 
 Write these files under `rcas/<slug>/` as the investigation progresses — don't
 wait until the end; the user watches live. Update `status` in `rca.toml` as you
-go: `investigating → identified → monitoring → resolved`.
+go: `investigating → identified → monitoring → resolved` — the easy way is
+`beagle status <slug> <status>`, which stamps `updated` for you.
 
 | File | Tab | What belongs there |
 |---|---|---|

@@ -161,6 +161,9 @@ pub struct App {
     status: Option<String>,
     /// Content cache for the current (workspace, tab, diagram) triple.
     pane: Option<(PaneKey, Pane)>,
+    /// Animation counter, advanced once per event-loop turn (the loop wakes
+    /// at least every 250 ms). Drives the `investigating` spinner.
+    tick: usize,
     /// Set by the draw pass; used to clamp scrolling to real content height.
     pub(crate) viewport: ViewportInfo,
 }
@@ -206,6 +209,7 @@ impl App {
             show_help: false,
             status: None,
             pane: None,
+            tick: 0,
             viewport: ViewportInfo::default(),
         })
     }
@@ -235,6 +239,10 @@ impl App {
                 self.status = Some("reloaded (files changed on disk)".to_owned());
             }
             self.ensure_pane();
+            // The loop turns at least every 250 ms (the poll timeout below),
+            // so bumping the counter here animates the investigating spinner
+            // at ~4 fps without any extra wakeups.
+            self.tick = self.tick.wrapping_add(1);
             terminal.draw(|frame| view::draw(frame, &mut self))?;
 
             if event::poll(Duration::from_millis(250))? {
@@ -421,6 +429,10 @@ impl App {
 
     pub(crate) fn status_line(&self) -> Option<&str> {
         self.status.as_deref()
+    }
+
+    pub(crate) fn tick(&self) -> usize {
+        self.tick
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> Flow {

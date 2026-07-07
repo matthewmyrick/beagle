@@ -15,6 +15,7 @@
 //! ```
 
 pub mod ansi;
+pub mod banner;
 pub mod clipboard;
 pub mod error;
 pub mod fuzzy;

@@ -33,7 +33,9 @@ the TUI is how it explains itself.
    re-renders live as the investigation is written — no refresh needed.
 
 Every RCA gets seven tabs: **Summary · Timeline · Root Cause · Impact · Fix ·
-Diagrams · Notes**.
+Diagrams · Notes**. Workspaces in `investigating` status show a live spinner
+in the sidebar and header — flip one with
+`beagle status <slug> investigating` and watch it start turning.
 
 ## Install & run
 
@@ -57,9 +59,12 @@ Then:
 beagle                    # open the TUI against ./rcas
 beagle --root ~/oncall    # or point it anywhere
 beagle list               # print workspaces to stdout
+beagle list --status investigating --severity high       # filtered
 beagle new <slug> --title "..." [--severity high] [--system payments-api]...
+beagle status <slug> investigating   # flip status; a running TUI updates live
 beagle export <slug>      # one markdown file → exports/<slug>.md
 beagle export <slug> --out ~/vault/incidents/<slug>.md   # e.g. an Obsidian vault
+beagle banner             # print the BEAGLE banner
 ```
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /

@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Animated spinner for `investigating` workspaces in the sidebar and header,
+  driven by the existing 250 ms event-loop wakeup (no extra redraws).
+- BEAGLE ASCII banner at the top right of the TUI (hidden automatically on
+  small terminals) and a `beagle banner` command that prints the same art.
+- `beagle status <id> <status>` to set a workspace's status from the CLI;
+  a running TUI picks the change up live via the filesystem watcher.
+- `beagle list --status <status> --severity <sev>` filters.
+
 ## [0.1.0] - 2026-07-07
 
 Initial release.

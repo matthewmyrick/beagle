@@ -5,7 +5,7 @@ use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use beagle::model::{RcaId, Severity};
+use beagle::model::{RcaId, Severity, Status};
 use beagle::store::{new_meta, Store};
 use beagle::ui;
 
@@ -18,9 +18,15 @@ USAGE:
                   [--severity <sev>]           critical|high|medium|low|info (default: medium)
                   [--system <name>]...         systems involved (repeatable)
                   [--root <dir>]
-    beagle list [--root <dir>]            print workspaces to stdout
+    beagle list [--status <status>]       print workspaces to stdout,
+                  [--severity <sev>]           optionally filtered
+                  [--root <dir>]
+    beagle status <id> <status>           set a workspace's status; a running
+                  [--root <dir>]            TUI picks the change up live
+                                            (investigating|identified|monitoring|resolved)
     beagle export <id> [--out <file>]     export one RCA as a single markdown
                   [--root <dir>]            document (default: exports/<id>.md)
+    beagle banner                         print the BEAGLE banner
     beagle --help | --version
 
 The <id> is a lowercase slug ([a-z0-9-], max 64 chars) and becomes the
@@ -42,12 +48,20 @@ enum Command {
     },
     List {
         root: PathBuf,
+        status: Option<Status>,
+        severity: Option<Severity>,
+    },
+    SetStatus {
+        root: PathBuf,
+        id: RcaId,
+        status: Status,
     },
     Export {
         root: PathBuf,
         id: RcaId,
         out: Option<PathBuf>,
     },
+    Banner,
     Help,
     Version,
 }
@@ -100,10 +114,18 @@ fn run(command: Command) -> Result<(), beagle::Error> {
             println!("{}", path.display());
             Ok(())
         }
-        Command::List { root } => {
+        Command::List {
+            root,
+            status,
+            severity,
+        } => {
             let store = Store::open(&root)?;
             let (summaries, warnings) = store.list()?;
-            for rca in &summaries {
+            for rca in summaries
+                .iter()
+                .filter(|rca| status.map_or(true, |s| rca.meta.status == s))
+                .filter(|rca| severity.map_or(true, |s| rca.meta.severity == s))
+            {
                 println!(
                     "{:<10} {:<14} {:<30} {}",
                     rca.meta.severity, rca.meta.status, rca.id, rca.meta.title,
@@ -112,6 +134,20 @@ fn run(command: Command) -> Result<(), beagle::Error> {
             for warning in &warnings {
                 eprintln!("warning: {}", warning.0);
             }
+            Ok(())
+        }
+        Command::SetStatus { root, id, status } => {
+            let store = Store::open(&root)?;
+            store.set_status(&id, status)?;
+            println!("{id}: status → {status}");
+            Ok(())
+        }
+        Command::Banner => {
+            println!(
+                "{}\nbeagle {} — a TUI for root-cause analysis workspaces",
+                beagle::banner::BANNER,
+                env!("CARGO_PKG_VERSION"),
+            );
             Ok(())
         }
     }
@@ -140,65 +176,125 @@ fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String> {
                 root: resolve_root(root)?,
             })
         }
-        Some("list") => {
-            parse_common_flags(&mut args, &mut root)?;
-            Ok(Command::List {
-                root: resolve_root(root)?,
-            })
-        }
-        Some("export") => {
-            let id_raw = args
-                .next()
-                .filter(|a| !a.starts_with('-'))
-                .ok_or("`export` requires an <id> slug as its first argument")?;
-            let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
-            let mut out: Option<PathBuf> = None;
-            while let Some(flag) = args.next() {
-                match flag.as_str() {
-                    "--out" => out = Some(PathBuf::from(take_value(&mut args, "--out")?)),
-                    "--root" => root = Some(PathBuf::from(take_value(&mut args, "--root")?)),
-                    other => return Err(format!("unknown flag `{other}` for `export`")),
-                }
+        Some("list") => parse_list(&mut args, root),
+        Some("status") => parse_status(&mut args, root),
+        Some("export") => parse_export(&mut args, root),
+        Some("new") => parse_new(&mut args, root),
+        Some("banner") => {
+            if let Some(extra) = args.next() {
+                return Err(format!("`banner` takes no arguments (got `{extra}`)"));
             }
-            Ok(Command::Export {
-                root: resolve_root(root)?,
-                id,
-                out,
-            })
-        }
-        Some("new") => {
-            let id_raw = args
-                .next()
-                .filter(|a| !a.starts_with('-'))
-                .ok_or("`new` requires an <id> slug as its first argument")?;
-            let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
-
-            let mut title: Option<String> = None;
-            let mut severity = Severity::Medium;
-            let mut systems = Vec::new();
-            while let Some(flag) = args.next() {
-                match flag.as_str() {
-                    "--title" => title = Some(take_value(&mut args, "--title")?),
-                    "--severity" => severity = take_value(&mut args, "--severity")?.parse()?,
-                    "--system" => systems.push(take_value(&mut args, "--system")?),
-                    "--root" => root = Some(PathBuf::from(take_value(&mut args, "--root")?)),
-                    other => return Err(format!("unknown flag `{other}` for `new`")),
-                }
-            }
-            let title = title.ok_or("`new` requires --title")?;
-            if title.trim().is_empty() {
-                return Err("--title must not be empty".to_owned());
-            }
-            Ok(Command::New {
-                root: resolve_root(root)?,
-                id,
-                title,
-                severity,
-                systems,
-            })
+            Ok(Command::Banner)
         }
         Some(other) => Err(format!("unknown command `{other}`")),
     }
+}
+
+fn parse_list(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let mut status: Option<Status> = None;
+    let mut severity: Option<Severity> = None;
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--status" => status = Some(take_value(args, "--status")?.parse()?),
+            "--severity" => severity = Some(take_value(args, "--severity")?.parse()?),
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `list`")),
+        }
+    }
+    Ok(Command::List {
+        root: resolve_root(root)?,
+        status,
+        severity,
+    })
+}
+
+fn parse_status(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`status` requires an <id> slug as its first argument")?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+    let status: Status = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`status` requires a <status> as its second argument")?
+        .parse()?;
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `status`")),
+        }
+    }
+    Ok(Command::SetStatus {
+        root: resolve_root(root)?,
+        id,
+        status,
+    })
+}
+
+fn parse_export(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`export` requires an <id> slug as its first argument")?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+    let mut out: Option<PathBuf> = None;
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--out" => out = Some(PathBuf::from(take_value(args, "--out")?)),
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `export`")),
+        }
+    }
+    Ok(Command::Export {
+        root: resolve_root(root)?,
+        id,
+        out,
+    })
+}
+
+fn parse_new(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`new` requires an <id> slug as its first argument")?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+
+    let mut title: Option<String> = None;
+    let mut severity = Severity::Medium;
+    let mut systems = Vec::new();
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--title" => title = Some(take_value(args, "--title")?),
+            "--severity" => severity = take_value(args, "--severity")?.parse()?,
+            "--system" => systems.push(take_value(args, "--system")?),
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `new`")),
+        }
+    }
+    let title = title.ok_or("`new` requires --title")?;
+    if title.trim().is_empty() {
+        return Err("--title must not be empty".to_owned());
+    }
+    Ok(Command::New {
+        root: resolve_root(root)?,
+        id,
+        title,
+        severity,
+        systems,
+    })
 }
 
 fn parse_common_flags(
@@ -316,5 +412,51 @@ mod tests {
     fn unknown_flags_and_commands_are_rejected() {
         assert!(parse(&["--frobnicate"]).is_err());
         assert!(parse(&["destroy"]).is_err());
+    }
+
+    #[test]
+    fn list_parses_filters() {
+        match parse(&["list", "--status", "investigating", "--severity", "high"]) {
+            Ok(Command::List {
+                status, severity, ..
+            }) => {
+                assert_eq!(status, Some(Status::Investigating));
+                assert_eq!(severity, Some(Severity::High));
+            }
+            other => panic!("unexpected parse: {other:?}"),
+        }
+        match parse(&["list"]) {
+            Ok(Command::List {
+                status, severity, ..
+            }) => {
+                assert_eq!(status, None);
+                assert_eq!(severity, None);
+            }
+            other => panic!("unexpected parse: {other:?}"),
+        }
+        assert!(parse(&["list", "--status", "closed"]).is_err());
+        assert!(parse(&["list", "--out", "x"]).is_err());
+    }
+
+    #[test]
+    fn status_parses_id_status_and_root() {
+        match parse(&["status", "my-rca", "investigating", "--root", "/x"]) {
+            Ok(Command::SetStatus { root, id, status }) => {
+                assert_eq!(root, PathBuf::from("/x"));
+                assert_eq!(id.as_str(), "my-rca");
+                assert_eq!(status, Status::Investigating);
+            }
+            other => panic!("unexpected parse: {other:?}"),
+        }
+        assert!(parse(&["status"]).is_err(), "missing id");
+        assert!(parse(&["status", "my-rca"]).is_err(), "missing status");
+        assert!(parse(&["status", "my-rca", "closed"]).is_err());
+        assert!(parse(&["status", "Bad Slug", "resolved"]).is_err());
+    }
+
+    #[test]
+    fn banner_parses_and_rejects_arguments() {
+        assert!(matches!(parse(&["banner"]), Ok(Command::Banner)));
+        assert!(parse(&["banner", "--loud"]).is_err());
     }
 }

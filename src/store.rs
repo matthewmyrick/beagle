@@ -230,6 +230,23 @@ impl Store {
         Ok(Self::load_summary(id.as_str(), &self.workspace_dir(id))?.meta)
     }
 
+    /// Rewrites one workspace's status, stamping `updated` with the current
+    /// time. Every other manifest field is preserved. The write is atomic,
+    /// so a running TUI (which watches the manifest) picks the change up
+    /// live without ever seeing a half-written file.
+    ///
+    /// # Errors
+    /// [`Error::Io`] / [`Error::ParseManifest`] if the manifest cannot be
+    /// read, [`Error::SerializeManifest`] / [`Error::Io`] on write failures.
+    pub fn set_status(&self, id: &RcaId, status: Status) -> Result<RcaMeta> {
+        let mut meta = self.read_meta(id)?;
+        meta.status = status;
+        meta.updated = Some(OffsetDateTime::now_utc());
+        let manifest = toml::to_string_pretty(&meta)?;
+        write_atomic(&self.workspace_dir(id).join(MANIFEST_FILE), &manifest)?;
+        Ok(meta)
+    }
+
     /// Builds the canonical single-file markdown export of a workspace:
     /// YAML frontmatter from the manifest (Obsidian-compatible — `tags`
     /// become vault tags), every present section in tab order, then diagrams
@@ -545,6 +562,37 @@ mod tests {
             store.read_section(&id, SectionKind::Notes),
             Err(Error::FileTooLarge { .. })
         ));
+    }
+
+    #[test]
+    fn set_status_rewrites_only_status_and_stamps_updated() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+        let id = test_id("flip");
+        let meta = test_meta("Flip", Severity::High);
+        store.scaffold(&id, &meta).expect("scaffold");
+
+        let written = store
+            .set_status(&id, Status::Identified)
+            .expect("set status");
+        assert_eq!(written.status, Status::Identified);
+
+        let back = store.read_meta(&id).expect("re-read");
+        assert_eq!(back.status, Status::Identified);
+        assert!(back.updated.is_some(), "updated stamped");
+        assert_eq!(back.title, meta.title, "other fields preserved");
+        assert_eq!(back.created, meta.created);
+        assert_eq!(back.systems, meta.systems);
+        assert_eq!(back.tags, meta.tags);
+    }
+
+    #[test]
+    fn set_status_on_missing_workspace_is_an_error() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+        assert!(store
+            .set_status(&test_id("ghost"), Status::Resolved)
+            .is_err());
     }
 
     #[test]
