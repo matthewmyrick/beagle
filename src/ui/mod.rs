@@ -713,12 +713,36 @@ impl App {
     /// Builds and opens the toolbox overlay: the root `toolbox.md` followed
     /// by the `systems/*.md` docs matching the selected workspace's systems
     /// (all of them when nothing is selected or the workspace lists none).
+    ///
+    /// A missing toolbox is scaffolded on the spot (`beagle init`) —
+    /// pressing `T` means the user wants one, and `init_context` never
+    /// overwrites existing files, so this is always safe.
     fn open_toolbox(&mut self) {
         use ratatui::style::{Color, Style};
         use ratatui::text::Line;
 
         let dim = Style::default().fg(Color::DarkGray);
         let mut lines: Vec<ratatui::text::Line<'static>> = Vec::new();
+
+        if matches!(self.store.read_toolbox(), Ok(None)) {
+            match self.store.init_context() {
+                Ok(created) if !created.is_empty() => {
+                    lines.push(Line::styled(
+                        "Scaffolded toolbox.md + systems/ (what `beagle init` does) — \
+                         fill them in for your stack; agents read them before every \
+                         investigation.",
+                        Style::default().fg(Color::LightGreen),
+                    ));
+                    lines.push(Line::from(""));
+                }
+                Ok(_) => {}
+                Err(e) => lines.push(Line::styled(
+                    format!("could not scaffold the toolbox: {e}"),
+                    Style::default().fg(Color::Red),
+                )),
+            }
+        }
+
         match self.store.read_toolbox() {
             Ok(Some(content)) => lines.extend(markdown::to_text(&content).lines),
             Ok(None) => lines.push(Line::styled(
@@ -1314,7 +1338,12 @@ mod tests {
         press(&mut app, KeyCode::Char('T'));
         assert!(app.toolbox().is_some(), "T opens the overlay");
 
-        // With no toolbox.md on disk, the overlay shows the init hint.
+        // With no toolbox.md on disk, T scaffolds it on the spot and shows
+        // the freshly written template.
+        assert!(
+            app.store.root().join("toolbox.md").is_file(),
+            "T runs the init when the toolbox is missing"
+        );
         let text = app.toolbox().expect("open").clone();
         let flat: String = text
             .lines
@@ -1322,7 +1351,8 @@ mod tests {
             .flat_map(|l| l.spans.iter())
             .map(|s| s.content.as_ref())
             .collect();
-        assert!(flat.contains("beagle init"), "hint present: {flat}");
+        assert!(flat.contains("Scaffolded toolbox.md"), "note shown: {flat}");
+        assert!(flat.contains("Toolbox"), "template rendered: {flat}");
 
         // Keys scroll the overlay instead of the app; q closes instead of
         // typing/quitting.
@@ -1333,6 +1363,32 @@ mod tests {
         assert_eq!(app.toolbox_scroll(), 40, "clamped to content bottom");
         assert_eq!(press(&mut app, KeyCode::Char('q')), Flow::Continue);
         assert!(app.toolbox().is_none(), "q closes the overlay");
+    }
+
+    #[test]
+    fn toolbox_auto_init_never_overwrites_an_existing_toolbox() {
+        let mut app = app_with(1);
+        std::fs::write(
+            app.store.root().join("toolbox.md"),
+            "# Toolbox\n\ncustomized\n",
+        )
+        .expect("write");
+        press(&mut app, KeyCode::Char('T'));
+        let text = app.toolbox().expect("open").clone();
+        let flat: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(
+            flat.contains("customized"),
+            "existing content shown: {flat}"
+        );
+        assert!(
+            !flat.contains("Scaffolded"),
+            "no scaffold note when the toolbox already exists"
+        );
     }
 
     #[test]
