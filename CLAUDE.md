@@ -50,7 +50,8 @@ go: `investigating → identified → monitoring → resolved` — the easy way 
 
 Manifest (`rca.toml`) fields: `title`, `severity`
 (`critical|high|medium|low|info`), `status`, `created` (RFC 3339, **quoted**
-string), optional `updated`, `systems`, `tags`. Unknown fields are rejected —
+string), optional `updated`, `systems`, `tags`, `prs` (remediation PR URLs —
+attach with `beagle pr add <slug> <url>`). Unknown fields are rejected —
 don't invent new ones.
 
 ## Markdown that renders well

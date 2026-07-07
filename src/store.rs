@@ -439,6 +439,32 @@ impl Store {
         Ok(meta)
     }
 
+    /// Attaches a remediation PR URL to the workspace manifest, stamping
+    /// `updated`. Idempotent: re-attaching an existing URL is a no-op and
+    /// returns `false`.
+    ///
+    /// # Errors
+    /// Rejects non-http(s) URLs; otherwise fails as manifest read/write
+    /// does.
+    pub fn add_pr(&self, id: &RcaId, url: &str) -> Result<bool> {
+        let url = url.trim();
+        if !(url.starts_with("https://") || url.starts_with("http://")) {
+            return Err(Error::Tool {
+                tool: "pr",
+                message: format!("`{url}` is not an http(s) URL"),
+            });
+        }
+        let mut meta = self.read_meta(id)?;
+        if meta.prs.iter().any(|existing| existing == url) {
+            return Ok(false);
+        }
+        meta.prs.push(url.to_owned());
+        meta.updated = Some(OffsetDateTime::now_utc());
+        let manifest = toml::to_string_pretty(&meta)?;
+        write_atomic(&self.workspace_dir(id).join(MANIFEST_FILE), &manifest)?;
+        Ok(true)
+    }
+
     /// Builds the canonical single-file markdown export of a workspace:
     /// YAML frontmatter from the manifest (Obsidian-compatible — `tags`
     /// become vault tags), every present section in tab order, then diagrams
@@ -537,6 +563,7 @@ pub fn new_meta(title: String, severity: Severity) -> RcaMeta {
         updated: None,
         systems: Vec::new(),
         tags: Vec::new(),
+        prs: Vec::new(),
     }
 }
 
@@ -650,6 +677,7 @@ mod tests {
             updated: None,
             systems: vec!["payments-api".to_owned()],
             tags: vec!["latency".to_owned()],
+            prs: Vec::new(),
         }
     }
 
@@ -839,6 +867,28 @@ mod tests {
         let custom_path = store.export_to(&id, Some(&custom)).expect("custom export");
         assert_eq!(custom_path, custom);
         assert!(custom.is_file(), "parent dirs created");
+    }
+
+    #[test]
+    fn add_pr_appends_once_stamps_updated_and_rejects_non_urls() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+        let id = test_id("fixed");
+        store
+            .scaffold(&id, &test_meta("Fixed", Severity::High))
+            .expect("scaffold");
+
+        let url = "https://github.com/org/repo/pull/12";
+        assert!(store.add_pr(&id, url).expect("attach"), "first add");
+        assert!(!store.add_pr(&id, url).expect("re-attach"), "idempotent");
+
+        let meta = store.read_meta(&id).expect("read");
+        assert_eq!(meta.prs, [url]);
+        assert!(meta.updated.is_some(), "updated stamped");
+        assert_eq!(meta.title, "Fixed", "other fields preserved");
+
+        assert!(store.add_pr(&id, "not-a-url").is_err());
+        assert!(store.add_pr(&test_id("ghost"), url).is_err());
     }
 
     #[test]
