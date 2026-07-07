@@ -25,22 +25,22 @@ const SIDEBAR_WIDTH: u16 = 34;
 /// and header never shift as it animates.
 const INVESTIGATING_FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+/// Minimum columns the header (title + meta) keeps for itself before the
+/// banner is allowed to claim the top-right corner.
+const MIN_HEADER_COLS: u16 = 44;
+
+/// Columns the banner claims when shown: the art plus a one-column gap on
+/// each side.
+const BANNER_COLS: u16 = crate::banner::WIDTH + 2;
+
 pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     let [main, status_bar] = vertical(frame.area(), &[Constraint::Min(0), Constraint::Length(1)]);
-    let [sidebar, right] = horizontal(
+    let [sidebar, content] = horizontal(
         main,
         &[Constraint::Length(SIDEBAR_WIDTH), Constraint::Min(0)],
     );
-    let banner_height = banner_height(right);
-    let [banner, content] = vertical(
-        right,
-        &[Constraint::Length(banner_height), Constraint::Min(0)],
-    );
 
     draw_sidebar(frame, app, sidebar);
-    if banner_height > 0 {
-        draw_banner(frame, banner);
-    }
     draw_workspace(frame, app, content);
     draw_status_bar(frame, app, status_bar);
 
@@ -49,20 +49,29 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     }
 }
 
-/// Height of the top-right banner strip: the art plus a version line, or 0
-/// when the pane is too small for it to render without wrapping or crowding
-/// out the content.
-fn banner_height(area: Rect) -> u16 {
-    let fits = area.width >= crate::banner::WIDTH + 2 && area.height >= 24;
-    if fits {
-        crate::banner::HEIGHT + 1
-    } else {
-        0
+/// Whether the workspace area has room for the banner beside the header —
+/// wide enough that the header column keeps [`MIN_HEADER_COLS`], tall enough
+/// that four rows of art don't crowd out the content.
+fn banner_fits(area: Rect) -> bool {
+    area.width >= BANNER_COLS + MIN_HEADER_COLS && area.height >= 16
+}
+
+/// The exact-width rect the banner renders into, pinned to the right edge
+/// of `area` with a one-column margin.
+fn banner_rect(area: Rect) -> Rect {
+    let width = crate::banner::WIDTH.min(area.width);
+    Rect {
+        x: area.x + area.width.saturating_sub(width + 1),
+        width,
+        ..area
     }
 }
 
+/// Renders the banner art left-aligned inside [`banner_rect`]. Left
+/// alignment inside a pinned rect is what keeps the art intact: per-line
+/// right-alignment would stagger the ragged line ends.
 fn draw_banner(frame: &mut Frame, area: Rect) {
-    let mut lines: Vec<Line<'static>> = crate::banner::BANNER
+    let lines: Vec<Line<'static>> = crate::banner::BANNER
         .lines()
         .map(|l| {
             Line::styled(
@@ -73,15 +82,7 @@ fn draw_banner(frame: &mut Frame, area: Rect) {
             )
         })
         .collect();
-    lines.push(Line::styled(
-        format!(
-            "v{} · what broke, why, and the fix ",
-            env!("CARGO_PKG_VERSION")
-        ),
-        Style::default().fg(Color::DarkGray),
-    ));
-    let paragraph = Paragraph::new(lines).alignment(Alignment::Right);
-    frame.render_widget(paragraph, inset_right(area, 1));
+    frame.render_widget(Paragraph::new(lines), banner_rect(area));
 }
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
@@ -141,29 +142,44 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     };
 
+    // The banner sits beside the header/tab rows at the top right, so it
+    // never pushes content down by more than the difference between its
+    // height and the rows the header already uses. Hidden when it would
+    // squeeze the header below MIN_HEADER_COLS.
+    let banner_cols = if banner_fits(area) { BANNER_COLS } else { 0 };
+    let head_width = area.width.saturating_sub(banner_cols);
+
     // Header and tab bar heights are computed from the actual width so
     // nothing is ever cut off on narrow terminals — both flow onto extra
     // lines instead of truncating.
     let header = header_paragraph(&rca, app.tick());
-    let header_width = area.width.saturating_sub(1).max(1); // inset by 1 below
+    let header_width = head_width.saturating_sub(1).max(1); // inset by 1 below
     let header_height = u16::try_from(header.line_count(header_width))
         .unwrap_or(2)
         .min(6);
 
-    let tab_lines = flow_tabs(app.tab(), area.width);
+    let tab_lines = flow_tabs(app.tab(), head_width);
     let tab_height = u16::try_from(tab_lines.len()).unwrap_or(1);
 
-    let [header_area, tab_bar, body] = vertical(
-        area,
-        &[
-            Constraint::Length(header_height),
-            Constraint::Length(tab_height),
-            Constraint::Min(0),
-        ],
+    let banner_height = if banner_cols > 0 {
+        crate::banner::HEIGHT
+    } else {
+        0
+    };
+    let top_height = (header_height + tab_height).max(banner_height);
+    let [top, body] = vertical(area, &[Constraint::Length(top_height), Constraint::Min(0)]);
+    let [head_col, banner_col] =
+        horizontal(top, &[Constraint::Min(0), Constraint::Length(banner_cols)]);
+    let [header_area, tab_bar] = vertical(
+        head_col,
+        &[Constraint::Length(header_height), Constraint::Min(0)],
     );
 
     frame.render_widget(header, inset(header_area, 1));
     frame.render_widget(Paragraph::new(tab_lines), tab_bar);
+    if banner_cols > 0 {
+        draw_banner(frame, banner_col);
+    }
 
     draw_content(frame, app, body);
 }
@@ -517,13 +533,6 @@ fn inset(area: Rect, left: u16) -> Rect {
     }
 }
 
-fn inset_right(area: Rect, right: u16) -> Rect {
-    Rect {
-        width: area.width.saturating_sub(right),
-        ..area
-    }
-}
-
 fn center(area: Rect, width: u16, height: u16) -> Rect {
     Rect {
         x: area.x + area.width.saturating_sub(width) / 2,
@@ -593,12 +602,77 @@ mod tests {
 
     #[test]
     fn banner_shows_only_when_the_pane_is_big_enough() {
-        let big = Rect::new(0, 0, 80, 40);
-        assert_eq!(banner_height(big), crate::banner::HEIGHT + 1);
-        let narrow = Rect::new(0, 0, crate::banner::WIDTH + 1, 40);
-        assert_eq!(banner_height(narrow), 0, "too narrow: banner would wrap");
-        let short = Rect::new(0, 0, 80, 20);
-        assert_eq!(banner_height(short), 0, "too short: content comes first");
+        let big = Rect::new(0, 0, BANNER_COLS + MIN_HEADER_COLS, 40);
+        assert!(banner_fits(big));
+        let narrow = Rect::new(0, 0, BANNER_COLS + MIN_HEADER_COLS - 1, 40);
+        assert!(
+            !banner_fits(narrow),
+            "too narrow: header column comes first"
+        );
+        let short = Rect::new(0, 0, 120, 15);
+        assert!(!banner_fits(short), "too short: content comes first");
+    }
+
+    #[test]
+    fn banner_rect_is_pinned_to_the_right_edge_at_full_art_width() {
+        // Alignment correctness: the art must render left-aligned in a rect
+        // exactly as wide as its widest line, or ragged line ends stagger.
+        let area = Rect::new(10, 2, 60, 6);
+        let rect = banner_rect(area);
+        assert_eq!(rect.width, crate::banner::WIDTH, "never wider than the art");
+        assert_eq!(
+            rect.x + rect.width + 1,
+            area.x + area.width,
+            "one-column right margin"
+        );
+        assert_eq!(rect.y, area.y);
+
+        // Degenerate area: must not underflow or exceed the area.
+        let tiny = Rect::new(0, 0, 10, 6);
+        let clamped = banner_rect(tiny);
+        assert!(clamped.width <= tiny.width);
+        assert!(clamped.x + clamped.width <= tiny.width);
+    }
+
+    /// Renders a full frame into a test backend and checks every banner art
+    /// row occupies the same columns — the regression that motivated
+    /// [`banner_rect`]: per-line right-alignment staggered the art.
+    #[test]
+    fn rendered_banner_rows_are_column_aligned() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = crate::store::Store::open(tmp.path()).expect("store");
+        let id = crate::model::RcaId::new("banner-check").expect("id");
+        store
+            .scaffold(&id, &crate::store::new_meta("T".to_owned(), Severity::High))
+            .expect("scaffold");
+        let mut app = App::new(store).expect("app");
+
+        let (width, height) = (120u16, 30u16);
+        let backend = ratatui::backend::TestBackend::new(width, height);
+        let mut terminal = ratatui::Terminal::new(backend).expect("terminal");
+        terminal.draw(|frame| draw(frame, &mut app)).expect("draw");
+        let buffer = terminal.backend().buffer();
+
+        // Where the layout should have pinned the art: right edge of the
+        // content column, one-column margin.
+        let art_x = usize::from(width - 1 - crate::banner::WIDTH);
+        for (y, expected) in crate::banner::BANNER.lines().enumerate() {
+            let row: String = (0..width)
+                .map(|x| {
+                    buffer[(x, u16::try_from(y).expect("small"))]
+                        .symbol()
+                        .chars()
+                        .next()
+                        .unwrap_or(' ')
+                })
+                .collect();
+            let segment: String = row
+                .chars()
+                .skip(art_x)
+                .take(expected.chars().count())
+                .collect();
+            assert_eq!(segment, expected, "banner row {y} misaligned:\n{row}");
+        }
     }
 
     #[test]
