@@ -177,6 +177,11 @@ pub struct App {
     mtimes: HashMap<(RcaId, SectionKind), SystemTime>,
     /// Sections that changed on disk since the user last viewed them.
     unread: HashSet<(RcaId, SectionKind)>,
+    /// Live PR states (url → state), fed by the background `gh` poller.
+    /// Empty when `gh` is unavailable — PRs then render as plain links.
+    pr_states: HashMap<String, crate::prs::PrState>,
+    /// The `o` link popup: attached PRs plus URLs found on the current tab.
+    links: Option<LinksPopup>,
     /// Rendered toolbox overlay content; `Some` while the overlay is open.
     toolbox: Option<Text<'static>>,
     /// Vertical scroll of the toolbox overlay.
@@ -186,6 +191,15 @@ pub struct App {
     pub(crate) toolbox_viewport: (u16, u16),
     /// Set by the draw pass; used to clamp scrolling to real content height.
     pub(crate) viewport: ViewportInfo,
+}
+
+/// State of the `o` link popup.
+#[derive(Debug)]
+pub(crate) struct LinksPopup {
+    /// Links to offer: attached PRs first, then URLs from the current tab.
+    pub items: Vec<String>,
+    /// Index of the highlighted link.
+    pub selected: usize,
 }
 
 /// Identity of the cached pane content.
@@ -233,6 +247,8 @@ impl App {
             follow: false,
             mtimes: HashMap::new(),
             unread: HashSet::new(),
+            pr_states: HashMap::new(),
+            links: None,
             toolbox: None,
             toolbox_scroll: 0,
             toolbox_viewport: (0, 0),
@@ -281,7 +297,20 @@ impl App {
             })?;
         watcher.watch(self.store.watch_root(), RecursiveMode::Recursive)?;
 
+        // PR merge-status polling: a background thread queries `gh` (every
+        // 30 min, plus whenever the attached-PR set changes) and reports
+        // over a channel, so the UI thread never blocks on the network.
+        // Without gh, the poller exits and PRs stay plain links.
+        let (urls_tx, urls_rx) = mpsc::channel::<Vec<String>>();
+        let (states_tx, states_rx) = mpsc::channel();
+        crate::prs::spawn_poller(urls_rx, states_tx);
+        let mut polled_urls = self.pr_urls();
+        let _ = urls_tx.send(polled_urls.clone());
+
         loop {
+            while let Ok(states) = states_rx.try_recv() {
+                self.pr_states.extend(states);
+            }
             if drain(&rx) {
                 let arrived = self.reload();
                 self.status = Some(match arrived.first() {
@@ -292,6 +321,11 @@ impl App {
                     // Tail-f: pin the current tab to its (possibly longer)
                     // bottom; the draw pass clamps to the real height.
                     self.scroll = u16::MAX;
+                }
+                let urls = self.pr_urls();
+                if urls != polled_urls {
+                    polled_urls.clone_from(&urls);
+                    let _ = urls_tx.send(urls);
                 }
             }
             self.ensure_pane();
@@ -530,6 +564,10 @@ impl App {
             self.handle_search_key(key.code);
             return Flow::Continue;
         }
+        if self.links.is_some() {
+            self.handle_links_key(key.code);
+            return Flow::Continue;
+        }
         if self.toolbox.is_some() {
             self.handle_toolbox_key(key.code);
             return Flow::Continue;
@@ -544,6 +582,7 @@ impl App {
             KeyCode::Char('Q') => return Flow::Quit,
             KeyCode::Char('?') => self.show_help = true,
             KeyCode::Char('T') => self.open_toolbox(),
+            KeyCode::Char('o') => self.open_links(),
             KeyCode::Char('/') => self.search_active = true,
             KeyCode::Char('b') => self.focus = Focus::List,
             KeyCode::Char('c') => self.copy_current_tab(),
@@ -583,6 +622,92 @@ impl App {
             },
         }
         Flow::Continue
+    }
+
+    /// Builds and opens the `o` popup: the workspace's attached PRs first,
+    /// then every URL found in the current tab's raw content.
+    fn open_links(&mut self) {
+        let Some(rca) = self.selected_rca() else {
+            self.status = Some("no workspace selected".to_owned());
+            return;
+        };
+        let id = rca.id.clone();
+        let mut items: Vec<String> = rca.meta.prs.clone();
+        let raw = match self.tab.section() {
+            Some(kind) => self.store.read_section(&id, kind).ok().flatten(),
+            None => self
+                .current_diagram_raw(&id)
+                .ok()
+                .flatten()
+                .map(|(_, content)| content),
+        };
+        if let Some(raw) = raw {
+            for url in crate::links::extract_urls(&raw) {
+                if !items.contains(&url) {
+                    items.push(url);
+                }
+            }
+        }
+        if items.is_empty() {
+            self.status = Some("no attached PRs or links on this tab".to_owned());
+            return;
+        }
+        self.links = Some(LinksPopup { items, selected: 0 });
+    }
+
+    /// Keystrokes while the link popup is open: pick, open, or close.
+    fn handle_links_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Esc | KeyCode::Char('q' | 'o') => self.links = None,
+            KeyCode::Char('j') | KeyCode::Down => {
+                if let Some(popup) = self.links.as_mut() {
+                    popup.selected = (popup.selected + 1).min(popup.items.len().saturating_sub(1));
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if let Some(popup) = self.links.as_mut() {
+                    popup.selected = popup.selected.saturating_sub(1);
+                }
+            }
+            KeyCode::Enter => {
+                let url = self
+                    .links
+                    .take()
+                    .and_then(|popup| popup.items.get(popup.selected).cloned());
+                if let Some(url) = url {
+                    self.status = Some(match crate::links::open_url(&url) {
+                        Ok(()) => format!("opened {url}"),
+                        Err(e) => format!("open failed: {e}"),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Every unique attached-PR URL across all workspaces, sorted, for the
+    /// status poller.
+    fn pr_urls(&self) -> Vec<String> {
+        let mut urls: Vec<String> = Vec::new();
+        for rca in &self.rcas {
+            for url in &rca.meta.prs {
+                if !urls.contains(url) {
+                    urls.push(url.clone());
+                }
+            }
+        }
+        urls.sort();
+        urls
+    }
+
+    /// The polled state of one attached PR, if known.
+    pub(crate) fn pr_state(&self, url: &str) -> Option<crate::prs::PrState> {
+        self.pr_states.get(url).copied()
+    }
+
+    /// The link popup, when open.
+    pub(crate) fn links(&self) -> Option<&LinksPopup> {
+        self.links.as_ref()
     }
 
     /// Builds and opens the toolbox overlay: the root `toolbox.md` followed
@@ -1136,6 +1261,50 @@ mod tests {
         );
         press(&mut app, KeyCode::Char('f'));
         assert!(!app.follow());
+    }
+
+    #[test]
+    fn o_opens_the_link_popup_with_attached_prs_and_tab_urls() {
+        let mut app = app_with(1);
+        let id = app.selected_rca().expect("selected").id.clone();
+        app.store
+            .add_pr(&id, "https://github.com/o/r/pull/12")
+            .expect("attach");
+        std::fs::write(
+            app.store.workspace_dir(&id).join("summary.md"),
+            "# Summary\n\nSee https://grafana.example.com/d/abc for the graph.\n",
+        )
+        .expect("write");
+        app.reload();
+
+        press(&mut app, KeyCode::Char('o'));
+        let popup = app.links().expect("popup open");
+        assert_eq!(
+            popup.items,
+            [
+                "https://github.com/o/r/pull/12",
+                "https://grafana.example.com/d/abc",
+            ],
+            "PRs first, then tab URLs"
+        );
+
+        // j moves and clamps; esc closes without opening anything.
+        press(&mut app, KeyCode::Char('j'));
+        press(&mut app, KeyCode::Char('j'));
+        assert_eq!(app.links().expect("open").selected, 1, "clamped to last");
+        press(&mut app, KeyCode::Esc);
+        assert!(app.links().is_none());
+    }
+
+    #[test]
+    fn o_with_no_links_reports_instead_of_opening_an_empty_popup() {
+        let mut app = app_with(1);
+        press(&mut app, KeyCode::Char('o'));
+        assert!(app.links().is_none());
+        assert!(app
+            .status_line()
+            .expect("status set")
+            .contains("no attached PRs"));
     }
 
     #[test]

@@ -21,8 +21,21 @@ All notable changes to this project are documented here. The format follows
   the sidebar entry a dot); `investigating` headers tick elapsed time; and
   newly scaffolded workspaces are announced in the status bar.
 
+- Attached PRs: `beagle pr add <slug> <url>` records remediation PRs in a
+  new optional `prs` manifest field; the workspace header shows live merge
+  status (`fixes: ○ #123 open · ✓ #124 merged`) via a background `gh` poll
+  every 30 minutes. Without `gh`, links render plain — no polling, no
+  errors. `o` opens a popup of attached PRs plus URLs on the current tab
+  and launches the selection in the browser.
+
 ### Changed
 
+- **Manifest format:** new optional `prs` field (list of PR URLs). Omitted
+  while empty, so existing manifests are untouched — but note that beagle
+  binaries older than this release reject manifests that *do* contain
+  `prs` (unknown field) and will skip those workspaces with a warning.
+  Update via `beagle update` before using `pr add` if you run multiple
+  machines.
 - The Claude Code skill is now `/beagle` (was `/rca`) and instructs agents
   to read the toolbox/systems context before investigating, keep it updated,
   and narrate every investigation step to `log.md`.

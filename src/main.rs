@@ -33,6 +33,10 @@ USAGE:
                                             (investigating|identified|monitoring|resolved)
     beagle log <id> <message...>          append a timestamped bullet to the
                   [--root <dir>]            workspace's log.md (the Log tab)
+    beagle pr add <id> <url>              attach a remediation PR to the RCA;
+                  [--root <dir>]            the TUI tracks merge status via gh
+    beagle pr list <id> [--root <dir>]    print attached PRs (live state
+                                            included when gh is available)
     beagle export <id> [--out <file>]     export one RCA as a single markdown
                   [--root <dir>]            document (default: exports/<id>.md)
     beagle init [--root <dir>]            scaffold toolbox.md + systems/ agent
@@ -78,6 +82,15 @@ enum Command {
         root: Option<PathBuf>,
         id: RcaId,
         message: String,
+    },
+    PrAdd {
+        root: Option<PathBuf>,
+        id: RcaId,
+        url: String,
+    },
+    PrList {
+        root: Option<PathBuf>,
+        id: RcaId,
     },
     Export {
         root: Option<PathBuf>,
@@ -153,24 +166,7 @@ fn run(command: Command) -> Result<(), Error> {
             root,
             status,
             severity,
-        } => {
-            let store = Store::open(&effective_root(root)?)?;
-            let (summaries, warnings) = store.list()?;
-            for rca in summaries
-                .iter()
-                .filter(|rca| status.map_or(true, |s| rca.meta.status == s))
-                .filter(|rca| severity.map_or(true, |s| rca.meta.severity == s))
-            {
-                println!(
-                    "{:<10} {:<14} {:<30} {}",
-                    rca.meta.severity, rca.meta.status, rca.id, rca.meta.title,
-                );
-            }
-            for warning in &warnings {
-                eprintln!("warning: {}", warning.0);
-            }
-            Ok(())
-        }
+        } => run_list(root, status, severity),
         Command::SetStatus { root, id, status } => {
             let store = Store::open(&effective_root(root)?)?;
             store.set_status(&id, status)?;
@@ -183,6 +179,16 @@ fn run(command: Command) -> Result<(), Error> {
             println!("logged to {}", path.display());
             Ok(())
         }
+        Command::PrAdd { root, id, url } => {
+            let store = Store::open(&effective_root(root)?)?;
+            if store.add_pr(&id, &url)? {
+                println!("attached {url} to {id}");
+            } else {
+                println!("{url} is already attached to {id}");
+            }
+            Ok(())
+        }
+        Command::PrList { root, id } => run_pr_list(root, &id),
         Command::Init { root } => {
             let store = Store::open(&effective_root(root)?)?;
             let created = store.init_context()?;
@@ -214,6 +220,48 @@ fn run(command: Command) -> Result<(), Error> {
             Ok(())
         }
     }
+}
+
+/// `beagle list`: workspaces to stdout, warnings to stderr.
+fn run_list(
+    root: Option<PathBuf>,
+    status: Option<Status>,
+    severity: Option<Severity>,
+) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    let (summaries, warnings) = store.list()?;
+    for rca in summaries
+        .iter()
+        .filter(|rca| status.map_or(true, |s| rca.meta.status == s))
+        .filter(|rca| severity.map_or(true, |s| rca.meta.severity == s))
+    {
+        println!(
+            "{:<10} {:<14} {:<30} {}",
+            rca.meta.severity, rca.meta.status, rca.id, rca.meta.title,
+        );
+    }
+    for warning in &warnings {
+        eprintln!("warning: {}", warning.0);
+    }
+    Ok(())
+}
+
+/// `beagle pr list`: attached PRs, with live state when `gh` works.
+fn run_pr_list(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    let meta = store.read_meta(id)?;
+    if meta.prs.is_empty() {
+        println!("no PRs attached to {id} (use `beagle pr add {id} <url>`)");
+        return Ok(());
+    }
+    let gh = beagle::prs::gh_available();
+    for url in &meta.prs {
+        match gh.then(|| beagle::prs::state_of(url)).flatten() {
+            Some(state) => println!("{} {:<8} {url}", state.glyph(), state.label()),
+            None => println!("  {:<8} {url}", "-"),
+        }
+    }
+    Ok(())
 }
 
 /// Resolves the workspace root: explicit `--root` → config file `root` →
@@ -372,6 +420,7 @@ fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String> {
         Some("list") => parse_list(&mut args, root),
         Some("status") => parse_status(&mut args, root),
         Some("log") => parse_log(&mut args, root),
+        Some("pr") => parse_pr(&mut args, root),
         Some("export") => parse_export(&mut args, root),
         Some("new") => parse_new(&mut args, root),
         Some("init") => {
@@ -487,6 +536,45 @@ fn parse_log(
         id,
         message: words.join(" "),
     })
+}
+
+fn parse_pr(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let action = args
+        .next()
+        .ok_or("`pr` requires a subcommand: `add` or `list`")?;
+    if action != "add" && action != "list" {
+        return Err(format!(
+            "unknown `pr` subcommand `{action}` (expected add|list)"
+        ));
+    }
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or_else(|| format!("`pr {action}` requires an <id> slug"))?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+    let url = if action == "add" {
+        Some(
+            args.next()
+                .filter(|a| !a.starts_with('-'))
+                .ok_or("`pr add` requires a <url> after the <id>")?,
+        )
+    } else {
+        None
+    };
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `pr {action}`")),
+        }
+    }
+    match url {
+        // `url` is Some exactly when the action is `add`.
+        Some(url) => Ok(Command::PrAdd { root, id, url }),
+        None => Ok(Command::PrList { root, id }),
+    }
 }
 
 fn parse_export(
@@ -719,6 +807,33 @@ mod tests {
         assert!(parse(&["log"]).is_err(), "missing id");
         assert!(parse(&["log", "my-rca"]).is_err(), "missing message");
         assert!(parse(&["log", "my-rca", "msg", "--force"]).is_err());
+    }
+
+    #[test]
+    fn pr_parses_add_and_list() {
+        match parse(&[
+            "pr",
+            "add",
+            "my-rca",
+            "https://github.com/o/r/pull/1",
+            "--root",
+            "/x",
+        ]) {
+            Ok(Command::PrAdd { root, id, url }) => {
+                assert_eq!(root, Some(PathBuf::from("/x")));
+                assert_eq!(id.as_str(), "my-rca");
+                assert_eq!(url, "https://github.com/o/r/pull/1");
+            }
+            other => panic!("unexpected parse: {other:?}"),
+        }
+        assert!(matches!(
+            parse(&["pr", "list", "my-rca"]),
+            Ok(Command::PrList { .. })
+        ));
+        assert!(parse(&["pr"]).is_err(), "missing subcommand");
+        assert!(parse(&["pr", "close", "my-rca"]).is_err(), "bad subcommand");
+        assert!(parse(&["pr", "add", "my-rca"]).is_err(), "missing url");
+        assert!(parse(&["pr", "list", "my-rca", "--frob"]).is_err());
     }
 
     #[test]
