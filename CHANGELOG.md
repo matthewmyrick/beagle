@@ -16,6 +16,16 @@ All notable changes to this project are documented here. The format follows
 - `beagle status <id> <status>` to set a workspace's status from the CLI;
   a running TUI picks the change up live via the filesystem watcher.
 - `beagle list --status <status> --severity <sev>` filters.
+- `beagle config`: opens `~/.config/beagle/config.toml` in your editor
+  (config `editor` → `$VISUAL` → `$EDITOR` → vim) and validates it on close,
+  reporting unknown keys and type errors. Config `root` becomes the default
+  `--root`, so `beagle` can run from anywhere.
+- `beagle update`: self-update to the latest GitHub release —
+  sha256-verified download, atomic binary swap. `--version <ver>` installs
+  any released version, upgrade or downgrade.
+- `beagle version` (version + target triple) and `beagle version list`, an
+  interactive release browser where enter installs the selected version
+  (plain listing when piped).
 
 ## [0.1.0] - 2026-07-07
 

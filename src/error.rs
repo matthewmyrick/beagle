@@ -59,6 +59,54 @@ pub enum Error {
     /// The filesystem watcher could not be created or attached.
     #[error("filesystem watcher error: {0}")]
     Watch(#[from] notify::Error),
+
+    /// The beagle config file failed to parse or validate.
+    #[error("invalid config `{path}`: {source}")]
+    ParseConfig {
+        /// Path of the offending config file.
+        path: PathBuf,
+        /// The TOML deserialization error.
+        #[source]
+        source: Box<toml::de::Error>,
+    },
+
+    /// An external tool (curl, tar, shasum, the editor) failed or was
+    /// missing. Self-update and config editing shell out rather than adding
+    /// heavyweight dependencies, so their failures surface here.
+    #[error("{tool}: {message}")]
+    Tool {
+        /// The tool that failed (`curl`, `tar`, ...).
+        tool: &'static str,
+        /// What went wrong, including any stderr worth showing.
+        message: String,
+    },
+
+    /// The GitHub releases feed could not be understood.
+    #[error("could not parse the releases feed: {0}")]
+    ParseReleases(String),
+
+    /// A downloaded artifact's checksum did not match the published one.
+    #[error("checksum mismatch for `{path}`: expected {expected}, got {actual}")]
+    ChecksumMismatch {
+        /// The downloaded file.
+        path: PathBuf,
+        /// The checksum published alongside the release asset.
+        expected: String,
+        /// The checksum computed from the download.
+        actual: String,
+    },
+
+    /// No prebuilt release binary exists for this platform.
+    #[error(
+        "no prebuilt binary for {target}; install from source instead: \
+         cargo install --git {repo}"
+    )]
+    UnsupportedTarget {
+        /// The compile-time target triple.
+        target: &'static str,
+        /// The repository URL, for the `cargo install` hint.
+        repo: &'static str,
+    },
 }
 
 impl Error {

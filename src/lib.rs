@@ -13,15 +13,21 @@
 //!  ├──▶ markdown ────┘
 //!  └──▶ ansi
 //! ```
+//!
+//! `config` (the user config file) and `update` (self-update against GitHub
+//! releases) sit beside `ui` at the top of the stack; both depend only on
+//! `error`.
 
 pub mod ansi;
 pub mod banner;
 pub mod clipboard;
+pub mod config;
 pub mod error;
 pub mod fuzzy;
 pub mod markdown;
 pub mod model;
 pub mod store;
 pub mod ui;
+pub mod update;
 
 pub use error::Error;
