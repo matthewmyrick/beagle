@@ -45,6 +45,7 @@ go: `investigating → identified → monitoring → resolved` — the easy way 
 | `impact.md` | Impact | Quantified: requests, users, duration, money, SLO budget burned. |
 | `remediation.md` | Fix | Immediate mitigation first, then durable fixes with owners and status. |
 | `notes.md` | Notes | Raw evidence: metrics tables, queries, log excerpts, links, open questions. |
+| `log.md` | Log | Live investigation narration — append `beagle log <slug> "..."` at every step. |
 | `diagrams/NN-name.txt` | Diagrams | ASCII diagrams (see below). |
 
 Manifest (`rca.toml`) fields: `title`, `severity`

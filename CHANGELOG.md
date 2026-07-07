@@ -14,11 +14,18 @@ All notable changes to this project are documented here. The format follows
   `T` in the TUI shows the toolbox plus the systems docs matching the
   selected incident.
 
+- Live investigation experience: a new **Log** tab (`log.md`, tabs are now
+  1–8) streams the agent's narration, appended via `beagle log <slug>
+  "message"`; `f` toggles follow mode (reloads stick to the bottom, tail -f
+  style); tabs whose files changed since last viewed show a `●` marker (and
+  the sidebar entry a dot); `investigating` headers tick elapsed time; and
+  newly scaffolded workspaces are announced in the status bar.
+
 ### Changed
 
 - The Claude Code skill is now `/beagle` (was `/rca`) and instructs agents
-  to read the toolbox/systems context before investigating and to keep it
-  updated.
+  to read the toolbox/systems context before investigating, keep it updated,
+  and narrate every investigation step to `log.md`.
 
 ## [0.2.0] - 2026-07-07
 
