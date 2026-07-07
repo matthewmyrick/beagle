@@ -31,6 +31,8 @@ USAGE:
     beagle status <id> <status>           set a workspace's status; a running
                   [--root <dir>]            TUI picks the change up live
                                             (investigating|identified|monitoring|resolved)
+    beagle log <id> <message...>          append a timestamped bullet to the
+                  [--root <dir>]            workspace's log.md (the Log tab)
     beagle export <id> [--out <file>]     export one RCA as a single markdown
                   [--root <dir>]            document (default: exports/<id>.md)
     beagle init [--root <dir>]            scaffold toolbox.md + systems/ agent
@@ -71,6 +73,11 @@ enum Command {
         root: Option<PathBuf>,
         id: RcaId,
         status: Status,
+    },
+    Log {
+        root: Option<PathBuf>,
+        id: RcaId,
+        message: String,
     },
     Export {
         root: Option<PathBuf>,
@@ -168,6 +175,12 @@ fn run(command: Command) -> Result<(), Error> {
             let store = Store::open(&effective_root(root)?)?;
             store.set_status(&id, status)?;
             println!("{id}: status → {status}");
+            Ok(())
+        }
+        Command::Log { root, id, message } => {
+            let store = Store::open(&effective_root(root)?)?;
+            let path = store.append_log(&id, &message)?;
+            println!("logged to {}", path.display());
             Ok(())
         }
         Command::Init { root } => {
@@ -358,6 +371,7 @@ fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String> {
         }
         Some("list") => parse_list(&mut args, root),
         Some("status") => parse_status(&mut args, root),
+        Some("log") => parse_log(&mut args, root),
         Some("export") => parse_export(&mut args, root),
         Some("new") => parse_new(&mut args, root),
         Some("init") => {
@@ -442,6 +456,37 @@ fn parse_status(
         }
     }
     Ok(Command::SetStatus { root, id, status })
+}
+
+/// `log <id> <message...>`: everything that isn't a flag becomes the
+/// message, so multi-word messages work without quoting.
+fn parse_log(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`log` requires an <id> slug as its first argument")?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+    let mut words: Vec<String> = Vec::new();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            flag if flag.starts_with("--") => {
+                return Err(format!("unknown flag `{flag}` for `log`"));
+            }
+            _ => words.push(arg),
+        }
+    }
+    if words.is_empty() {
+        return Err("`log` requires a message after the <id>".to_owned());
+    }
+    Ok(Command::Log {
+        root,
+        id,
+        message: words.join(" "),
+    })
 }
 
 fn parse_export(
@@ -651,6 +696,29 @@ mod tests {
         assert!(parse(&["status", "my-rca"]).is_err(), "missing status");
         assert!(parse(&["status", "my-rca", "closed"]).is_err());
         assert!(parse(&["status", "Bad Slug", "resolved"]).is_err());
+    }
+
+    #[test]
+    fn log_parses_multi_word_messages_and_root() {
+        match parse(&[
+            "log",
+            "my-rca",
+            "checked",
+            "the",
+            "dashboard",
+            "--root",
+            "/x",
+        ]) {
+            Ok(Command::Log { root, id, message }) => {
+                assert_eq!(root, Some(PathBuf::from("/x")));
+                assert_eq!(id.as_str(), "my-rca");
+                assert_eq!(message, "checked the dashboard");
+            }
+            other => panic!("unexpected parse: {other:?}"),
+        }
+        assert!(parse(&["log"]).is_err(), "missing id");
+        assert!(parse(&["log", "my-rca"]).is_err(), "missing message");
+        assert!(parse(&["log", "my-rca", "msg", "--force"]).is_err());
     }
 
     #[test]

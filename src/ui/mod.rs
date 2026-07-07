@@ -7,8 +7,9 @@
 
 mod view;
 
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use notify::{RecursiveMode, Watcher as _};
@@ -39,11 +40,13 @@ pub enum Tab {
     Diagrams,
     /// Raw evidence and loose ends ([`SectionKind::Notes`]).
     Notes,
+    /// The live investigation log ([`SectionKind::Log`]).
+    Log,
 }
 
 impl Tab {
     /// Every tab, in display order.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Summary,
         Self::Timeline,
         Self::RootCause,
@@ -51,6 +54,7 @@ impl Tab {
         Self::Remediation,
         Self::Diagrams,
         Self::Notes,
+        Self::Log,
     ];
 
     /// The tab title shown in the tab bar.
@@ -64,6 +68,7 @@ impl Tab {
             Self::Impact => SectionKind::Impact.title(),
             Self::Remediation => SectionKind::Remediation.title(),
             Self::Notes => SectionKind::Notes.title(),
+            Self::Log => SectionKind::Log.title(),
         }
     }
 
@@ -77,6 +82,7 @@ impl Tab {
             Self::Impact => Some(SectionKind::Impact),
             Self::Remediation => Some(SectionKind::Remediation),
             Self::Notes => Some(SectionKind::Notes),
+            Self::Log => Some(SectionKind::Log),
             Self::Diagrams => None,
         }
     }
@@ -164,6 +170,13 @@ pub struct App {
     /// Animation counter, advanced once per event-loop turn (the loop wakes
     /// at least every 250 ms). Drives the `investigating` spinner.
     tick: usize,
+    /// Follow mode: filesystem reloads keep the current tab scrolled to the
+    /// bottom, tail-f style.
+    follow: bool,
+    /// Last-seen modification time per section file, for change detection.
+    mtimes: HashMap<(RcaId, SectionKind), SystemTime>,
+    /// Sections that changed on disk since the user last viewed them.
+    unread: HashSet<(RcaId, SectionKind)>,
     /// Rendered toolbox overlay content; `Some` while the overlay is open.
     toolbox: Option<Text<'static>>,
     /// Vertical scroll of the toolbox overlay.
@@ -200,7 +213,7 @@ impl App {
     pub fn new(store: Store) -> Result<Self> {
         let (rcas, warnings) = store.list()?;
         let visible = (0..rcas.len()).collect();
-        Ok(Self {
+        let mut app = Self {
             store,
             rcas,
             warnings,
@@ -217,11 +230,36 @@ impl App {
             status: None,
             pane: None,
             tick: 0,
+            follow: false,
+            mtimes: HashMap::new(),
+            unread: HashSet::new(),
             toolbox: None,
             toolbox_scroll: 0,
             toolbox_viewport: (0, 0),
             viewport: ViewportInfo::default(),
-        })
+        };
+        // Baseline snapshot: nothing is "unread" at startup.
+        app.refresh_mtimes(false);
+        Ok(app)
+    }
+
+    /// Re-snapshots every section file's mtime. When `mark_unread` is set,
+    /// sections whose mtime advanced (or which newly appeared) since the
+    /// last snapshot are flagged unread until viewed.
+    fn refresh_mtimes(&mut self, mark_unread: bool) {
+        for rca in &self.rcas {
+            for (kind, mtime) in self.store.section_mtimes(&rca.id) {
+                let key = (rca.id.clone(), kind);
+                let changed = match self.mtimes.get(&key) {
+                    Some(old) => mtime > *old,
+                    None => true, // file appeared since the last snapshot
+                };
+                if changed && mark_unread {
+                    self.unread.insert(key.clone());
+                }
+                self.mtimes.insert(key, mtime);
+            }
+        }
     }
 
     /// Runs the event loop until the user quits.
@@ -245,8 +283,16 @@ impl App {
 
         loop {
             if drain(&rx) {
-                self.reload();
-                self.status = Some("reloaded (files changed on disk)".to_owned());
+                let arrived = self.reload();
+                self.status = Some(match arrived.first() {
+                    Some(title) => format!("new incident: {title}"),
+                    None => "reloaded (files changed on disk)".to_owned(),
+                });
+                if self.follow {
+                    // Tail-f: pin the current tab to its (possibly longer)
+                    // bottom; the draw pass clamps to the real height.
+                    self.scroll = u16::MAX;
+                }
             }
             self.ensure_pane();
             // The loop turns at least every 250 ms (the poll timeout below),
@@ -271,11 +317,20 @@ impl App {
     }
 
     /// Re-lists workspaces, keeping the selection pinned to the same id when
-    /// it survives the reload, and drops the content cache.
-    fn reload(&mut self) {
+    /// it survives the reload, and drops the content cache. Returns the
+    /// titles of workspaces that appeared since the last listing, and flags
+    /// changed sections as unread.
+    fn reload(&mut self) -> Vec<String> {
         let previous = self.selected_rca().map(|r| r.id.clone());
+        let known: HashSet<RcaId> = self.rcas.iter().map(|r| r.id.clone()).collect();
+        let mut arrived = Vec::new();
         match self.store.list() {
             Ok((rcas, warnings)) => {
+                arrived = rcas
+                    .iter()
+                    .filter(|r| !known.contains(&r.id))
+                    .map(|r| r.meta.title.clone())
+                    .collect();
                 self.rcas = rcas;
                 self.warnings = warnings;
             }
@@ -283,8 +338,10 @@ impl App {
                 self.warnings = vec![LoadWarning(format!("reload failed: {e}"))];
             }
         }
+        self.refresh_mtimes(true);
         self.recompute_visible(previous);
         self.pane = None;
+        arrived
     }
 
     /// Re-runs the fuzzy filter over the workspace list, keeping the
@@ -336,6 +393,10 @@ impl App {
             return;
         }
         let pane = self.load_pane(&key);
+        // Looking at a tab reads it.
+        if let Some(kind) = key.tab.section() {
+            self.unread.remove(&(key.rca.clone(), kind));
+        }
         self.pane = Some((key, pane));
     }
 
@@ -445,6 +506,21 @@ impl App {
         self.tick
     }
 
+    pub(crate) fn follow(&self) -> bool {
+        self.follow
+    }
+
+    /// Whether `tab` of workspace `id` changed on disk since last viewed.
+    pub(crate) fn is_unread(&self, id: &RcaId, tab: Tab) -> bool {
+        tab.section()
+            .is_some_and(|kind| self.unread.contains(&(id.clone(), kind)))
+    }
+
+    /// Whether any section of workspace `id` is unread.
+    pub(crate) fn has_unread(&self, id: &RcaId) -> bool {
+        self.unread.iter().any(|(unread_id, _)| unread_id == id)
+    }
+
     fn handle_key(&mut self, key: KeyEvent) -> Flow {
         self.status = None;
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
@@ -474,8 +550,17 @@ impl App {
             KeyCode::Char('C') => self.copy_workspace(),
             KeyCode::Char('e') => self.export_current(),
             KeyCode::Char('r') => {
-                self.reload();
+                let _ = self.reload();
                 self.status = Some("reloaded".to_owned());
+            }
+            KeyCode::Char('f') => {
+                self.follow = !self.follow;
+                if self.follow {
+                    self.scroll = u16::MAX; // jump to the tail immediately
+                    self.status = Some("following — reloads stick to the bottom".to_owned());
+                } else {
+                    self.status = Some("follow off".to_owned());
+                }
             }
             KeyCode::Tab | KeyCode::Char(']') | KeyCode::Right => {
                 self.switch_tab(self.tab.next());
@@ -483,8 +568,8 @@ impl App {
             KeyCode::BackTab | KeyCode::Char('[') | KeyCode::Left => {
                 self.switch_tab(self.tab.prev());
             }
-            KeyCode::Char(c @ '1'..='7') => {
-                // '1'..='7' maps exactly onto Tab::ALL's seven entries.
+            KeyCode::Char(c @ '1'..='8') => {
+                // '1'..='8' maps exactly onto Tab::ALL's eight entries.
                 let index = (c as usize).saturating_sub('1' as usize);
                 if let Some(tab) = Tab::ALL.get(index) {
                     self.switch_tab(*tab);
@@ -868,8 +953,8 @@ mod tests {
         for tab in Tab::ALL {
             assert_eq!(tab.next().prev(), tab);
         }
-        assert_eq!(Tab::Notes.next(), Tab::Summary);
-        assert_eq!(Tab::Summary.prev(), Tab::Notes);
+        assert_eq!(Tab::Log.next(), Tab::Summary);
+        assert_eq!(Tab::Summary.prev(), Tab::Log);
     }
 
     #[test]
@@ -988,6 +1073,69 @@ mod tests {
         press(&mut app, KeyCode::Char('6'));
         app.ensure_pane();
         assert!(matches!(app.pane(), Some(Pane::Empty(_))));
+    }
+
+    #[test]
+    fn key_8_jumps_to_the_log_tab() {
+        let mut app = app_with(1);
+        press(&mut app, KeyCode::Char('8'));
+        assert_eq!(app.tab(), Tab::Log);
+        assert_eq!(Tab::Log.section(), Some(SectionKind::Log));
+    }
+
+    #[test]
+    fn changed_sections_are_unread_until_viewed() {
+        let mut app = app_with(1);
+        let id = app.selected_rca().expect("selected").id.clone();
+
+        // Nothing is unread at startup, and an untouched reload adds nothing.
+        assert!(!app.has_unread(&id));
+        app.reload();
+        assert!(!app.has_unread(&id));
+
+        // The agent writes notes.md → unread until the Notes tab is opened.
+        let notes = app.store.workspace_dir(&id).join("notes.md");
+        std::fs::write(&notes, "# Notes\n\nfresh evidence\n").expect("write");
+        app.reload();
+        assert!(app.is_unread(&id, Tab::Notes));
+        assert!(!app.is_unread(&id, Tab::Summary), "summary untouched");
+        assert!(app.has_unread(&id));
+
+        press(&mut app, KeyCode::Char('7')); // Notes tab
+        app.ensure_pane();
+        assert!(!app.is_unread(&id, Tab::Notes), "viewing clears the dot");
+        assert!(!app.has_unread(&id));
+    }
+
+    #[test]
+    fn reload_reports_workspaces_that_appeared() {
+        let mut app = app_with(1);
+        let id = RcaId::new("rca-fresh").expect("valid id");
+        app.store
+            .scaffold(&id, &new_meta("Fresh incident".to_owned(), Severity::High))
+            .expect("scaffold");
+        let arrived = app.reload();
+        assert_eq!(arrived, ["Fresh incident"]);
+        assert!(app.reload().is_empty(), "only reported once");
+    }
+
+    #[test]
+    fn follow_mode_pins_scroll_to_the_bottom() {
+        let mut app = app_with(1);
+        app.viewport = ViewportInfo {
+            content_lines: 100,
+            height: 10,
+        };
+        assert!(!app.follow());
+        press(&mut app, KeyCode::Char('f'));
+        assert!(app.follow());
+        assert_eq!(
+            app.scroll_offsets().0,
+            u16::MAX,
+            "jumps to tail (draw clamps)"
+        );
+        press(&mut app, KeyCode::Char('f'));
+        assert!(!app.follow());
     }
 
     #[test]
