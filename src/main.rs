@@ -1,13 +1,20 @@
-//! CLI entry point: `beagle` opens the TUI; `new` and `list` give
-//! scripts (and Claude) a typed way to create and inspect workspaces.
+//! CLI entry point: `beagle` opens the TUI; the subcommands give scripts
+//! (and Claude) a typed way to create, inspect, and update workspaces — and
+//! the binary itself (`beagle update`).
+//!
+//! Parsing here is pure (no filesystem, no network); `run` does the I/O.
+//! `--root` resolution consults the config file: explicit flag → config
+//! `root` → current directory.
 
 use std::env;
+use std::fs;
+use std::io::IsTerminal as _;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use beagle::model::{RcaId, Severity, Status};
 use beagle::store::{new_meta, Store};
-use beagle::ui;
+use beagle::{config, ui, update, Error};
 
 const USAGE: &str = "\
 beagle — a TUI for root-cause analysis workspaces
@@ -26,41 +33,53 @@ USAGE:
                                             (investigating|identified|monitoring|resolved)
     beagle export <id> [--out <file>]     export one RCA as a single markdown
                   [--root <dir>]            document (default: exports/<id>.md)
+    beagle config                         edit the config file and validate it
+    beagle update [--version <ver>]       install the latest release, or move
+                                            to <ver> (upgrade or downgrade)
+    beagle version                        print the installed version
+    beagle version list                   browse releases; enter installs one
     beagle banner                         print the BEAGLE banner
     beagle --help | --version
 
 The <id> is a lowercase slug ([a-z0-9-], max 64 chars) and becomes the
-directory name under <root>/rcas/.";
+directory name under <root>/rcas/. Without --root, the config file's `root`
+is used, then the current directory.";
 
 /// A fully parsed invocation. Parsing happens once, here at the boundary;
-/// everything downstream takes typed values.
+/// everything downstream takes typed values. `root` stays optional until
+/// `run`, where it is resolved against the config file.
 #[derive(Debug)]
 enum Command {
     Tui {
-        root: PathBuf,
+        root: Option<PathBuf>,
     },
     New {
-        root: PathBuf,
+        root: Option<PathBuf>,
         id: RcaId,
         title: String,
         severity: Severity,
         systems: Vec<String>,
     },
     List {
-        root: PathBuf,
+        root: Option<PathBuf>,
         status: Option<Status>,
         severity: Option<Severity>,
     },
     SetStatus {
-        root: PathBuf,
+        root: Option<PathBuf>,
         id: RcaId,
         status: Status,
     },
     Export {
-        root: PathBuf,
+        root: Option<PathBuf>,
         id: RcaId,
         out: Option<PathBuf>,
     },
+    Config,
+    Update {
+        version: Option<update::Version>,
+    },
+    VersionList,
     Banner,
     Help,
     Version,
@@ -83,17 +102,21 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(command: Command) -> Result<(), beagle::Error> {
+fn run(command: Command) -> Result<(), Error> {
     match command {
         Command::Help => {
             println!("{USAGE}");
             Ok(())
         }
         Command::Version => {
-            println!("beagle {}", env!("CARGO_PKG_VERSION"));
+            println!(
+                "beagle {} ({})",
+                update::Version::current(),
+                update::release_target().unwrap_or("source build"),
+            );
             Ok(())
         }
-        Command::Tui { root } => ui::run(Store::open(&root)?),
+        Command::Tui { root } => ui::run(Store::open(&effective_root(root)?)?),
         Command::New {
             root,
             id,
@@ -101,7 +124,7 @@ fn run(command: Command) -> Result<(), beagle::Error> {
             severity,
             systems,
         } => {
-            let store = Store::open(&root)?;
+            let store = Store::open(&effective_root(root)?)?;
             let mut meta = new_meta(title, severity);
             meta.systems = systems;
             let dir = store.scaffold(&id, &meta)?;
@@ -109,7 +132,7 @@ fn run(command: Command) -> Result<(), beagle::Error> {
             Ok(())
         }
         Command::Export { root, id, out } => {
-            let store = Store::open(&root)?;
+            let store = Store::open(&effective_root(root)?)?;
             let path = store.export_to(&id, out.as_deref())?;
             println!("{}", path.display());
             Ok(())
@@ -119,7 +142,7 @@ fn run(command: Command) -> Result<(), beagle::Error> {
             status,
             severity,
         } => {
-            let store = Store::open(&root)?;
+            let store = Store::open(&effective_root(root)?)?;
             let (summaries, warnings) = store.list()?;
             for rca in summaries
                 .iter()
@@ -137,20 +160,161 @@ fn run(command: Command) -> Result<(), beagle::Error> {
             Ok(())
         }
         Command::SetStatus { root, id, status } => {
-            let store = Store::open(&root)?;
+            let store = Store::open(&effective_root(root)?)?;
             store.set_status(&id, status)?;
             println!("{id}: status → {status}");
             Ok(())
         }
+        Command::Config => run_config(),
+        Command::Update { version } => {
+            let version = match version {
+                Some(version) => version,
+                None => latest_release()?,
+            };
+            install_version(version)
+        }
+        Command::VersionList => run_version_list(),
         Command::Banner => {
             println!(
                 "{}\nbeagle {} — a TUI for root-cause analysis workspaces",
                 beagle::banner::BANNER,
-                env!("CARGO_PKG_VERSION"),
+                update::Version::current(),
             );
             Ok(())
         }
     }
+}
+
+/// Resolves the workspace root: explicit `--root` → config file `root` →
+/// current directory. An invalid config surfaces here rather than being
+/// silently ignored — otherwise beagle would quietly open the wrong root.
+fn effective_root(explicit: Option<PathBuf>) -> Result<PathBuf, Error> {
+    if let Some(root) = explicit {
+        return Ok(root);
+    }
+    if let Some(config) = config::load_default()? {
+        if let Some(root) = config.root {
+            return Ok(root);
+        }
+    }
+    env::current_dir().map_err(|e| Error::io(".", e))
+}
+
+/// `beagle config`: create the file from the template if absent, open it in
+/// the user's editor, and validate it when the editor closes.
+fn run_config() -> Result<(), Error> {
+    let path = config::path();
+    if !path.exists() {
+        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        }
+        fs::write(&path, config::TEMPLATE).map_err(|e| Error::io(&path, e))?;
+        println!("created {}", path.display());
+    }
+
+    // Choose the editor from the pre-edit config when it parses; a broken
+    // config falls back to $VISUAL/$EDITOR/vim — that broken state is
+    // exactly when the editor most needs to open.
+    let pre_edit = config::load(&path).ok().flatten();
+    let editor = config::editor(pre_edit.as_ref());
+    let mut parts = editor.split_whitespace();
+    let program = parts.next().unwrap_or("vim");
+    let status = std::process::Command::new(program)
+        .args(parts)
+        .arg(&path)
+        .status()
+        .map_err(|e| Error::Tool {
+            tool: "editor",
+            message: format!("could not launch `{editor}`: {e}"),
+        })?;
+    if !status.success() {
+        return Err(Error::Tool {
+            tool: "editor",
+            message: format!("`{editor}` exited with {status}; config not validated"),
+        });
+    }
+
+    match config::load(&path) {
+        Ok(Some(config)) => {
+            println!("✓ config OK ({})", path.display());
+            if let Some(root) = &config.root {
+                println!("  root   = {}", root.display());
+            }
+            if let Some(editor) = &config.editor {
+                println!("  editor = {editor}");
+            }
+            Ok(())
+        }
+        Ok(None) => {
+            println!("config file removed; beagle will use defaults");
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("your edits are saved, but the config does not validate;");
+            eprintln!("run `beagle config` again to fix it:");
+            Err(e)
+        }
+    }
+}
+
+/// `beagle version list`: interactive picker on a terminal (enter installs
+/// the selected version), plain listing when piped.
+fn run_version_list() -> Result<(), Error> {
+    let releases = update::fetch_releases()?;
+    if releases.is_empty() {
+        println!("no releases published yet — {}/releases", update::REPO_URL);
+        return Ok(());
+    }
+    let current = update::Version::current();
+    if std::io::stdout().is_terminal() {
+        match update::pick_version(&releases, current)? {
+            Some(version) => install_version(version),
+            None => Ok(()),
+        }
+    } else {
+        for (i, release) in releases.iter().enumerate() {
+            let mut markers = String::new();
+            if i == 0 {
+                markers.push_str("  latest");
+            }
+            if release.version == current {
+                markers.push_str("  current");
+            }
+            println!("{}{markers}", release.version.tag());
+        }
+        Ok(())
+    }
+}
+
+fn latest_release() -> Result<update::Version, Error> {
+    update::fetch_releases()?
+        .first()
+        .map(|release| release.version)
+        .ok_or_else(|| Error::Tool {
+            tool: "update",
+            message: format!("no releases published yet — {}/releases", update::REPO_URL),
+        })
+}
+
+/// Installs `version` over the running binary — the same path for upgrades
+/// and downgrades. A no-op (with a message) when already on that version.
+fn install_version(version: update::Version) -> Result<(), Error> {
+    let current = update::Version::current();
+    if version == current {
+        println!("already on beagle {current}; nothing to do");
+        return Ok(());
+    }
+    let exe = env::current_exe().map_err(|e| Error::io("beagle", e))?;
+    let verb = if version > current {
+        "updating"
+    } else {
+        "downgrading"
+    };
+    println!("{verb} beagle {current} → {version} …");
+    update::update_to(version, &exe)?;
+    println!("✓ beagle {version} installed at {}", exe.display());
+    println!("  restart any running beagle TUIs to pick it up");
+    Ok(())
 }
 
 fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String> {
@@ -172,22 +336,46 @@ fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String> {
     match subcommand.as_deref() {
         None => {
             parse_common_flags(&mut args, &mut root)?;
-            Ok(Command::Tui {
-                root: resolve_root(root)?,
-            })
+            Ok(Command::Tui { root })
         }
         Some("list") => parse_list(&mut args, root),
         Some("status") => parse_status(&mut args, root),
         Some("export") => parse_export(&mut args, root),
         Some("new") => parse_new(&mut args, root),
-        Some("banner") => {
-            if let Some(extra) = args.next() {
-                return Err(format!("`banner` takes no arguments (got `{extra}`)"));
-            }
-            Ok(Command::Banner)
-        }
+        Some("config") => no_arguments(&mut args, "config", Command::Config),
+        Some("update") => parse_update(&mut args),
+        Some("version") => match args.next().as_deref() {
+            None => Ok(Command::Version),
+            Some("list") => no_arguments(&mut args, "version list", Command::VersionList),
+            Some(other) => Err(format!(
+                "unknown `version` subcommand `{other}` (expected `list`)"
+            )),
+        },
+        Some("banner") => no_arguments(&mut args, "banner", Command::Banner),
         Some(other) => Err(format!("unknown command `{other}`")),
     }
+}
+
+fn no_arguments(
+    args: &mut impl Iterator<Item = String>,
+    name: &str,
+    command: Command,
+) -> Result<Command, String> {
+    match args.next() {
+        Some(extra) => Err(format!("`{name}` takes no arguments (got `{extra}`)")),
+        None => Ok(command),
+    }
+}
+
+fn parse_update(args: &mut impl Iterator<Item = String>) -> Result<Command, String> {
+    let mut version: Option<update::Version> = None;
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--version" => version = Some(take_value(args, "--version")?.parse()?),
+            other => return Err(format!("unknown flag `{other}` for `update`")),
+        }
+    }
+    Ok(Command::Update { version })
 }
 
 fn parse_list(
@@ -205,7 +393,7 @@ fn parse_list(
         }
     }
     Ok(Command::List {
-        root: resolve_root(root)?,
+        root,
         status,
         severity,
     })
@@ -231,11 +419,7 @@ fn parse_status(
             other => return Err(format!("unknown flag `{other}` for `status`")),
         }
     }
-    Ok(Command::SetStatus {
-        root: resolve_root(root)?,
-        id,
-        status,
-    })
+    Ok(Command::SetStatus { root, id, status })
 }
 
 fn parse_export(
@@ -255,11 +439,7 @@ fn parse_export(
             other => return Err(format!("unknown flag `{other}` for `export`")),
         }
     }
-    Ok(Command::Export {
-        root: resolve_root(root)?,
-        id,
-        out,
-    })
+    Ok(Command::Export { root, id, out })
 }
 
 fn parse_new(
@@ -289,7 +469,7 @@ fn parse_new(
         return Err("--title must not be empty".to_owned());
     }
     Ok(Command::New {
-        root: resolve_root(root)?,
+        root,
         id,
         title,
         severity,
@@ -315,13 +495,6 @@ fn take_value(args: &mut impl Iterator<Item = String>, flag: &str) -> Result<Str
         .ok_or_else(|| format!("{flag} requires a value"))
 }
 
-fn resolve_root(explicit: Option<PathBuf>) -> Result<PathBuf, String> {
-    match explicit {
-        Some(root) => Ok(root),
-        None => env::current_dir().map_err(|e| format!("cannot determine working directory: {e}")),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)] // panicking is the correct failure mode in tests
@@ -333,8 +506,12 @@ mod tests {
     }
 
     #[test]
-    fn bare_invocation_is_tui() {
-        assert!(matches!(parse(&[]), Ok(Command::Tui { .. })));
+    fn bare_invocation_is_tui_with_no_explicit_root() {
+        assert!(matches!(parse(&[]), Ok(Command::Tui { root: None })));
+        assert!(matches!(
+            parse(&["--root", "/x"]),
+            Ok(Command::Tui { root: Some(_) })
+        ));
     }
 
     #[test]
@@ -361,7 +538,7 @@ mod tests {
                 severity,
                 systems,
             }) => {
-                assert_eq!(root, PathBuf::from("/tmp/x"));
+                assert_eq!(root, Some(PathBuf::from("/tmp/x")));
                 assert_eq!(id.as_str(), "pay-latency");
                 assert_eq!(title, "Payments latency");
                 assert_eq!(severity, Severity::High);
@@ -398,7 +575,7 @@ mod tests {
         ]);
         match parsed {
             Ok(Command::Export { root, id, out }) => {
-                assert_eq!(root, PathBuf::from("/x"));
+                assert_eq!(root, Some(PathBuf::from("/x")));
                 assert_eq!(id.as_str(), "my-rca");
                 assert_eq!(out, Some(PathBuf::from("/tmp/vault/note.md")));
             }
@@ -442,7 +619,7 @@ mod tests {
     fn status_parses_id_status_and_root() {
         match parse(&["status", "my-rca", "investigating", "--root", "/x"]) {
             Ok(Command::SetStatus { root, id, status }) => {
-                assert_eq!(root, PathBuf::from("/x"));
+                assert_eq!(root, Some(PathBuf::from("/x")));
                 assert_eq!(id.as_str(), "my-rca");
                 assert_eq!(status, Status::Investigating);
             }
@@ -458,5 +635,38 @@ mod tests {
     fn banner_parses_and_rejects_arguments() {
         assert!(matches!(parse(&["banner"]), Ok(Command::Banner)));
         assert!(parse(&["banner", "--loud"]).is_err());
+    }
+
+    #[test]
+    fn config_parses_and_rejects_arguments() {
+        assert!(matches!(parse(&["config"]), Ok(Command::Config)));
+        assert!(parse(&["config", "extra"]).is_err());
+    }
+
+    #[test]
+    fn version_and_version_list_parse() {
+        assert!(matches!(parse(&["version"]), Ok(Command::Version)));
+        assert!(matches!(
+            parse(&["version", "list"]),
+            Ok(Command::VersionList)
+        ));
+        assert!(parse(&["version", "bump"]).is_err());
+        assert!(parse(&["version", "list", "extra"]).is_err());
+    }
+
+    #[test]
+    fn update_parses_an_optional_target_version() {
+        assert!(matches!(
+            parse(&["update"]),
+            Ok(Command::Update { version: None })
+        ));
+        match parse(&["update", "--version", "v0.1.0"]) {
+            Ok(Command::Update {
+                version: Some(version),
+            }) => assert_eq!(version.tag(), "v0.1.0"),
+            other => panic!("unexpected parse: {other:?}"),
+        }
+        assert!(parse(&["update", "--version", "latest"]).is_err());
+        assert!(parse(&["update", "--force"]).is_err());
     }
 }

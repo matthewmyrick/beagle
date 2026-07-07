@@ -65,7 +65,32 @@ beagle status <slug> investigating   # flip status; a running TUI updates live
 beagle export <slug>      # one markdown file → exports/<slug>.md
 beagle export <slug> --out ~/vault/incidents/<slug>.md   # e.g. an Obsidian vault
 beagle banner             # print the BEAGLE banner
+beagle config             # edit + validate ~/.config/beagle/config.toml
+beagle version            # print the installed version
+beagle version list       # browse releases; enter installs the selection
+beagle update             # self-update to the latest release
+beagle update --version 0.1.0    # or move to any release, up or down
 ```
+
+## Config & updates
+
+`beagle config` opens `~/.config/beagle/config.toml` in your editor (config
+`editor`, then `$VISUAL`/`$EDITOR`, then vim) and **validates it when the
+editor closes** — typos and unknown keys are reported immediately. Every
+setting is optional and overridden by flags:
+
+```toml
+root = "/path/to/oncall"   # default --root, so `beagle` works from anywhere
+editor = "code -w"         # editor for `beagle config`
+```
+
+`beagle update` downloads the release binary for your platform, **verifies
+its sha256** against the published checksum, and atomically swaps the
+installed binary — never a half-written executable. `--version <ver>` moves
+to any released version, older or newer, so a bad release is one command to
+back out of. `beagle version list` shows every release (latest and current
+marked); pick one with `j`/`k` + enter to install it. On platforms without
+prebuilt binaries, update via `cargo install` instead.
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
 `1`–`7` switch tabs · `/` fuzzy-filter incidents · `c` copy tab / `C` copy
