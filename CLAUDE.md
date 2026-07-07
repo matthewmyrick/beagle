@@ -2,11 +2,19 @@
 
 This repo is the `beagle` TUI: it renders RCA (root-cause analysis)
 workspaces that **you** write while debugging a system. There is a dedicated
-skill for this workflow — `/rca` (`.claude/skills/rca/SKILL.md`); invoke it
-whenever you are debugging an incident or writing one up. The user keeps the TUI
-open; it live-reloads as you write files. Your job when debugging: investigate,
-then explain **what broke, why it happened, and how to fix it** through these
-files.
+skill for this workflow — `/beagle` (`.claude/skills/beagle/SKILL.md`); invoke
+it whenever you are debugging an incident or writing one up. The user keeps the
+TUI open; it live-reloads as you write files. Your job when debugging:
+investigate, then explain **what broke, why it happened, and how to fix it**
+through these files.
+
+## Before investigating: the toolbox
+
+If the store root has a `toolbox.md` and/or `systems/*.md` (scaffold with
+`beagle init`), read them first — they describe the telemetry, CLIs, and
+per-system context available to you (the TUI shows the same files via `T`).
+When an investigation teaches you something durable about a system, update
+its `systems/<name>.md`.
 
 ## Creating a workspace
 

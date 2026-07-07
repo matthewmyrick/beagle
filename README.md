@@ -65,12 +65,28 @@ beagle status <slug> investigating   # flip status; a running TUI updates live
 beagle export <slug>      # one markdown file → exports/<slug>.md
 beagle export <slug> --out ~/vault/incidents/<slug>.md   # e.g. an Obsidian vault
 beagle banner             # print the BEAGLE banner
+beagle init               # scaffold toolbox.md + systems/ agent context
 beagle config             # edit + validate ~/.config/beagle/config.toml
 beagle version            # print the installed version
 beagle version list       # browse releases; enter installs the selection
 beagle update             # self-update to the latest release
 beagle update --version 0.1.0    # or move to any release, up or down
 ```
+
+## Give agents context: the toolbox
+
+An investigating agent works much faster when it knows what telemetry exists
+before it starts. `beagle init` scaffolds two things at the store root:
+
+- `toolbox.md` — the tools available here: Grafana dashboards, Loki/Sentry,
+  CLIs the agent may shell out to, runbooks, escalation paths.
+- `systems/<name>.md` — one file per service (names match `systems` in
+  `rca.toml`): its dashboards, log labels, dependencies, known failure modes.
+
+The `/beagle` Claude Code skill reads these before every investigation and
+updates them when it learns something durable. Press `T` in the TUI to see
+the toolbox plus the systems docs for the selected incident — you and the
+agent share the same source of truth.
 
 ## Config & updates
 
@@ -93,7 +109,7 @@ marked); pick one with `j`/`k` + enter to install it. On platforms without
 prebuilt binaries, update via `cargo install` instead.
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
-`1`–`7` switch tabs · `/` fuzzy-filter incidents · `c` copy tab / `C` copy
+`1`–`7` switch tabs · `/` fuzzy-filter incidents · `T` toolbox · `c` copy tab / `C` copy
 whole RCA (pbcopy or OSC 52) · `e` export to `exports/<slug>.md` · `n/p` cycle
 diagrams · `h/l` pan diagrams · `r` reload · `?` help · `Q` / `ctrl-c` quit.
 

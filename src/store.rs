@@ -47,6 +47,14 @@ pub const DIAGRAMS_DIR: &str = "diagrams";
 /// exported single-file markdown documents are written.
 pub const EXPORTS_DIR: &str = "exports";
 
+/// Name of the toolbox file at the store root: what an investigating agent
+/// has to work with (dashboards, CLIs, runbooks). See `beagle init`.
+pub const TOOLBOX_FILE: &str = "toolbox.md";
+
+/// Name of the per-system context directory at the store root. File names
+/// (minus `.md`) line up with `systems` entries in workspace manifests.
+pub const SYSTEMS_DIR: &str = "systems";
+
 /// A non-fatal problem found while listing workspaces (corrupt manifest,
 /// stray file, ...). Shown in the status bar; never aborts the listing.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,6 +64,16 @@ pub struct LoadWarning(pub String);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramEntry {
     /// File name, e.g. `01-topology.txt`.
+    pub name: String,
+    /// Absolute path to the file.
+    pub path: PathBuf,
+}
+
+/// A per-system context document inside the root `systems/` directory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SystemDoc {
+    /// The system name: the file name minus `.md` (e.g. `payments-api`),
+    /// matching `systems` entries in workspace manifests.
     pub name: String,
     /// Absolute path to the file.
     pub path: PathBuf,
@@ -219,6 +237,135 @@ impl Store {
         Ok(dir)
     }
 }
+
+impl Store {
+    /// Reads the root `toolbox.md` — the investigation context agents read
+    /// before starting. `Ok(None)` when it does not exist.
+    ///
+    /// # Errors
+    /// [`Error::Io`] / [`Error::FileTooLarge`] as for sections.
+    pub fn read_toolbox(&self) -> Result<Option<String>> {
+        read_optional(&self.root.join(TOOLBOX_FILE))
+    }
+
+    /// Lists the root `systems/*.md` context documents, sorted by system
+    /// name. A missing `systems/` directory yields an empty list.
+    ///
+    /// # Errors
+    /// [`Error::Io`] if the directory exists but cannot be read.
+    pub fn list_system_docs(&self) -> Result<Vec<SystemDoc>> {
+        let dir = self.root.join(SYSTEMS_DIR);
+        let entries = match fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(Error::io(&dir, e)),
+        };
+        let mut docs: Vec<SystemDoc> = entries
+            .filter_map(std::result::Result::ok)
+            .filter(|entry| entry.path().is_file())
+            .filter_map(|entry| {
+                let path = entry.path();
+                let name = path.file_stem()?.to_string_lossy().into_owned();
+                (path.extension()? == "md").then_some(SystemDoc { name, path })
+            })
+            .collect();
+        docs.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(docs)
+    }
+
+    /// Reads one system context document. `Ok(None)` if it vanished since
+    /// listing.
+    ///
+    /// # Errors
+    /// [`Error::Io`] / [`Error::FileTooLarge`] as for sections.
+    pub fn read_system_doc(&self, doc: &SystemDoc) -> Result<Option<String>> {
+        read_optional(&doc.path)
+    }
+
+    /// Scaffolds the investigation context at the store root: `toolbox.md`
+    /// and `systems/` with an example document. Never overwrites — existing
+    /// files are skipped. Returns the paths actually created.
+    ///
+    /// # Errors
+    /// [`Error::Io`] on write failures.
+    pub fn init_context(&self) -> Result<Vec<PathBuf>> {
+        let mut created = Vec::new();
+
+        let toolbox = self.root.join(TOOLBOX_FILE);
+        if !toolbox.exists() {
+            write_atomic(&toolbox, TOOLBOX_TEMPLATE)?;
+            created.push(toolbox);
+        }
+
+        let systems = self.root.join(SYSTEMS_DIR);
+        fs::create_dir_all(&systems).map_err(|e| Error::io(&systems, e))?;
+        let example = systems.join("example-service.md");
+        if !example.exists() && self.list_system_docs()?.is_empty() {
+            write_atomic(&example, SYSTEM_TEMPLATE)?;
+            created.push(example);
+        }
+        Ok(created)
+    }
+}
+
+/// Template for `toolbox.md`, written by [`Store::init_context`].
+pub const TOOLBOX_TEMPLATE: &str = "\
+# Toolbox
+
+> What an investigating agent has to work with here. Keep this current —
+> agents read it before touching any telemetry, and `T` shows it in the TUI.
+
+## Observability
+
+- Grafana: <https://grafana.example.com> — start with the `service overview`
+  dashboard
+- Logs: Loki via Grafana Explore (labels: `service`, `env`, `level`)
+- Errors: Sentry — <https://sentry.io/organizations/example>
+
+## CLIs available
+
+- `gh` — GitHub (PRs, issues, API)
+- `kubectl` — cluster access (read-only context: `prod-ro`)
+
+## Runbooks & escalation
+
+- Runbooks: <https://wiki.example.com/runbooks>
+- Escalation: #incident-response
+
+## Conventions
+
+- Times in UTC everywhere.
+- One `systems/<name>.md` per service — read the ones matching the incident
+  before investigating, and update them when you learn something durable.
+";
+
+/// Template for a `systems/<name>.md` document, written by
+/// [`Store::init_context`].
+pub const SYSTEM_TEMPLATE: &str = "\
+# example-service
+
+> Rename this file to match a real system (the name used in `rca.toml`
+> `systems`). One file per service.
+
+## Telemetry
+
+- Dashboard: <https://grafana.example.com/d/example-service>
+- Log labels: `service=\"example-service\"`
+- Sentry project: `example-service`
+
+## Depends on
+
+- postgres (primary), redis (sessions), sendgrid (email)
+
+## Known failure modes
+
+- Redis pool exhaustion under login storms — p99 spikes, `pool timeout`
+  in logs. See rcas/2026-06-30-... for the worked incident.
+
+## Oncall / ownership
+
+- Team: payments · Slack: #team-payments
+";
 
 impl Store {
     /// Reads and parses one workspace's manifest.
@@ -643,6 +790,76 @@ mod tests {
         let custom_path = store.export_to(&id, Some(&custom)).expect("custom export");
         assert_eq!(custom_path, custom);
         assert!(custom.is_file(), "parent dirs created");
+    }
+
+    #[test]
+    fn init_context_scaffolds_once_and_never_overwrites() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+
+        let created = store.init_context().expect("init");
+        assert_eq!(created.len(), 2, "toolbox + example system: {created:?}");
+        assert!(tmp.path().join(TOOLBOX_FILE).is_file());
+        assert!(tmp
+            .path()
+            .join(SYSTEMS_DIR)
+            .join("example-service.md")
+            .is_file());
+
+        // Second run creates nothing and touches nothing.
+        fs::write(tmp.path().join(TOOLBOX_FILE), "customized").expect("customize");
+        let again = store.init_context().expect("re-init");
+        assert!(again.is_empty(), "no overwrites: {again:?}");
+        assert_eq!(
+            fs::read_to_string(tmp.path().join(TOOLBOX_FILE)).expect("read"),
+            "customized"
+        );
+    }
+
+    #[test]
+    fn init_context_skips_the_example_when_real_system_docs_exist() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+        let systems = tmp.path().join(SYSTEMS_DIR);
+        fs::create_dir_all(&systems).expect("mkdir");
+        fs::write(systems.join("payments-api.md"), "# payments-api").expect("write");
+
+        let created = store.init_context().expect("init");
+        assert_eq!(created.len(), 1, "only the toolbox is missing");
+        assert!(
+            !systems.join("example-service.md").exists(),
+            "no example next to real docs"
+        );
+    }
+
+    #[test]
+    fn toolbox_and_system_docs_read_back() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let store = Store::open(tmp.path()).expect("open store");
+
+        assert_eq!(store.read_toolbox().expect("absent ok"), None);
+        assert!(store.list_system_docs().expect("missing dir ok").is_empty());
+
+        store.init_context().expect("init");
+        let toolbox = store.read_toolbox().expect("read").expect("present");
+        assert!(toolbox.starts_with("# Toolbox"));
+
+        let systems = tmp.path().join(SYSTEMS_DIR);
+        fs::write(systems.join("api.md"), "# api").expect("write");
+        fs::write(systems.join("notes.txt"), "not markdown").expect("write");
+        let docs = store.list_system_docs().expect("list");
+        let names: Vec<&str> = docs.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, ["api", "example-service"], "sorted, .md only");
+        assert_eq!(
+            store.read_system_doc(&docs[0]).expect("read").as_deref(),
+            Some("# api")
+        );
+    }
+
+    #[test]
+    fn context_templates_are_valid_markdown_seeds() {
+        assert!(TOOLBOX_TEMPLATE.starts_with("# Toolbox"));
+        assert!(SYSTEM_TEMPLATE.starts_with("# example-service"));
     }
 
     #[test]

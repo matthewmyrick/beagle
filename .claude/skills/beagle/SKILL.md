@@ -1,5 +1,5 @@
 ---
-name: rca
+name: beagle
 description: Create and maintain RCA (root-cause analysis) workspaces rendered live by the Beagle TUI. Use when debugging a system or incident, or when asked to write up what broke, why it happened, and how to fix it.
 ---
 
@@ -8,6 +8,25 @@ description: Create and maintain RCA (root-cause analysis) workspaces rendered l
 The user keeps the `beagle` TUI open in a terminal. It watches `rcas/` and
 re-renders **live** as files change — the workspace you write *is* how you
 explain the incident to them. Write as you investigate, not at the end.
+
+## 0. Read the toolbox first
+
+Before touching telemetry, read the investigation context at the store root
+(next to `rcas/`), if present:
+
+- `toolbox.md` — the tools available to you here: observability stack
+  (Grafana dashboards, Loki/Prometheus, Sentry), CLIs you can shell out to,
+  runbook locations. Start your investigation with what it lists.
+- `systems/<name>.md` — per-system context (dashboards with URLs, log
+  labels, dependencies, known failure modes). Read the files matching the
+  systems you suspect; their names line up with `systems` in `rca.toml`.
+
+These files are also rendered in the TUI (`T`), so the user sees the same
+context you do. **If you learn something durable during the investigation**
+— a dashboard moved, a new failure mode, a dependency nobody wrote down —
+update the relevant `systems/` file or `toolbox.md`; that knowledge compounds
+across incidents. If none of these files exist yet, suggest `beagle init`
+to the user (don't run it unprompted mid-incident).
 
 ## 1. Scaffold
 

@@ -44,9 +44,40 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     draw_workspace(frame, app, content);
     draw_status_bar(frame, app, status_bar);
 
+    if app.toolbox().is_some() {
+        draw_toolbox(frame, app, frame.area());
+    }
     if app.help_visible() {
         draw_help(frame, frame.area());
     }
+}
+
+/// The toolbox overlay: root `toolbox.md` plus relevant `systems/*.md`,
+/// pre-rendered by the app when opened. Scrollable; geometry is fed back
+/// for clamping, like the content pane.
+fn draw_toolbox(frame: &mut Frame, app: &mut App, area: Rect) {
+    let Some(text) = app.toolbox() else { return };
+    let width = area.width.saturating_sub(6).clamp(20, 96);
+    let height = area.height.saturating_sub(2).max(5);
+    let popup = center(area, width, height);
+
+    let block = Block::default()
+        .title(" Toolbox — j/k scroll · T/esc close ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+    let inner = block.inner(popup);
+
+    let paragraph = Paragraph::new(text.clone()).wrap(Wrap { trim: false });
+    let content_lines = u16::try_from(paragraph.line_count(inner.width)).unwrap_or(u16::MAX);
+    app.toolbox_viewport = (content_lines, inner.height);
+    let scroll = app
+        .toolbox_scroll()
+        .min(content_lines.saturating_sub(inner.height));
+
+    frame.render_widget(Clear, popup);
+    frame.render_widget(paragraph.block(block).scroll((scroll, 0)), popup);
 }
 
 /// Whether the workspace area has room for the banner beside the header —
@@ -368,7 +399,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let mut spans = vec![Span::styled(
         match app.focus() {
             Focus::List => {
-                "  j/k select · enter open · ←/→ tabs · / filter · c copy · r reload · ? help · Q quit"
+                "  j/k select · enter open · ←/→ tabs · / filter · T toolbox · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
                 "  j/k scroll · ←/→ tabs · h/l pan · c copy · b back · ? help · Q quit"
@@ -391,7 +422,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_help(frame: &mut Frame, area: Rect) {
     let width = 62.min(area.width.saturating_sub(4));
-    let height = 18.min(area.height.saturating_sub(2));
+    let height = 19.min(area.height.saturating_sub(2));
     let popup = center(area, width, height);
 
     let rows = [
@@ -406,6 +437,7 @@ fn draw_help(frame: &mut Frame, area: Rect) {
             "e",
             "export RCA to exports/<id>.md (frontmatter + all tabs)",
         ),
+        ("T", "toolbox: toolbox.md + systems/ context"),
         ("n / p", "next / previous diagram"),
         ("h / l, ← / →", "pan diagrams horizontally"),
         ("space / pgdn / pgup", "page through content"),
