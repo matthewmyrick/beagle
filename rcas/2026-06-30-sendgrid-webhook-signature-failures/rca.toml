@@ -1,0 +1,15 @@
+title = "SendGrid webhook signature verification failing on all delivery + bounce events"
+severity = "high"
+status = "identified"
+created = "2026-07-06T22:48:05.231922Z"
+updated = "2026-07-06T23:05:00Z"
+systems = [
+    "hadrius-backend",
+    "sendgrid",
+]
+tags = [
+    "webhooks",
+    "config",
+    "email",
+    "data-loss",
+]
