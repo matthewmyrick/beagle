@@ -1,0 +1,302 @@
+//! Drawing: a pure projection of [`App`] onto the frame.
+//!
+//! The only mutation allowed here is feeding viewport geometry back into the
+//! app (for scroll clamping) — no state transitions, no I/O, and no markdown
+//! parsing (content is pre-rendered by the app when it changes, not per
+//! frame).
+//!
+//! Submodules: `header` (title, meta, tab bar, banner), `popups` (links,
+//! toolbox, help), and `style` (badges, glyphs, layout helpers).
+
+mod header;
+mod popups;
+mod style;
+
+use ratatui::layout::{Constraint, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{List, ListItem, ListState, Paragraph, Wrap};
+use ratatui::Frame;
+
+use crate::model::RcaSummary;
+
+use super::{App, Focus, Pane, Tab};
+
+use header::{banner_fits, draw_banner, flow_tabs, header_paragraph, BANNER_COLS};
+use popups::{draw_help, draw_links, draw_toolbox};
+use style::{
+    horizontal, inset, pane_block, severity_badge, status_symbol, truncate, vertical, SIDEBAR_WIDTH,
+};
+
+pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
+    let [main, status_bar] = vertical(frame.area(), &[Constraint::Min(0), Constraint::Length(1)]);
+    let [sidebar, content] = horizontal(
+        main,
+        &[Constraint::Length(SIDEBAR_WIDTH), Constraint::Min(0)],
+    );
+
+    draw_sidebar(frame, app, sidebar);
+    draw_workspace(frame, app, content);
+    draw_status_bar(frame, app, status_bar);
+
+    if app.toolbox().is_some() {
+        draw_toolbox(frame, app, frame.area());
+    }
+    draw_links(frame, app, frame.area());
+    if app.help_visible() {
+        draw_help(frame, frame.area());
+    }
+}
+
+fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
+    let focused = app.focus() == Focus::List;
+    let title = if app.filter().is_empty() {
+        format!(" Incidents ({}) ", app.rcas().len())
+    } else {
+        format!(
+            " Incidents ({}/{})  /{} ",
+            app.visible_len(),
+            app.rcas().len(),
+            app.filter(),
+        )
+    };
+    let block = pane_block(title, focused);
+
+    let tick = app.tick();
+    let items: Vec<ListItem<'_>> = app
+        .visible_rcas()
+        .map(|rca| rca_list_item(rca, tick, app.has_unread(&rca.id)))
+        .collect();
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(40, 44, 60))
+            .add_modifier(Modifier::BOLD),
+    );
+
+    let mut state = ListState::default();
+    if app.visible_len() > 0 {
+        state.select(Some(app.selected_index()));
+    }
+    frame.render_stateful_widget(list, area, &mut state);
+}
+
+fn rca_list_item(rca: &RcaSummary, tick: usize, has_unread: bool) -> ListItem<'static> {
+    let (badge, badge_style) = severity_badge(rca.meta.severity);
+    let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
+    let title = Line::from(vec![
+        Span::styled(format!(" {badge} "), badge_style),
+        Span::raw(" "),
+        Span::raw(truncate(&rca.meta.title, SIDEBAR_WIDTH as usize - 10)),
+    ]);
+    let mut detail_spans = vec![
+        Span::styled(format!("  {symbol} "), symbol_style),
+        Span::styled(rca.meta.status.to_string(), symbol_style),
+        Span::styled(
+            format!("  {}", truncate(rca.id.as_str(), 20)),
+            Style::default().fg(Color::DarkGray),
+        ),
+    ];
+    if has_unread {
+        detail_spans.push(Span::styled(" ●", Style::default().fg(Color::LightYellow)));
+    }
+    ListItem::new(vec![title, Line::from(detail_spans)])
+}
+
+fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
+    let Some(rca) = app.selected_rca().cloned() else {
+        draw_welcome(frame, area);
+        return;
+    };
+
+    // The banner sits beside the header/tab rows at the top right, so it
+    // never pushes content down by more than the difference between its
+    // height and the rows the header already uses. Hidden when it would
+    // squeeze the header below MIN_HEADER_COLS.
+    let banner_cols = if banner_fits(area) { BANNER_COLS } else { 0 };
+    let head_width = area.width.saturating_sub(banner_cols);
+
+    // Header and tab bar heights are computed from the actual width so
+    // nothing is ever cut off on narrow terminals — both flow onto extra
+    // lines instead of truncating.
+    let prs: Vec<(String, Option<crate::prs::PrState>)> = rca
+        .meta
+        .prs
+        .iter()
+        .map(|url| (url.clone(), app.pr_state(url)))
+        .collect();
+    let header = header_paragraph(&rca, app.tick(), &prs);
+    let header_width = head_width.saturating_sub(1).max(1); // inset by 1 below
+    let header_height = u16::try_from(header.line_count(header_width))
+        .unwrap_or(2)
+        .min(6);
+
+    let unread: Vec<bool> = Tab::ALL
+        .iter()
+        .map(|tab| app.is_unread(&rca.id, *tab))
+        .collect();
+    let tab_lines = flow_tabs(app.tab(), head_width, &unread);
+    let tab_height = u16::try_from(tab_lines.len()).unwrap_or(1);
+
+    let banner_height = if banner_cols > 0 {
+        crate::banner::HEIGHT
+    } else {
+        0
+    };
+    let top_height = (header_height + tab_height).max(banner_height);
+    let [top, body] = vertical(area, &[Constraint::Length(top_height), Constraint::Min(0)]);
+    let [head_col, banner_col] =
+        horizontal(top, &[Constraint::Min(0), Constraint::Length(banner_cols)]);
+    let [header_area, tab_bar] = vertical(
+        head_col,
+        &[Constraint::Length(header_height), Constraint::Min(0)],
+    );
+
+    frame.render_widget(header, inset(header_area, 1));
+    frame.render_widget(Paragraph::new(tab_lines), tab_bar);
+    if banner_cols > 0 {
+        draw_banner(frame, banner_col);
+    }
+
+    draw_content(frame, app, body);
+}
+
+fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
+    let focused = app.focus() == Focus::Content;
+    let (scroll, hscroll) = app.scroll_offsets();
+
+    let (text, wrapped, title): (&Text<'static>, bool, String) = match app.pane() {
+        Some(Pane::Section(text)) => (text, true, format!(" {} ", app.tab().title())),
+        Some(Pane::Diagram {
+            text,
+            name,
+            index,
+            total,
+        }) => (
+            text,
+            false,
+            format!(" {name}  [{}/{total}]  n/p to cycle ", index + 1),
+        ),
+        Some(Pane::Empty(hint)) => {
+            let paragraph = Paragraph::new(hint.clone())
+                .style(Style::default().fg(Color::DarkGray))
+                .wrap(Wrap { trim: false })
+                .block(pane_block(format!(" {} ", app.tab().title()), focused));
+            frame.render_widget(paragraph, area);
+            return;
+        }
+        Some(Pane::LoadError(message)) => {
+            let paragraph = Paragraph::new(message.clone())
+                .style(Style::default().fg(Color::Red))
+                .wrap(Wrap { trim: false })
+                .block(pane_block(" load error ".to_owned(), focused));
+            frame.render_widget(paragraph, area);
+            return;
+        }
+        None => return,
+    };
+
+    let block = pane_block(title, focused);
+    let inner = block.inner(area);
+
+    // Feed real geometry back so scrolling clamps to actual wrapped height.
+    let mut paragraph = Paragraph::new(text.clone());
+    if wrapped {
+        paragraph = paragraph.wrap(Wrap { trim: false });
+    }
+    let content_lines = u16::try_from(paragraph.line_count(inner.width)).unwrap_or(u16::MAX);
+    app.viewport = super::ViewportInfo {
+        content_lines,
+        height: inner.height,
+    };
+    let max_scroll = content_lines.saturating_sub(inner.height);
+
+    let paragraph = paragraph
+        .block(block)
+        .scroll((scroll.min(max_scroll), if wrapped { 0 } else { hscroll }));
+    frame.render_widget(paragraph, area);
+}
+
+fn draw_welcome(frame: &mut Frame, area: Rect) {
+    let text = Text::from(vec![
+        Line::from(""),
+        Line::styled(
+            "  no RCA workspaces yet",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Line::from(""),
+        Line::from("  Create one:"),
+        Line::styled(
+            "    beagle new my-incident --title \"What broke\" --severity high",
+            Style::default().fg(Color::LightGreen),
+        ),
+        Line::from(""),
+        Line::from("  …or ask Claude to debug a system; it will scaffold a workspace"),
+        Line::from("  under rcas/ and this view will pick it up live."),
+    ]);
+    let block = pane_block(" beagle ".to_owned(), false);
+    frame.render_widget(Paragraph::new(text).block(block), area);
+}
+
+fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+    if app.search_active() {
+        let line = Line::from(vec![
+            Span::styled("  filter: ", Style::default().fg(Color::Yellow)),
+            Span::raw(app.filter().to_owned()),
+            Span::styled("▌", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                "   enter keep · esc clear · ↑/↓ select",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]);
+        frame.render_widget(Paragraph::new(line), area);
+        return;
+    }
+    // A status message gets the whole line — sharing it with the key hints
+    // truncated messages into uselessness. It disappears on the next
+    // keypress, so the hints are only ever hidden for one beat.
+    if let Some(message) = app.status_line() {
+        let (symbol, color) = if message.contains("failed") {
+            ("  ✗ ", Color::LightRed)
+        } else {
+            ("  ✓ ", Color::LightGreen)
+        };
+        let line = Line::from(vec![
+            Span::styled(symbol, Style::default().fg(color)),
+            Span::styled(message.to_owned(), Style::default().fg(color)),
+        ]);
+        frame.render_widget(Paragraph::new(line), area);
+        return;
+    }
+    let mut spans = vec![Span::styled(
+        match app.focus() {
+            Focus::List => {
+                "  j/k select · enter open · ←/→ tabs · / filter · T toolbox · c copy · r reload · ? help · Q quit"
+            }
+            Focus::Content => {
+                "  j/k scroll · ←/→ tabs · h/l pan · f follow · o links · c copy · b back · ? help · Q quit"
+            }
+        },
+        Style::default().fg(Color::DarkGray),
+    )];
+    if app.follow() {
+        spans.push(Span::styled(
+            "  ·  following",
+            Style::default().fg(Color::LightYellow),
+        ));
+    }
+    if !app.warnings().is_empty() {
+        spans.push(Span::styled(
+            format!(
+                "  ·  {} warning(s), first: {}",
+                app.warnings().len(),
+                app.warnings()[0].0
+            ),
+            Style::default().fg(Color::Yellow),
+        ));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+
+#[cfg(test)]
+#[path = "tests/view.rs"]
+mod tests;

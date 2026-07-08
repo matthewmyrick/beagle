@@ -69,7 +69,7 @@ a comment the reviewer might.
 
 - **Every read is buffered and bounded.** Files are read via
   `fs::read_to_string` (single syscall for small files) with a size cap
-  (`MAX_SECTION_BYTES`) checked from metadata first — a runaway 2 GB log pasted
+  (`MAX_FILE_BYTES`) checked from metadata first — a runaway 2 GB log pasted
   into a section must not OOM the TUI.
 - **Event-driven, never polled.** Filesystem changes arrive via `notify`
   watcher events on a channel; the input loop blocks on `event::poll` with a
@@ -129,9 +129,24 @@ is tiny; hand-rolled parser is ~80 audited lines), no async runtimes (§5).
   model), `markdown` (text → styled `Text`), `ui` (state machine + drawing).
   Dependencies point one way: `ui → store → model`; `model` imports nothing
   from the others.
+- **Keep files under ~400 lines.** A file that grows past that is doing more
+  than one job — split it into a directory module with one file per
+  responsibility (see `store/` and `ui/`), re-exporting from `mod.rs` so
+  public paths stay stable.
 - Functions that can fail return `Result` and are named for what they do, not
   how (`read_section`, not `try_get_section_file_contents`).
-- Tests live in `#[cfg(test)] mod tests` next to the code they test;
-  cross-module behavior tests go in `tests/`.
+- Unit tests live in a `tests/` folder beside the code, one file per module,
+  wired in with a path attribute so they stay child modules (full access to
+  private items):
+
+  ```rust
+  #[cfg(test)]
+  #[path = "tests/mutate.rs"]
+  mod tests;
+  ```
+
+  `src/store/mutate.rs` → `src/store/tests/mutate.rs`; top-level modules use
+  `src/tests/<name>.rs`. Shared fixtures go in a `tests/util.rs` declared the
+  same way. Cross-module behavior tests go in the crate-root `tests/`.
 - Doc comments explain *contract and edge cases* ("returns `Ok(None)` if the
   section file does not exist"), not implementation.
