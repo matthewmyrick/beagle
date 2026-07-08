@@ -67,6 +67,38 @@ fn navigation_on_empty_store_does_not_panic() {
 }
 
 #[test]
+fn tab_keys_on_an_empty_store_explain_instead_of_silence() {
+    // The welcome screen has no tab bar, so a mute Tab press reads as a
+    // broken keybinding. Every tab-switching key must say why instead.
+    let mut app = app_with(0);
+    for code in [
+        KeyCode::Tab,
+        KeyCode::BackTab,
+        KeyCode::Right,
+        KeyCode::Char('3'),
+    ] {
+        press(&mut app, code);
+        let status = app.status_line().expect("status explains the no-op");
+        assert!(status.contains("no incidents yet"), "got: {status}");
+        assert_eq!(app.focus(), Focus::List, "focus stays on the list");
+    }
+    assert_eq!(app.tab(), Tab::Summary, "tab state unchanged");
+}
+
+#[test]
+fn tab_keys_with_a_non_matching_filter_point_at_the_filter() {
+    let mut app = app_with(2);
+    press(&mut app, KeyCode::Char('/'));
+    press(&mut app, KeyCode::Char('z')); // matches nothing
+    press(&mut app, KeyCode::Enter); // keep filter, leave search mode
+    assert_eq!(app.visible_len(), 0);
+
+    press(&mut app, KeyCode::Tab);
+    let status = app.status_line().expect("status set");
+    assert!(status.contains("filter"), "got: {status}");
+}
+
+#[test]
 fn enter_focuses_content_and_esc_returns_to_list() {
     let mut app = app_with(1);
     press(&mut app, KeyCode::Enter);

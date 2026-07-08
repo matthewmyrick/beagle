@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Tab-switching keys (tab, arrows, 1-8) pressed with no incidents on
+  screen now explain themselves in the status bar instead of silently
+  doing nothing (the welcome screen has no tab bar, so the silence read
+  as a broken keybinding).
+
 ### Added
 
 - Pressing `T` with no toolbox scaffolds it on the spot (same as `beagle

@@ -161,13 +161,24 @@ impl App {
     }
 
     fn switch_tab(&mut self, tab: Tab) {
+        // Tabs belong to a selected incident. With nothing visible the
+        // welcome screen has no tab bar, so a silent state change would
+        // read as a broken keybinding — say why instead.
+        if self.visible.is_empty() {
+            self.status = Some(if self.rcas.is_empty() {
+                "no incidents yet — tabs appear once a workspace exists \
+                 (beagle new <slug> --title \"...\")"
+                    .to_owned()
+            } else {
+                "no incident matches the filter — esc clears it".to_owned()
+            });
+            return;
+        }
         if tab != self.tab {
             self.tab = tab;
             self.reset_scroll();
         }
-        if !self.visible.is_empty() {
-            self.focus = Focus::Content;
-        }
+        self.focus = Focus::Content;
     }
 
     fn cycle_diagram(&mut self, direction: i8) {
