@@ -4,6 +4,64 @@
 use super::*;
 use crate::model::Severity;
 
+fn sample_summary(severity: Severity) -> crate::model::RcaSummary {
+    crate::model::RcaSummary {
+        id: crate::model::RcaId::new("row-check").expect("id"),
+        meta: crate::model::RcaMeta {
+            title: "Row check".to_owned(),
+            severity,
+            status: crate::model::Status::Identified,
+            created: time::OffsetDateTime::from_unix_timestamp(1_780_000_000).expect("ts"),
+            updated: None,
+            systems: Vec::new(),
+            tags: Vec::new(),
+            prs: Vec::new(),
+        },
+    }
+}
+
+/// The regression from #23: the List-wide `highlight_style` used to patch its
+/// background over the severity badge, so the selected row lost its
+/// HIGH/MED coloring and looked *un*selected.
+#[test]
+fn selected_row_keeps_the_badge_background_and_tints_the_rest() {
+    let rca = sample_summary(Severity::High);
+
+    let selected = rca_list_item(&rca, 0, false, true);
+    let badge = &selected[0].spans[0];
+    assert_eq!(
+        badge.style.bg,
+        Some(Color::LightRed),
+        "badge keeps its own background when selected"
+    );
+    let title = &selected[0].spans[2];
+    assert_eq!(title.style.bg, Some(SELECTED_BG), "title gets the row tint");
+    for line in &selected {
+        let width: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+        assert_eq!(
+            width,
+            usize::from(SIDEBAR_WIDTH) - 2,
+            "row padded to full width so the tint has no gaps"
+        );
+        assert_eq!(
+            line.spans.last().expect("filler").style.bg,
+            Some(SELECTED_BG),
+            "filler carries the tint"
+        );
+    }
+
+    let unselected = rca_list_item(&rca, 0, false, false);
+    assert_eq!(
+        unselected[0].spans[0].style.bg,
+        Some(Color::LightRed),
+        "badge identical when unselected"
+    );
+    assert_eq!(
+        unselected[0].spans[2].style.bg, None,
+        "no tint off-selection"
+    );
+}
+
 /// Renders a full frame into a test backend and checks every banner art
 /// row occupies the same columns — the regression that motivated
 /// `banner_rect`: per-line right-alignment staggered the art.

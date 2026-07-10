@@ -65,13 +65,21 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     let tick = app.tick();
     let items: Vec<ListItem<'_>> = app
         .visible_rcas()
-        .map(|rca| rca_list_item(rca, tick, app.has_unread(&rca.id)))
+        .enumerate()
+        .map(|(row, rca)| {
+            ListItem::new(rca_list_item(
+                rca,
+                tick,
+                app.has_unread(&rca.id),
+                row == app.selected_index(),
+            ))
+        })
         .collect();
-    let list = List::new(items).block(block).highlight_style(
-        Style::default()
-            .bg(Color::Rgb(40, 44, 60))
-            .add_modifier(Modifier::BOLD),
-    );
+    // Selection styling is baked into the items (rca_list_item): a
+    // highlight_style here would be patched over every span in the row and
+    // wipe out the severity badge's own background — the selected row then
+    // looked *less* highlighted than its neighbors.
+    let list = List::new(items).block(block);
 
     let mut state = ListState::default();
     if app.visible_len() > 0 {
@@ -80,26 +88,73 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, area, &mut state);
 }
 
-fn rca_list_item(rca: &RcaSummary, tick: usize, has_unread: bool) -> ListItem<'static> {
+/// Background of the selected sidebar row.
+const SELECTED_BG: Color = Color::Rgb(40, 44, 60);
+
+/// The two sidebar lines for one workspace. Returned as lines (not a
+/// [`ListItem`]) so tests can inspect the span styles.
+fn rca_list_item(
+    rca: &RcaSummary,
+    tick: usize,
+    has_unread: bool,
+    selected: bool,
+) -> Vec<Line<'static>> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
     let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
-    let title = Line::from(vec![
-        Span::styled(format!(" {badge} "), badge_style),
-        Span::raw(" "),
-        Span::raw(truncate(&rca.meta.title, SIDEBAR_WIDTH as usize - 10)),
-    ]);
+
+    // The selection background is applied per-span so the badge keeps its
+    // own colors; `base` styles everything that has no color identity.
+    let base = if selected {
+        Style::default()
+            .bg(SELECTED_BG)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let tinted = |style: Style| {
+        if selected {
+            style.bg(SELECTED_BG)
+        } else {
+            style
+        }
+    };
+
+    let title_text = truncate(&rca.meta.title, SIDEBAR_WIDTH as usize - 10);
+    let title = pad_line(
+        vec![
+            Span::styled(format!(" {badge} "), badge_style),
+            Span::styled(" ", base),
+            Span::styled(title_text, base),
+        ],
+        base,
+    );
     let mut detail_spans = vec![
-        Span::styled(format!("  {symbol} "), symbol_style),
-        Span::styled(rca.meta.status.to_string(), symbol_style),
+        Span::styled(format!("  {symbol} "), tinted(symbol_style)),
+        Span::styled(rca.meta.status.to_string(), tinted(symbol_style)),
         Span::styled(
             format!("  {}", truncate(rca.id.as_str(), 20)),
-            Style::default().fg(Color::DarkGray),
+            tinted(Style::default().fg(Color::DarkGray)),
         ),
     ];
     if has_unread {
-        detail_spans.push(Span::styled(" ●", Style::default().fg(Color::LightYellow)));
+        detail_spans.push(Span::styled(
+            " ●",
+            tinted(Style::default().fg(Color::LightYellow)),
+        ));
     }
-    ListItem::new(vec![title, Line::from(detail_spans)])
+    vec![title, pad_line(detail_spans, base)]
+}
+
+/// Pads a sidebar line with a filler span so a selection background covers
+/// the full row width, not just the text.
+fn pad_line(spans: Vec<Span<'static>>, base: Style) -> Line<'static> {
+    let used: usize = spans.iter().map(|s| s.content.chars().count()).sum();
+    let mut spans = spans;
+    let width = usize::from(SIDEBAR_WIDTH).saturating_sub(2); // inside the borders
+    if used < width {
+        spans.push(Span::styled(" ".repeat(width - used), base));
+    }
+    Line::from(spans)
 }
 
 fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {

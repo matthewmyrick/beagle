@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Selecting a sidebar row no longer wipes out the severity badge's colored
+  background: selection styling is applied per-span (the badge keeps its
+  own colors, the rest of the row gets the tint, padded to full width).
+
 ## [0.3.0] - 2026-07-10
 
 The agent-investigation release: context files agents read before digging
