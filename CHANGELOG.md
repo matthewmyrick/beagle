@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-10
+
+The agent-investigation release: context files agents read before digging
+in, a live Log tab to watch them think, and PR tracking so an RCA follows
+its fix to the merge. Also includes the module-split refactor (#12) — no
+behavior change, but every file now respects the 400-line cap.
+
 ### Fixed
 
 - Tab-switching keys (tab, arrows, 1-8) pressed with no incidents on
@@ -101,6 +108,7 @@ Initial release.
   every exit path.
 - `/rca` Claude Code skill documenting the authoring workflow.
 
-[Unreleased]: https://github.com/matthewmyrick/beagle/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/matthewmyrick/beagle/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/matthewmyrick/beagle/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/matthewmyrick/beagle/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matthewmyrick/beagle/commit/fceb9d4
