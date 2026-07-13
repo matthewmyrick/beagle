@@ -10,12 +10,12 @@ the TUI is how it explains itself.
 
 ```text
 ┌ Incidents (3) ──────────┐┌ Payments API p99 latency 40x regression ─────────┐
-│ HIGH  Payments API p99… ││ ● identified · HIGH · payments-api, redis-sess…  │
-│  ◐ identified           ││                                                  │
+│ HIGH  Payments API p99… ││ ● review · HIGH · payments-api, redis-sess…      │
+│  ◐ review               ││                                                  │
 │ CRIT  Ledger export st… ││ 1 Summary·2 Timeline·3 Root Cause·4 Impact·5 Fix │
 │  ● investigating        ││ ·6 Diagrams·7 Notes                              │
 │ LOW   Cron drift on ba… ││ ┌ Root Cause ───────────────────────────────────┐│
-│  ✔ resolved             ││ │ Causal chain, symptom → root                  ││
+│  ✔ finished             ││ │ Causal chain, symptom → root                  ││
 │                         ││ │  1. checkout requests time out (ELB 504)      ││
 │                         ││ │  2. handlers block waiting for a free Redis…  ││
 └─────────────────────────┘└──────────────────────────────────────────────────┘
@@ -32,8 +32,8 @@ the TUI is how it explains itself.
 3. You keep `beagle` open in a terminal. It **watches the filesystem** and
    re-renders live as the investigation is written — no refresh needed.
 
-Every RCA gets eight tabs: **Summary · Timeline · Root Cause · Impact · Fix ·
-Diagrams · Notes · Log**. The Log tab is the live investigation stream — the
+Every RCA gets nine tabs: **Summary · Timeline · Root Cause · Impact · Fix ·
+Final Review · Diagrams · Notes · Log**. The Log tab is the live investigation stream — the
 agent appends a timestamped line at every step (`beagle log <slug> "..."`),
 and `f` (follow mode) keeps the tab pinned to the newest line, tail-f style.
 Tabs whose files changed since you last looked get a `●` marker, workspaces
@@ -116,19 +116,34 @@ marked); pick one with `j`/`k` + enter to install it. On platforms without
 prebuilt binaries, update via `cargo install` instead.
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
-`1`–`8` switch tabs · `/` fuzzy-filter incidents · `T` toolbox · `f` follow
-(tail -f) · `o` open links/PRs · `R` related incidents · `c` copy tab / `C` copy whole RCA (pbcopy or
+`1`–`9` switch tabs · `/` fuzzy-filter incidents · `T` toolbox · `f` follow
+(tail -f) · `o` open links/PRs · `R` related incidents · `V` sign off final-review · `c` copy tab / `C` copy whole RCA (pbcopy or
 OSC 52) · `e` export to `exports/<slug>.md` · `n/p` cycle diagrams · `h/l`
 pan diagrams · `r` reload · `?` help · `Q` / `ctrl-c` quit.
 
 ## Track the fix: attached PRs
 
-Remediation lands as pull requests, and an RCA isn't really resolved until
-they merge. `beagle pr add <slug> <url>` attaches a PR to the manifest; the
-workspace header then shows `fixes: ○ #123 open · ✓ #124 merged`, refreshed
-by a background `gh` poll every 30 minutes (plus whenever the set changes).
-No `gh` installed? The links still show — just without live state. Press `o`
-to open any attached PR or any URL on the current tab in your browser.
+Remediation lands as pull requests, and a merged PR isn't a verified fix.
+The lifecycle follows the fix all the way:
+
+```text
+investigating ──▶ review ──▶ final-review ──▶ finished
+   (digging)   (fix PR open)  (PR merged —      (verified,
+                               verify it!)       signed off)
+```
+
+`beagle pr add <slug> <url>` attaches a PR to the manifest; the workspace
+header shows `fixes: ○ #123 open · ✓ #124 merged`, refreshed by a background
+`gh` poll every 30 minutes (plus whenever the set changes). **When every
+attached PR has merged, beagle automatically moves the RCA from `review` to
+`final-review`** — time to work the Final Review tab, the checklist of
+checkable predictions the agent wrote *during* the investigation ("p99 back
+under 200ms for 24h"). Confirmed it held? Press **`V`** to sign off →
+`finished`. Viewing never changes state; only `V` (or `beagle status <slug>
+finished`) does.
+
+No `gh` installed? PR links still show — just without live state or the
+auto-transition. Press `o` to open any attached PR or URL in your browser.
 
 ## Export
 
@@ -152,6 +167,7 @@ rcas/
     root-cause.md     # why it broke, symptom → root
     impact.md         # who/what was affected, quantified
     remediation.md    # the Fix tab: mitigation + durable fixes
+    final-review.md   # verification checklist, worked after the fix merges
     notes.md          # raw evidence, queries, links
     diagrams/
       01-topology.txt # ASCII diagrams, rendered unwrapped; ANSI colors supported
@@ -162,7 +178,7 @@ rcas/
 ```toml
 title = "Payments API p99 latency 40x regression"
 severity = "high"          # critical | high | medium | low | info
-status = "identified"      # investigating | identified | monitoring | resolved
+status = "review"          # investigating | review | final-review | finished
 created = "2026-07-05T14:32:00Z"   # RFC 3339, quoted
 systems = ["payments-api", "redis-sessions"]
 tags = ["latency"]

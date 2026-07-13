@@ -80,15 +80,26 @@ before long queries. Then the sections:
 4. `impact.md` — quantify: requests, users, minutes, money, SLO budget burned.
 5. `remediation.md` — the Fix tab: immediate mitigation first (with
    timestamps), then durable fixes with owners and status, then how to verify.
-6. `notes.md` — raw evidence: metric tables (in code fences so columns align),
+6. `final-review.md` — the verification checklist, written **while the fix
+   is still forming, not after**. One `- [ ]` checkbox per concrete,
+   checkable prediction of what "fixed" looks like — metric thresholds,
+   error counts, alert silence, each with a how-to-check (query, dashboard):
+   `- [ ] p99 < 200ms for 24h (grafana: payments-overview)`. When every
+   attached PR merges, beagle moves the RCA to `final-review` and the user
+   works this list before signing off with `V`. Vague items ("looks
+   healthy") are useless here — write predictions someone else could verify.
+7. `notes.md` — raw evidence: metric tables (in code fences so columns align),
    exact queries, log excerpts, links, open questions.
-7. `diagrams/NN-name.txt` — see below.
+8. `diagrams/NN-name.txt` — see below.
 
 ## 3. Keep the manifest honest
 
 Edit `rca.toml` as the investigation progresses:
 
-- `status`: `investigating` → `identified` → `monitoring` → `resolved`.
+- `status`: `investigating` → `review` (fix PR open) → `final-review`
+  (beagle flips this automatically when every attached PR merges) →
+  `finished` (the user signs off with `V` after working your Final Review
+  checklist). Old names (identified/monitoring/resolved) still parse.
 - `updated`: bump to now (RFC 3339, **quoted string**, e.g. `"2026-07-05T14:32:00Z"`).
 - `tags`: **always set these** — 3–6 kebab-case topics (e.g. `webhooks`,
   `config`, `data-loss`, `redis`). They matter downstream: `beagle export`

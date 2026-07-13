@@ -51,6 +51,7 @@ impl App {
             KeyCode::Char('T') => self.open_toolbox(),
             KeyCode::Char('o') => self.open_links(),
             KeyCode::Char('R') => self.open_related(),
+            KeyCode::Char('V') => self.verify_final_review(),
             // `/` searches what you're looking at: the incident list when
             // the list is focused, the pane content otherwise.
             KeyCode::Char('/') if self.focus == Focus::Content => self.start_content_search(),
@@ -78,8 +79,8 @@ impl App {
             KeyCode::BackTab | KeyCode::Char('[') | KeyCode::Left => {
                 self.switch_tab(self.tab.prev());
             }
-            KeyCode::Char(c @ '1'..='8') => {
-                // '1'..='8' maps exactly onto Tab::ALL's eight entries.
+            KeyCode::Char(c @ '1'..='9') => {
+                // '1'..='9' maps exactly onto Tab::ALL's nine entries.
                 let index = (c as usize).saturating_sub('1' as usize);
                 if let Some(tab) = Tab::ALL.get(index) {
                     self.switch_tab(*tab);

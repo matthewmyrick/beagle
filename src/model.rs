@@ -130,37 +130,57 @@ impl fmt::Display for Severity {
 }
 
 /// Where the investigation currently stands. Ordering is
-/// most-active-first so open investigations sort above resolved ones.
+/// most-active-first so open investigations sort above finished ones —
+/// `investigating` tops the sidebar, `finished` sinks to the very bottom.
+///
+/// The pre-0.6 names still parse (`identified` → `review`, `monitoring` →
+/// `final-review`, `resolved` → `finished`) so old manifests keep loading;
+/// writes always use the new names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Status {
     /// Actively debugging; root cause unknown.
     Investigating,
-    /// Root cause identified; fix not yet applied.
-    Identified,
-    /// Fix applied; watching telemetry for recurrence.
-    Monitoring,
-    /// Closed out; the write-up is the record.
-    Resolved,
+    /// Root cause found; the fix (usually a PR) is out for review.
+    #[serde(alias = "identified")]
+    Review,
+    /// The fix has merged — verify it actually worked via the Final
+    /// Review checklist, then sign off.
+    #[serde(alias = "monitoring")]
+    FinalReview,
+    /// Verified and closed; the write-up is the record.
+    #[serde(alias = "resolved")]
+    Finished,
 }
 
 impl Status {
     /// Every status, most active first.
     pub const ALL: [Self; 4] = [
         Self::Investigating,
-        Self::Identified,
-        Self::Monitoring,
-        Self::Resolved,
+        Self::Review,
+        Self::FinalReview,
+        Self::Finished,
     ];
 
-    /// Stable lowercase name, matching the serde representation.
+    /// Stable name, matching the serde representation.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Investigating => "investigating",
-            Self::Identified => "identified",
-            Self::Monitoring => "monitoring",
-            Self::Resolved => "resolved",
+            Self::Review => "review",
+            Self::FinalReview => "final-review",
+            Self::Finished => "finished",
+        }
+    }
+
+    /// The pre-0.6 name this status replaces, accepted as CLI/manifest
+    /// input for compatibility.
+    fn legacy_alias(self) -> Option<&'static str> {
+        match self {
+            Self::Investigating => None,
+            Self::Review => Some("identified"),
+            Self::FinalReview => Some("monitoring"),
+            Self::Finished => Some("resolved"),
         }
     }
 }
@@ -169,9 +189,15 @@ impl FromStr for Status {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::ALL.into_iter().find(|st| st.as_str() == s).ok_or_else(|| {
-            format!("unknown status `{s}` (expected one of: investigating, identified, monitoring, resolved)")
-        })
+        Self::ALL
+            .into_iter()
+            .find(|st| st.as_str() == s || st.legacy_alias() == Some(s))
+            .ok_or_else(|| {
+                format!(
+                    "unknown status `{s}` (expected one of: investigating, review, \
+                     final-review, finished)"
+                )
+            })
     }
 }
 
@@ -255,6 +281,11 @@ pub enum SectionKind {
     Impact,
     /// How to fix it: immediate mitigation and durable fix.
     Remediation,
+    /// The verification checklist: concrete, checkable predictions of what
+    /// "fixed" looks like, written **during** the investigation so the
+    /// `final-review` phase knows exactly what to confirm once the fix
+    /// PR merges.
+    FinalReview,
     /// Raw evidence, queries, links, and loose ends.
     Notes,
     /// Append-only investigation log: what the investigator did, when.
@@ -264,12 +295,13 @@ pub enum SectionKind {
 
 impl SectionKind {
     /// Every section, in tab order.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Summary,
         Self::Timeline,
         Self::RootCause,
         Self::Impact,
         Self::Remediation,
+        Self::FinalReview,
         Self::Notes,
         Self::Log,
     ];
@@ -283,6 +315,7 @@ impl SectionKind {
             Self::RootCause => "root-cause.md",
             Self::Impact => "impact.md",
             Self::Remediation => "remediation.md",
+            Self::FinalReview => "final-review.md",
             Self::Notes => "notes.md",
             Self::Log => "log.md",
         }
@@ -297,6 +330,7 @@ impl SectionKind {
             Self::RootCause => "Root Cause",
             Self::Impact => "Impact",
             Self::Remediation => "Fix",
+            Self::FinalReview => "Final Review",
             Self::Notes => "Notes",
             Self::Log => "Log",
         }

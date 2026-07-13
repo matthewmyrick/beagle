@@ -160,6 +160,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("T", "toolbox: toolbox.md + systems/ context"),
         ("o", "links: open attached PRs / URLs on this tab"),
         ("R", "related incidents (shared systems/tags); enter jumps"),
+        ("V", "sign off final-review as verified \u{2192} finished"),
         ("n / p", "next / previous diagram"),
         ("h / l, ← / →", "pan diagrams horizontally"),
         ("space / pgdn / pgup", "page through content"),

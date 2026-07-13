@@ -52,6 +52,7 @@ impl App {
             while let Ok(states) = states_rx.try_recv() {
                 self.pr_states.extend(states);
             }
+            self.advance_merged_reviews();
             if drain(&rx) {
                 let arrived = self.reload();
                 self.status = Some(match arrived.first() {
@@ -89,6 +90,42 @@ impl App {
                 }
             }
         }
+    }
+
+    /// `review` → `final-review` the moment every attached fix PR has
+    /// merged, per the states the background `gh` poller reports. The
+    /// manifest write is atomic and also wakes the filesystem watcher, so
+    /// other beagle instances see the transition too. Workspaces without
+    /// attached PRs never auto-advance — there is nothing to observe merge.
+    pub(crate) fn advance_merged_reviews(&mut self) {
+        let ready: Vec<(RcaId, String)> = self
+            .rcas
+            .iter()
+            .filter(|rca| {
+                rca.meta.status == crate::model::Status::Review && !rca.meta.prs.is_empty()
+            })
+            .filter(|rca| {
+                rca.meta
+                    .prs
+                    .iter()
+                    .all(|url| self.pr_states.get(url) == Some(&crate::prs::PrState::Merged))
+            })
+            .map(|rca| (rca.id.clone(), rca.meta.title.clone()))
+            .collect();
+        if ready.is_empty() {
+            return;
+        }
+        for (id, title) in &ready {
+            match self.store.set_status(id, crate::model::Status::FinalReview) {
+                Ok(_) => {
+                    self.status = Some(format!("→ final-review: {title} (all fix PRs merged)"));
+                }
+                Err(e) => self.warnings.push(LoadWarning(format!(
+                    "auto final-review failed for {id}: {e}"
+                ))),
+            }
+        }
+        let _ = self.reload();
     }
 
     /// Re-lists workspaces, keeping the selection pinned to the same id when

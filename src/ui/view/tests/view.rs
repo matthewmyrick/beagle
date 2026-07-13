@@ -10,7 +10,7 @@ fn sample_summary(severity: Severity) -> crate::model::RcaSummary {
         meta: crate::model::RcaMeta {
             title: "Row check".to_owned(),
             severity,
-            status: crate::model::Status::Identified,
+            status: crate::model::Status::Review,
             created: time::OffsetDateTime::from_unix_timestamp(1_780_000_000).expect("ts"),
             updated: None,
             systems: Vec::new(),

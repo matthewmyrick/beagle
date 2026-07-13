@@ -26,7 +26,7 @@ USAGE:
                   [--root <dir>]
     beagle status <id> <status>           set a workspace's status; a running
                   [--root <dir>]            TUI picks the change up live
-                                            (investigating|identified|monitoring|resolved)
+                                            (investigating|review|final-review|finished)
     beagle log <id> <message...>          append a timestamped bullet to the
                   [--root <dir>]            workspace's log.md (the Log tab)
     beagle pr add <id> <url>              attach a remediation PR to the RCA;

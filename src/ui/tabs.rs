@@ -16,6 +16,8 @@ pub enum Tab {
     Impact,
     /// How to fix it ([`SectionKind::Remediation`]).
     Remediation,
+    /// The verification checklist ([`SectionKind::FinalReview`]).
+    FinalReview,
     /// ASCII diagrams from the workspace's `diagrams/` directory.
     Diagrams,
     /// Raw evidence and loose ends ([`SectionKind::Notes`]).
@@ -26,12 +28,13 @@ pub enum Tab {
 
 impl Tab {
     /// Every tab, in display order.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Summary,
         Self::Timeline,
         Self::RootCause,
         Self::Impact,
         Self::Remediation,
+        Self::FinalReview,
         Self::Diagrams,
         Self::Notes,
         Self::Log,
@@ -47,6 +50,7 @@ impl Tab {
             Self::RootCause => SectionKind::RootCause.title(),
             Self::Impact => SectionKind::Impact.title(),
             Self::Remediation => SectionKind::Remediation.title(),
+            Self::FinalReview => SectionKind::FinalReview.title(),
             Self::Notes => SectionKind::Notes.title(),
             Self::Log => SectionKind::Log.title(),
         }
@@ -61,6 +65,7 @@ impl Tab {
             Self::RootCause => Some(SectionKind::RootCause),
             Self::Impact => Some(SectionKind::Impact),
             Self::Remediation => Some(SectionKind::Remediation),
+            Self::FinalReview => Some(SectionKind::FinalReview),
             Self::Notes => Some(SectionKind::Notes),
             Self::Log => Some(SectionKind::Log),
             Self::Diagrams => None,

@@ -113,13 +113,15 @@ fn number_keys_jump_to_tabs() {
     press(&mut app, KeyCode::Char('3'));
     assert_eq!(app.tab(), Tab::RootCause);
     press(&mut app, KeyCode::Char('6'));
+    assert_eq!(app.tab(), Tab::FinalReview);
+    press(&mut app, KeyCode::Char('7'));
     assert_eq!(app.tab(), Tab::Diagrams);
 }
 
 #[test]
-fn key_8_jumps_to_the_log_tab() {
+fn key_9_jumps_to_the_log_tab() {
     let mut app = app_with(1);
-    press(&mut app, KeyCode::Char('8'));
+    press(&mut app, KeyCode::Char('9'));
     assert_eq!(app.tab(), Tab::Log);
     assert_eq!(Tab::Log.section(), Some(crate::model::SectionKind::Log));
 }

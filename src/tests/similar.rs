@@ -13,7 +13,7 @@ fn summary(id: &str, systems: &[&str], tags: &[&str], created: i64) -> RcaSummar
         meta: RcaMeta {
             title: format!("Incident {id}"),
             severity: Severity::Medium,
-            status: Status::Resolved,
+            status: Status::Finished,
             created: OffsetDateTime::from_unix_timestamp(created).expect("valid ts"),
             updated: None,
             systems: systems.iter().map(ToString::to_string).collect(),
