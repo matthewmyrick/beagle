@@ -63,6 +63,9 @@ impl App {
             self.unread.remove(&(key.rca.clone(), kind));
         }
         self.pane = Some((key, pane));
+        // The search query survives pane changes; its matches don't.
+        // No jump: switching tabs must not yank the scroll around.
+        self.recompute_content_matches(false);
     }
 
     fn load_pane(&mut self, key: &PaneKey) -> Pane {

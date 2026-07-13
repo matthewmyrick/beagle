@@ -92,7 +92,7 @@ pub(super) fn draw_toolbox(frame: &mut Frame, app: &mut App, area: Rect) {
 
 pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
     let width = 62.min(area.width.saturating_sub(4));
-    let height = 21.min(area.height.saturating_sub(2));
+    let height = 23.min(area.height.saturating_sub(2));
     let popup = center(area, width, height);
 
     let rows = [
@@ -102,7 +102,8 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("tab / [ / ], ← / →", "cycle tabs"),
         ("1–8", "jump to a tab"),
         ("f", "follow: reloads stick to the bottom (tail -f)"),
-        ("/", "fuzzy-filter incidents (esc clears)"),
+        ("/", "filter incidents (list) / search content (pane)"),
+        ("n / N", "next / previous search match"),
         ("c / C", "copy this tab / whole RCA to clipboard"),
         (
             "e",

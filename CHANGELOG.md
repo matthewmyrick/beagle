@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- In-content search: `/` with the content pane focused searches **every
+  section tab of the selected incident** (the list filter keeps `/` when
+  the list is focused). Case-insensitive substring match; the matched text
+  itself highlights live as you type (current hit amber, others tinted —
+  the occurrence, not the whole line), enter commits, and `n`/`N` walk the
+  hits in tab order —
+  hopping tabs automatically when the next hit lives on another one —
+  wrapping at the ends. Esc clears. The status bar shows
+  `match 3/17 for "429" · Notes`.
+
 ### Fixed
 
 - Selecting a sidebar row no longer wipes out the severity badge's colored

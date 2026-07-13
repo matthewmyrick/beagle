@@ -8,13 +8,15 @@
 //! Submodules by responsibility: `tabs` (the tab/focus enums), `event_loop`
 //! (the blocking input/watcher loop), `keys` (keypress → state transition),
 //! `pane` (content loading and caching), `overlays` (the toolbox and link
-//! popups), `actions` (copy/export), and `view` (drawing).
+//! popups), `search` (in-content search), `actions` (copy/export), and
+//! `view` (drawing).
 
 mod actions;
 mod event_loop;
 mod keys;
 mod overlays;
 mod pane;
+mod search;
 mod tabs;
 mod view;
 
@@ -31,6 +33,7 @@ use crate::store::{LoadWarning, Store};
 
 use overlays::LinksPopup;
 use pane::PaneKey;
+use search::ContentSearch;
 
 /// The whole TUI state.
 pub struct App {
@@ -69,6 +72,8 @@ pub struct App {
     pr_states: HashMap<String, crate::prs::PrState>,
     /// The `o` link popup: attached PRs plus URLs found on the current tab.
     links: Option<LinksPopup>,
+    /// In-content search over the pane (`/` with content focus).
+    content_search: Option<ContentSearch>,
     /// Rendered toolbox overlay content; `Some` while the overlay is open.
     toolbox: Option<Text<'static>>,
     /// Vertical scroll of the toolbox overlay.
@@ -87,6 +92,8 @@ pub(crate) struct ViewportInfo {
     pub content_lines: u16,
     /// Visible height of the content area.
     pub height: u16,
+    /// Visible width of the content area (for wrap-aware search jumps).
+    pub width: u16,
 }
 
 impl App {
@@ -119,6 +126,7 @@ impl App {
             unread: HashSet::new(),
             pr_states: HashMap::new(),
             links: None,
+            content_search: None,
             toolbox: None,
             toolbox_scroll: 0,
             toolbox_viewport: (0, 0),
