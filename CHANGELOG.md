@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Filter facets: inside `f` filter mode, single keys toggle facets
+  instantly — `i`/`r`/`v`/`f` by status, `c`/`h`/`m`/`l` by severity —
+  stacking across dimensions (high AND investigating) and toggling off on
+  a second press. `/` switches to free-text typing, which ranks within the
+  facet set. Active facets show in the sidebar title
+  (`Incidents (2/7) [high · investigating]`) and the filter prompt; esc
+  peels typing → facets → clear; enter keeps the filter; opening an
+  incident still consumes everything.
+
 ### Changed
 
 - **Keybindings** (muscle-memory alert): `/` now *always* searches the

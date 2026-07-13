@@ -168,7 +168,7 @@ impl App {
     /// that would hide it.
     fn jump_to_workspace(&mut self, id: &RcaId) {
         self.filter.clear();
-        self.search_active = false;
+        self.filter_input = crate::ui::FilterInput::Off;
         self.recompute_visible(Some(id.clone()));
         self.diagram_index = 0;
         self.reset_scroll();
