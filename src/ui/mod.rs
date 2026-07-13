@@ -42,8 +42,14 @@ pub struct App {
     warnings: Vec<LoadWarning>,
     /// Fuzzy filter over the incident list; empty means "show everything".
     filter: String,
-    /// True while `/` search input is capturing keystrokes.
-    search_active: bool,
+    /// Status facets toggled in filter mode (`i`/`r`/`v`/`f`); empty means
+    /// every status passes.
+    facet_statuses: HashSet<crate::model::Status>,
+    /// Severity facets toggled in filter mode (`c`/`h`/`m`/`l`); empty
+    /// means every severity passes.
+    facet_severities: HashSet<crate::model::Severity>,
+    /// Filter-mode input state: which keys the filter is capturing.
+    filter_input: FilterInput,
     /// Indices into `rcas` that match `filter`, best match first.
     visible: Vec<usize>,
     /// Index into `visible` of the selected workspace, if any match.
@@ -87,6 +93,19 @@ pub struct App {
     pub(crate) viewport: ViewportInfo,
 }
 
+/// What filter mode is doing with keystrokes: nothing (`Off`), toggling
+/// facets (`Facets`, entered with `f`), or typing free text (`Typing`,
+/// entered with `/` inside filter mode).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FilterInput {
+    /// Filter mode closed; keys behave normally.
+    Off,
+    /// Single keys toggle status/severity facets.
+    Facets,
+    /// Keys type into the fuzzy query.
+    Typing,
+}
+
 /// Geometry facts the draw pass feeds back for scroll clamping.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct ViewportInfo {
@@ -111,7 +130,9 @@ impl App {
             rcas,
             warnings,
             filter: String::new(),
-            search_active: false,
+            facet_statuses: HashSet::new(),
+            facet_severities: HashSet::new(),
+            filter_input: FilterInput::Off,
             visible,
             selected: 0,
             focus: Focus::List,
@@ -140,13 +161,22 @@ impl App {
         Ok(app)
     }
 
-    /// Re-runs the fuzzy filter over the workspace list, keeping the
-    /// selection pinned to `keep` when that workspace still matches.
+    /// Re-runs the filter over the workspace list, keeping the selection
+    /// pinned to `keep` when that workspace still matches. Facets narrow
+    /// the candidate set (a workspace must match every non-empty facet
+    /// dimension), then the fuzzy query ranks within it.
     fn recompute_visible(&mut self, keep: Option<RcaId>) {
         let mut scored: Vec<(i32, usize)> = self
             .rcas
             .iter()
             .enumerate()
+            .filter(|(_, rca)| {
+                self.facet_statuses.is_empty() || self.facet_statuses.contains(&rca.meta.status)
+            })
+            .filter(|(_, rca)| {
+                self.facet_severities.is_empty()
+                    || self.facet_severities.contains(&rca.meta.severity)
+            })
             .filter_map(|(index, rca)| {
                 let haystack = format!(
                     "{} {} {} {}",
@@ -164,6 +194,48 @@ impl App {
         self.selected = keep
             .and_then(|id| self.visible.iter().position(|&i| self.rcas[i].id == id))
             .unwrap_or(0);
+    }
+
+    /// Whether anything (facets or free text) is narrowing the list.
+    pub(crate) fn has_active_filter(&self) -> bool {
+        !self.filter.is_empty()
+            || !self.facet_statuses.is_empty()
+            || !self.facet_severities.is_empty()
+    }
+
+    /// Clears every filter dimension and restores the full list, keeping
+    /// the current selection when it survives.
+    pub(crate) fn clear_filter(&mut self) {
+        let keep = self.selected_rca().map(|r| r.id.clone());
+        self.filter.clear();
+        self.facet_statuses.clear();
+        self.facet_severities.clear();
+        self.recompute_visible(keep);
+    }
+
+    /// The active facets as a compact label for the sidebar title and the
+    /// filter prompt: `[high · investigating]`. Empty when no facets are on.
+    pub(crate) fn facet_label(&self) -> String {
+        let mut parts: Vec<&str> = Vec::new();
+        for severity in crate::model::Severity::ALL {
+            if self.facet_severities.contains(&severity) {
+                parts.push(severity.as_str());
+            }
+        }
+        for status in crate::model::Status::ALL {
+            if self.facet_statuses.contains(&status) {
+                parts.push(status.as_str());
+            }
+        }
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!("[{}]", parts.join(" · "))
+        }
+    }
+
+    pub(crate) fn filter_typing(&self) -> bool {
+        self.filter_input == FilterInput::Typing
     }
 
     /// The currently selected workspace, if any match the filter.
@@ -194,7 +266,7 @@ impl App {
     }
 
     pub(crate) fn search_active(&self) -> bool {
-        self.search_active
+        self.filter_input != FilterInput::Off
     }
 
     pub(crate) fn warnings(&self) -> &[LoadWarning] {

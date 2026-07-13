@@ -51,15 +51,20 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus() == Focus::List;
-    let title = if app.filter().is_empty() {
-        format!(" Incidents ({}) ", app.rcas().len())
+    let title = if app.has_active_filter() {
+        use std::fmt::Write as _;
+        let mut title = format!(" Incidents ({}/{})", app.visible_len(), app.rcas().len());
+        let facets = app.facet_label();
+        if !facets.is_empty() {
+            let _ = write!(title, " {facets}");
+        }
+        if !app.filter().is_empty() {
+            let _ = write!(title, " /{}", app.filter());
+        }
+        title.push(' ');
+        title
     } else {
-        format!(
-            " Incidents ({}/{})  /{} ",
-            app.visible_len(),
-            app.rcas().len(),
-            app.filter(),
-        )
+        format!(" Incidents ({}) ", app.rcas().len())
     };
     let block = pane_block(title, focused);
 
@@ -319,18 +324,83 @@ fn draw_welcome(frame: &mut Frame, area: Rect) {
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
-fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
-    if app.search_active() {
-        let line = Line::from(vec![
-            Span::styled("  filter: ", Style::default().fg(Color::Yellow)),
-            Span::raw(app.filter().to_owned()),
+/// The filter-mode prompt: active facet chips, the free-text query (with a
+/// cursor while typing), and the keys available in the current sub-mode.
+fn filter_prompt_line(app: &App) -> Line<'static> {
+    let mut spans = vec![Span::styled(
+        "  filter: ",
+        Style::default().fg(Color::Yellow),
+    )];
+    let facets = app.facet_label();
+    if !facets.is_empty() {
+        spans.push(Span::styled(
+            format!("{facets} "),
+            Style::default().fg(Color::LightBlue),
+        ));
+    }
+    spans.push(Span::raw(app.filter().to_owned()));
+    if app.filter_typing() {
+        spans.push(Span::styled("▌", Style::default().fg(Color::Yellow)));
+        spans.push(Span::styled(
+            "   type keywords · esc back to facets",
+            Style::default().fg(Color::DarkGray),
+        ));
+    } else {
+        spans.push(Span::styled(
+            "   i/r/v/f status · c/h/m/l severity · / type · enter keep · esc clear",
+            Style::default().fg(Color::DarkGray),
+        ));
+    }
+    Line::from(spans)
+}
+
+/// The in-content search's hint line: live query, match position, or the
+/// no-matches report.
+fn search_status_line(search: &super::search::ContentSearch) -> Line<'static> {
+    if search.typing {
+        Line::from(vec![
+            Span::styled("  search: ", Style::default().fg(Color::Yellow)),
+            Span::raw(search.query.clone()),
             Span::styled("▌", Style::default().fg(Color::Yellow)),
             Span::styled(
-                "   enter keep · esc clear · ↑/↓ select",
+                "   enter commit · esc cancel",
                 Style::default().fg(Color::DarkGray),
             ),
-        ]);
-        frame.render_widget(Paragraph::new(line), area);
+        ])
+    } else if search.hits.is_empty() {
+        Line::from(Span::styled(
+            format!(
+                "  no matches for \"{}\" anywhere in this incident — esc clears",
+                search.query
+            ),
+            Style::default().fg(Color::Yellow),
+        ))
+    } else {
+        let place = search
+            .hits
+            .get(search.current)
+            .map_or("", |hit| hit.tab.title());
+        Line::from(vec![
+            Span::styled(
+                format!(
+                    "  match {}/{} for \"{}\" · {place}",
+                    search.current + 1,
+                    search.hits.len(),
+                    search.query,
+                ),
+                Style::default().fg(Color::Yellow),
+            ),
+            Span::styled(
+                "   n/N next/prev (across tabs) · esc clear",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ])
+    }
+}
+
+fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+    if app.search_active() {
+        frame.render_widget(Paragraph::new(filter_prompt_line(app)), area);
         return;
     }
     // A status message gets the whole line — sharing it with the key hints
@@ -352,46 +422,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     // In-content search owns the hint line while it exists; a transient
     // status message (handled above) still gets its one beat.
     if let Some(search) = app.content_search() {
-        let line = if search.typing {
-            Line::from(vec![
-                Span::styled("  search: ", Style::default().fg(Color::Yellow)),
-                Span::raw(search.query.clone()),
-                Span::styled("▌", Style::default().fg(Color::Yellow)),
-                Span::styled(
-                    "   enter commit · esc cancel",
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ])
-        } else if search.hits.is_empty() {
-            Line::from(Span::styled(
-                format!(
-                    "  no matches for \"{}\" anywhere in this incident — esc clears",
-                    search.query
-                ),
-                Style::default().fg(Color::Yellow),
-            ))
-        } else {
-            let place = search
-                .hits
-                .get(search.current)
-                .map_or("", |hit| hit.tab.title());
-            Line::from(vec![
-                Span::styled(
-                    format!(
-                        "  match {}/{} for \"{}\" · {place}",
-                        search.current + 1,
-                        search.hits.len(),
-                        search.query,
-                    ),
-                    Style::default().fg(Color::Yellow),
-                ),
-                Span::styled(
-                    "   n/N next/prev (across tabs) · esc clear",
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ])
-        };
-        frame.render_widget(Paragraph::new(line), area);
+        frame.render_widget(Paragraph::new(search_status_line(search)), area);
         return;
     }
     let mut spans = vec![Span::styled(

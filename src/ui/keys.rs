@@ -19,7 +19,7 @@ impl App {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             return Flow::Quit;
         }
-        if self.search_active {
+        if self.filter_input != super::FilterInput::Off {
             self.handle_search_key(key.code);
             return Flow::Continue;
         }
@@ -57,7 +57,7 @@ impl App {
             // also moves the focus to where the action is.
             KeyCode::Char('/') => self.start_content_search(),
             KeyCode::Char('f') => {
-                self.search_active = true;
+                self.filter_input = super::FilterInput::Facets;
                 self.focus = Focus::List;
             }
             KeyCode::Char('b') => self.focus = Focus::List,
@@ -105,30 +105,71 @@ impl App {
         Flow::Continue
     }
 
-    /// Keystrokes while the `/` filter is capturing input. Plain characters
-    /// edit the query (so `q` types, it does not quit); arrows still move
-    /// the selection so filtering and picking interleave naturally.
+    /// Keystrokes in filter mode. Facets first: single keys toggle status
+    /// (`i`/`r`/`v`/`f`) and severity (`c`/`h`/`m`/`l`) filters instantly,
+    /// stacking across dimensions; `/` switches to free-text typing. Arrows
+    /// (and `j`/`k` while not typing) still move the selection so filtering
+    /// and picking interleave naturally.
     fn handle_search_key(&mut self, code: KeyCode) {
+        use crate::model::{Severity, Status};
+
+        if self.filter_input == super::FilterInput::Typing {
+            match code {
+                // Esc peels: stop typing first (query kept), facets next.
+                KeyCode::Esc => self.filter_input = super::FilterInput::Facets,
+                KeyCode::Enter => self.filter_input = super::FilterInput::Off,
+                KeyCode::Backspace => {
+                    self.filter.pop();
+                    self.recompute_visible(None);
+                }
+                KeyCode::Char(c) => {
+                    self.filter.push(c);
+                    self.recompute_visible(None);
+                }
+                KeyCode::Down => self.select(self.selected.saturating_add(1)),
+                KeyCode::Up => self.select(self.selected.saturating_sub(1)),
+                _ => {}
+            }
+            return;
+        }
         match code {
             KeyCode::Esc => {
-                self.filter.clear();
-                self.search_active = false;
-                self.recompute_visible(None);
+                self.clear_filter();
+                self.filter_input = super::FilterInput::Off;
                 self.reset_scroll();
             }
-            KeyCode::Enter => self.search_active = false,
+            KeyCode::Enter => self.filter_input = super::FilterInput::Off,
+            KeyCode::Char('/') => self.filter_input = super::FilterInput::Typing,
+            KeyCode::Char('i') => self.toggle_status_facet(Status::Investigating),
+            KeyCode::Char('r') => self.toggle_status_facet(Status::Review),
+            KeyCode::Char('v') => self.toggle_status_facet(Status::FinalReview),
+            KeyCode::Char('f') => self.toggle_status_facet(Status::Finished),
+            KeyCode::Char('c') => self.toggle_severity_facet(Severity::Critical),
+            KeyCode::Char('h') => self.toggle_severity_facet(Severity::High),
+            KeyCode::Char('m') => self.toggle_severity_facet(Severity::Medium),
+            KeyCode::Char('l') => self.toggle_severity_facet(Severity::Low),
             KeyCode::Backspace => {
                 self.filter.pop();
                 self.recompute_visible(None);
             }
-            KeyCode::Char(c) => {
-                self.filter.push(c);
-                self.recompute_visible(None);
-            }
-            KeyCode::Down => self.select(self.selected.saturating_add(1)),
-            KeyCode::Up => self.select(self.selected.saturating_sub(1)),
+            KeyCode::Char('j') | KeyCode::Down => self.select(self.selected.saturating_add(1)),
+            KeyCode::Char('k') | KeyCode::Up => self.select(self.selected.saturating_sub(1)),
             _ => {}
         }
+    }
+
+    fn toggle_status_facet(&mut self, status: crate::model::Status) {
+        if !self.facet_statuses.remove(&status) {
+            self.facet_statuses.insert(status);
+        }
+        self.recompute_visible(None);
+    }
+
+    fn toggle_severity_facet(&mut self, severity: crate::model::Severity) {
+        if !self.facet_severities.remove(&severity) {
+            self.facet_severities.insert(severity);
+        }
+        self.recompute_visible(None);
     }
 
     fn handle_list_key(&mut self, code: KeyCode) {
@@ -137,22 +178,17 @@ impl App {
             KeyCode::Char('k') | KeyCode::Up => self.select(self.selected.saturating_sub(1)),
             KeyCode::Char('g') | KeyCode::Home => self.select(0),
             KeyCode::Char('G') | KeyCode::End => self.select(usize::MAX),
-            KeyCode::Esc if !self.filter.is_empty() => {
-                self.filter.clear();
-                self.recompute_visible(None);
-            }
+            KeyCode::Esc if self.has_active_filter() => self.clear_filter(),
             KeyCode::Esc if self.follow => {
                 self.follow = false;
                 self.status = Some("follow off".to_owned());
             }
             KeyCode::Enter | KeyCode::Char('l') if !self.visible.is_empty() => {
-                // Opening an incident consumes the filter: the pick has
-                // been made, so bring the full list back with the chosen
-                // incident still selected.
-                if !self.filter.is_empty() {
-                    let keep = self.selected_rca().map(|r| r.id.clone());
-                    self.filter.clear();
-                    self.recompute_visible(keep);
+                // Opening an incident consumes the filter (text and facets
+                // alike): the pick has been made, so bring the full list
+                // back with the chosen incident still selected.
+                if self.has_active_filter() {
+                    self.clear_filter();
                 }
                 self.focus = Focus::Content;
             }

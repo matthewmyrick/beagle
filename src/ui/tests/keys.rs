@@ -89,6 +89,7 @@ fn tab_keys_on_an_empty_store_explain_instead_of_silence() {
 fn tab_keys_with_a_non_matching_filter_point_at_the_filter() {
     let mut app = app_with(2);
     press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('/')); // facet mode → typing
     press(&mut app, KeyCode::Char('z')); // matches nothing
     press(&mut app, KeyCode::Enter); // keep filter, leave search mode
     assert_eq!(app.visible_len(), 0);
@@ -200,23 +201,126 @@ fn esc_exits_follow_mode_from_either_focus() {
 }
 
 #[test]
-fn f_filter_narrows_the_list_and_esc_clears() {
+fn f_filter_narrows_the_list_and_esc_peels() {
     let mut app = app_with(3); // titles "RCA 0".."RCA 2"
     press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('/'));
     press(&mut app, KeyCode::Char('2'));
     assert_eq!(app.visible_len(), 1);
     assert_eq!(app.selected_rca().map(|r| r.id.as_str()), Some("rca-2"));
 
     press(&mut app, KeyCode::Esc);
+    assert!(app.search_active(), "first esc only stops typing");
+    assert_eq!(app.filter(), "2", "query survives the peel");
+
+    press(&mut app, KeyCode::Esc);
     assert!(!app.search_active());
     assert!(app.filter().is_empty());
-    assert_eq!(app.visible_len(), 3, "esc restores the full list");
+    assert_eq!(app.visible_len(), 3, "second esc restores the full list");
+}
+
+/// Workspaces spanning severities and statuses, for facet tests.
+fn app_with_variety() -> crate::ui::App {
+    use crate::model::{RcaId, Severity, Status};
+    use crate::store::{new_meta, Store};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("store");
+    let scaffold = |slug: &str, title: &str, severity: Severity, status: Option<Status>| {
+        let id = RcaId::new(slug).expect("valid id");
+        store
+            .scaffold(&id, &new_meta(title.to_owned(), severity))
+            .expect("scaffold");
+        if let Some(status) = status {
+            store.set_status(&id, status).expect("status");
+        }
+    };
+    scaffold(
+        "alloy-inv-high",
+        "Alloy pool exhausted",
+        Severity::High,
+        None,
+    );
+    scaffold("cron-inv-low", "Cron drift", Severity::Low, None);
+    scaffold(
+        "ses-rev-high",
+        "SES blocklist",
+        Severity::High,
+        Some(Status::Review),
+    );
+    scaffold(
+        "rds-fin-med",
+        "RDS locks",
+        Severity::Medium,
+        Some(Status::Finished),
+    );
+    std::mem::forget(tmp); // OS cleans the temp root; see app_with
+    crate::ui::App::new(store).expect("app")
+}
+
+#[test]
+fn facet_keys_stack_toggle_and_never_type() {
+    let mut app = app_with_variety();
+    press(&mut app, KeyCode::Char('f'));
+
+    press(&mut app, KeyCode::Char('h')); // severity: high
+    assert_eq!(app.visible_len(), 2, "two high-severity incidents");
+    assert!(app.filter().is_empty(), "facet keys do not type");
+    assert_eq!(app.facet_label(), "[high]");
+
+    press(&mut app, KeyCode::Char('i')); // + status: investigating
+    assert_eq!(app.visible_len(), 1, "facets AND across dimensions");
+    assert_eq!(
+        app.selected_rca().expect("match").id.as_str(),
+        "alloy-inv-high"
+    );
+    assert_eq!(app.facet_label(), "[high · investigating]");
+
+    press(&mut app, KeyCode::Char('h')); // toggle high off
+    assert_eq!(app.visible_len(), 2, "both investigating incidents return");
+
+    press(&mut app, KeyCode::Char('v')); // + final-review (none exist)
+    press(&mut app, KeyCode::Char('i')); // investigating off → only v left
+    assert_eq!(app.visible_len(), 0, "no final-review incidents");
+
+    press(&mut app, KeyCode::Esc); // facet mode esc clears everything
+    assert!(!app.has_active_filter());
+    assert_eq!(app.visible_len(), 4);
+}
+
+#[test]
+fn facets_combine_with_free_text_and_survive_enter() {
+    let mut app = app_with_variety();
+    press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('i')); // investigating: 2 left
+    press(&mut app, KeyCode::Char('/')); // switch to typing
+    for c in "cron".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    assert_eq!(app.visible_len(), 1, "text ranks within the facet set");
+    assert_eq!(
+        app.selected_rca().expect("match").id.as_str(),
+        "cron-inv-low"
+    );
+
+    press(&mut app, KeyCode::Enter); // keep everything, leave filter mode
+    assert!(!app.search_active());
+    assert!(app.has_active_filter(), "facets + text survive enter");
+
+    press(&mut app, KeyCode::Enter); // open the incident → consumed
+    assert!(!app.has_active_filter(), "opening consumes facets too");
+    assert_eq!(app.visible_len(), 4);
+    assert_eq!(
+        app.selected_rca().expect("selected").id.as_str(),
+        "cron-inv-low"
+    );
 }
 
 #[test]
 fn typing_q_in_filter_mode_filters_instead_of_quitting() {
     let mut app = app_with(2);
     press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('/'));
     assert_eq!(press(&mut app, KeyCode::Char('q')), Flow::Continue);
     assert_eq!(app.filter(), "q");
     assert_eq!(app.visible_len(), 0, "no workspace matches `q`");
@@ -229,6 +333,7 @@ fn typing_q_in_filter_mode_filters_instead_of_quitting() {
 fn enter_keeps_filter_and_esc_in_list_mode_clears_it() {
     let mut app = app_with(3);
     press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('/'));
     press(&mut app, KeyCode::Char('1'));
     press(&mut app, KeyCode::Enter);
     assert!(!app.search_active());
@@ -242,6 +347,7 @@ fn enter_keeps_filter_and_esc_in_list_mode_clears_it() {
 fn opening_an_incident_consumes_the_filter_and_restores_the_list() {
     let mut app = app_with(3); // titles "RCA 0".."RCA 2"
     press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('/'));
     press(&mut app, KeyCode::Char('2'));
     press(&mut app, KeyCode::Enter); // commit the filter
     assert_eq!(app.visible_len(), 1);
