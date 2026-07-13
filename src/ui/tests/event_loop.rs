@@ -39,9 +39,45 @@ fn reload_reports_workspaces_that_appeared() {
     app.store
         .scaffold(&id, &new_meta("Fresh incident".to_owned(), Severity::High))
         .expect("scaffold");
-    let arrived = app.reload();
-    assert_eq!(arrived, ["Fresh incident"]);
-    assert!(app.reload().is_empty(), "only reported once");
+    let delta = app.reload();
+    assert_eq!(delta.arrived, ["Fresh incident"]);
+    assert!(app.reload().arrived.is_empty(), "only reported once");
+}
+
+#[test]
+fn reload_reports_status_transitions_observed_on_disk() {
+    use crate::model::Status;
+
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    // A status change made outside this App (agent, CLI, another beagle)
+    // shows up in the delta exactly once.
+    app.store.set_status(&id, Status::Review).expect("review");
+    let delta = app.reload();
+    assert_eq!(delta.status_changes.len(), 1);
+    let (title, from, to) = &delta.status_changes[0];
+    assert_eq!(title, "RCA 0");
+    assert_eq!(*from, Status::Investigating);
+    assert_eq!(*to, Status::Review);
+    assert!(delta.arrived.is_empty());
+    assert!(app.reload().status_changes.is_empty(), "only reported once");
+}
+
+#[test]
+fn last_activity_tracks_the_newest_section_write() {
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+    let before = app.last_activity(&id).expect("scaffold has mtimes");
+
+    std::fs::write(
+        app.store.workspace_dir(&id).join("log.md"),
+        "# Log\n- **12:00 UTC** — checking\n",
+    )
+    .expect("write");
+    app.reload();
+    let after = app.last_activity(&id).expect("still tracked");
+    assert!(after >= before, "newest write moves the activity forward");
 }
 
 #[test]

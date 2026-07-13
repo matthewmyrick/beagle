@@ -35,6 +35,10 @@ pub const TEMPLATE: &str = "\
 # Editor for `beagle config` (may include arguments, e.g. \"code -w\").
 # Falls back to $VISUAL, then $EDITOR, then vim.
 # editor = \"vim\"
+
+# Desktop notifications while the TUI runs: new incidents and status
+# changes (osascript on macOS, notify-send on Linux). Off by default.
+# notify = true
 ";
 
 /// Parsed contents of the config file. All fields optional; the empty file
@@ -49,6 +53,10 @@ pub struct Config {
     /// Editor command for `beagle config`, possibly with arguments.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editor: Option<String>,
+    /// Desktop notifications from the TUI (new incidents, status changes).
+    /// Off unless explicitly enabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notify: Option<bool>,
 }
 
 /// Where the config file lives: `$BEAGLE_CONFIG` if set, else

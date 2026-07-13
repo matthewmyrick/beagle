@@ -51,7 +51,14 @@ fn run(command: Command) -> Result<(), Error> {
             );
             Ok(())
         }
-        Command::Tui { root } => ui::run(Store::open(&effective_root(root)?)?),
+        Command::Tui { root } => {
+            let notify = config::load_default()
+                .ok()
+                .flatten()
+                .and_then(|c| c.notify)
+                .unwrap_or(false);
+            ui::run(Store::open(&effective_root(root)?)?, notify)
+        }
         Command::New {
             root,
             id,
