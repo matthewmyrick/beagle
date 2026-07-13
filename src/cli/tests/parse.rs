@@ -157,6 +157,20 @@ fn log_parses_multi_word_messages_and_root() {
 }
 
 #[test]
+fn similar_parses_id_and_root() {
+    match parse(&["similar", "my-rca", "--root", "/x"]) {
+        Ok(Command::Similar { root, id }) => {
+            assert_eq!(root, Some(PathBuf::from("/x")));
+            assert_eq!(id.as_str(), "my-rca");
+        }
+        other => panic!("unexpected parse: {other:?}"),
+    }
+    assert!(parse(&["similar"]).is_err(), "missing id");
+    assert!(parse(&["similar", "Bad Slug"]).is_err(), "invalid slug");
+    assert!(parse(&["similar", "my-rca", "--frob"]).is_err());
+}
+
+#[test]
 fn pr_parses_add_and_list() {
     match parse(&[
         "pr",

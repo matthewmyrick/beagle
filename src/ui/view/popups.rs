@@ -1,6 +1,6 @@
-//! Popup rendering: the `o` link picker, the `T` toolbox overlay, and the
-//! `?` help sheet. All render centered over the main layout with a `Clear`
-//! underneath.
+//! Popup rendering: the `o` link picker, the `R` related-incidents picker,
+//! the `T` toolbox overlay, and the `?` help sheet. All render centered
+//! over the main layout with a `Clear` underneath.
 
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -62,6 +62,54 @@ pub(super) fn draw_links(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, rect, &mut state);
 }
 
+/// The `R` popup: past incidents sharing systems/tags with the selected
+/// one, best match first. Enter jumps to the workspace.
+pub(super) fn draw_related(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(popup) = app.related() else { return };
+    let width = area.width.saturating_sub(6).clamp(30, 110);
+    let height = u16::try_from(popup.items.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(2)
+        .min(area.height.saturating_sub(2));
+    let rect = center(area, width, height);
+
+    let items: Vec<ListItem<'_>> = popup
+        .items
+        .iter()
+        .map(|item| {
+            let (badge, badge_style) = super::style::severity_badge(item.severity);
+            let (symbol, symbol_style) = super::style::status_symbol(item.status, 0);
+            // Leave room for badge/status/shared so the title never pushes
+            // the "why it ranked" note off screen.
+            let title_room = usize::from(width).saturating_sub(item.shared.len() + 24);
+            ListItem::new(Line::from(vec![
+                Span::styled(format!(" {badge} "), badge_style),
+                Span::styled(format!(" {symbol} "), symbol_style),
+                Span::raw(truncate(&item.title, title_room.max(12))),
+                Span::styled(
+                    format!("  ({})", item.shared),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]))
+        })
+        .collect();
+    let block = Block::default()
+        .title(" related incidents — enter jump · j/k move · esc close ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(40, 44, 60))
+            .add_modifier(Modifier::BOLD),
+    );
+    let mut state = ListState::default();
+    state.select(Some(popup.selected));
+    frame.render_widget(Clear, rect);
+    frame.render_stateful_widget(list, rect, &mut state);
+}
+
 /// The toolbox overlay: root `toolbox.md` plus relevant `systems/*.md`,
 /// pre-rendered by the app when opened. Scrollable; geometry is fed back
 /// for clamping, like the content pane.
@@ -92,7 +140,7 @@ pub(super) fn draw_toolbox(frame: &mut Frame, app: &mut App, area: Rect) {
 
 pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
     let width = 62.min(area.width.saturating_sub(4));
-    let height = 23.min(area.height.saturating_sub(2));
+    let height = 24.min(area.height.saturating_sub(2));
     let popup = center(area, width, height);
 
     let rows = [
@@ -111,6 +159,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ),
         ("T", "toolbox: toolbox.md + systems/ context"),
         ("o", "links: open attached PRs / URLs on this tab"),
+        ("R", "related incidents (shared systems/tags); enter jumps"),
         ("n / p", "next / previous diagram"),
         ("h / l, ← / →", "pan diagrams horizontally"),
         ("space / pgdn / pgup", "page through content"),

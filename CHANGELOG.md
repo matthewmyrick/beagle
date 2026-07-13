@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Related incidents: `R` opens a popup of past RCAs ranked by shared
+  `systems` (weighted 3×) and `tags` (1×), newest first on ties — enter
+  jumps to the workspace, clearing any filter that would hide it. `beagle
+  similar <slug>` prints the same ranking for scripts, and the `/beagle`
+  skill now checks history right after scaffolding and cites prior
+  incidents in root-cause writeups. Ranking runs entirely over the
+  manifests already in memory.
+
 ## [0.4.0] - 2026-07-13
 
 ### Added

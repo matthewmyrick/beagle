@@ -63,6 +63,24 @@ pub(super) fn parse_status(
     Ok(Command::SetStatus { root, id, status })
 }
 
+pub(super) fn parse_similar(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`similar` requires an <id> slug as its first argument")?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `similar`")),
+        }
+    }
+    Ok(Command::Similar { root, id })
+}
+
 /// `log <id> <message...>`: everything that isn't a flag becomes the
 /// message, so multi-word messages work without quoting.
 pub(super) fn parse_log(

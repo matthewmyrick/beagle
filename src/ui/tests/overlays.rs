@@ -1,11 +1,15 @@
-//! Tests for the link popup and toolbox overlay (`ui::overlays`).
+//! Tests for the link popup, related popup, and toolbox overlay
+//! (`ui::overlays`).
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)] // panicking is the correct failure mode in tests
 
 use crossterm::event::KeyCode;
 use ratatui::text::Text;
 
+use crate::model::{RcaId, Severity};
+use crate::store::{new_meta, Store};
 use crate::ui::keys::Flow;
 use crate::ui::testutil::{app_with, press};
+use crate::ui::App;
 
 /// Flattens rendered text to a plain string for containment asserts.
 fn flat(text: &Text<'_>) -> String {
@@ -58,6 +62,79 @@ fn o_with_no_links_reports_instead_of_opening_an_empty_popup() {
         .status_line()
         .expect("status set")
         .contains("no attached PRs"));
+}
+
+/// An app over three workspaces: `target` and `alloy-again` share the
+/// `alloy` system; `unrelated` shares nothing.
+fn app_with_related() -> App {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("store");
+    let scaffold = |slug: &str, title: &str, systems: &[&str]| {
+        let mut meta = new_meta(title.to_owned(), Severity::Medium);
+        meta.systems = systems.iter().map(ToString::to_string).collect();
+        store
+            .scaffold(&RcaId::new(slug).expect("valid id"), &meta)
+            .expect("scaffold");
+    };
+    scaffold("target", "Alloy breaks again", &["alloy"]);
+    scaffold("alloy-again", "Alloy OOM last month", &["alloy", "mimir"]);
+    scaffold("unrelated", "SendGrid webhooks", &["sendgrid"]);
+    std::mem::forget(tmp); // OS cleans the temp root; see app_with
+    let mut app = App::new(store).expect("app");
+    while app.selected_rca().expect("non-empty").id.as_str() != "target" {
+        press(&mut app, KeyCode::Char('j'));
+    }
+    app
+}
+
+#[test]
+fn r_opens_related_and_enter_jumps_to_the_workspace() {
+    let mut app = app_with_related();
+    press(&mut app, KeyCode::Char('R'));
+    let popup = app.related().expect("popup open");
+    assert_eq!(popup.items.len(), 1, "only the alloy-sharing workspace");
+    assert_eq!(popup.items[0].id.as_str(), "alloy-again");
+    assert_eq!(popup.items[0].shared, "system: alloy");
+
+    press(&mut app, KeyCode::Enter);
+    assert!(app.related().is_none(), "enter closes the popup");
+    assert_eq!(
+        app.selected_rca().expect("selected").id.as_str(),
+        "alloy-again",
+        "enter jumps the sidebar selection"
+    );
+    assert!(app
+        .status_line()
+        .expect("status set")
+        .contains("jumped to alloy-again"));
+}
+
+#[test]
+fn r_with_nothing_shared_reports_instead_of_an_empty_popup() {
+    let mut app = app_with(2); // scaffolds carry no systems or tags
+    press(&mut app, KeyCode::Char('R'));
+    assert!(app.related().is_none());
+    assert!(app
+        .status_line()
+        .expect("status set")
+        .contains("no related incidents"));
+}
+
+#[test]
+fn related_popup_owns_its_keys_until_closed() {
+    let mut app = app_with_related();
+    press(&mut app, KeyCode::Char('R'));
+    assert_eq!(
+        press(&mut app, KeyCode::Char('q')),
+        Flow::Continue,
+        "q closes the popup instead of quitting"
+    );
+    assert!(app.related().is_none());
+    assert_eq!(
+        app.selected_rca().expect("selected").id.as_str(),
+        "target",
+        "closing without enter leaves the selection alone"
+    );
 }
 
 #[test]

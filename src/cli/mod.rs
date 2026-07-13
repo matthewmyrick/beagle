@@ -33,6 +33,8 @@ USAGE:
                   [--root <dir>]            the TUI tracks merge status via gh
     beagle pr list <id> [--root <dir>]    print attached PRs (live state
                                             included when gh is available)
+    beagle similar <id> [--root <dir>]    print past RCAs related to this one
+                                            (shared systems and tags, ranked)
     beagle export <id> [--out <file>]     export one RCA as a single markdown
                   [--root <dir>]            document (default: exports/<id>.md)
     beagle init [--root <dir>]            scaffold toolbox.md + systems/ agent
@@ -115,6 +117,13 @@ pub enum Command {
         /// The workspace slug.
         id: RcaId,
     },
+    /// `beagle similar`: print related workspaces, ranked.
+    Similar {
+        /// Explicit `--root`, if given.
+        root: Option<PathBuf>,
+        /// The workspace slug.
+        id: RcaId,
+    },
     /// `beagle export`: write the single-file markdown export.
     Export {
         /// Explicit `--root`, if given.
@@ -176,6 +185,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
         Some("status") => subcommands::parse_status(&mut args, root),
         Some("log") => subcommands::parse_log(&mut args, root),
         Some("pr") => subcommands::parse_pr(&mut args, root),
+        Some("similar") => subcommands::parse_similar(&mut args, root),
         Some("export") => subcommands::parse_export(&mut args, root),
         Some("new") => subcommands::parse_new(&mut args, root),
         Some("init") => {
