@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Keybindings** (muscle-memory alert): `/` now *always* searches the
+  selected incident's content, from either pane — committing a search (or
+  pressing `n`/`N`) focuses the content on the hit. `f` now opens the
+  incident-list filter (previously on `/` when the list was focused), and
+  follow mode moves to `F`.
+
 ### Added
 
 - Final-review lifecycle: a new **Final Review** tab (`final-review.md`,

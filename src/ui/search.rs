@@ -1,4 +1,4 @@
-//! In-content search: `/` inside the content pane, `n`/`N` between matches.
+//! In-content search: `/` from anywhere, `n`/`N` between matches.
 //!
 //! One query searches **every section tab of the selected incident** —
 //! you're hunting through an investigation, not a file. Matching runs over
@@ -16,7 +16,7 @@ use ratatui::widgets::Paragraph;
 
 use crate::markdown;
 
-use super::{App, Tab};
+use super::{App, Focus, Tab};
 
 /// One search hit: a rendered line on a section tab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -151,8 +151,16 @@ fn find_hits(corpus: &[(Tab, Text<'static>)], query: &str) -> Vec<SearchHit> {
 
 impl App {
     /// Enters search-typing mode with a fresh query, snapshotting every
-    /// section of the selected incident as the search corpus.
+    /// section of the selected incident as the search corpus. Works from
+    /// either focus — `/` searches the selected incident wherever you are.
     pub(crate) fn start_content_search(&mut self) {
+        if self.selected_rca().is_none() {
+            self.status = Some("no incident selected — nothing to search".to_owned());
+            return;
+        }
+        // Searching is content work: land on the incident immediately so
+        // the live highlights appear where you're looking.
+        self.focus = Focus::Content;
         self.content_search = Some(ContentSearch {
             query: String::new(),
             typing: true,
@@ -310,6 +318,8 @@ impl App {
             self.tab = hit.tab;
             self.reset_scroll();
         }
+        // Navigating to a hit is content navigation, wherever it started.
+        self.focus = Focus::Content;
         self.scroll_to_current_hit();
     }
 

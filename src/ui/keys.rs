@@ -52,10 +52,14 @@ impl App {
             KeyCode::Char('o') => self.open_links(),
             KeyCode::Char('R') => self.open_related(),
             KeyCode::Char('V') => self.verify_final_review(),
-            // `/` searches what you're looking at: the incident list when
-            // the list is focused, the pane content otherwise.
-            KeyCode::Char('/') if self.focus == Focus::Content => self.start_content_search(),
-            KeyCode::Char('/') => self.search_active = true,
+            // `/` always searches keywords across the selected incident;
+            // `f` filters the incident list; `F` follows (tail -f). Each
+            // also moves the focus to where the action is.
+            KeyCode::Char('/') => self.start_content_search(),
+            KeyCode::Char('f') => {
+                self.search_active = true;
+                self.focus = Focus::List;
+            }
             KeyCode::Char('b') => self.focus = Focus::List,
             KeyCode::Char('c') => self.copy_current_tab(),
             KeyCode::Char('C') => self.copy_workspace(),
@@ -64,11 +68,12 @@ impl App {
                 let _ = self.reload();
                 self.status = Some("reloaded".to_owned());
             }
-            KeyCode::Char('f') => {
+            KeyCode::Char('F') => {
                 self.follow = !self.follow;
                 if self.follow {
                     self.scroll = u16::MAX; // jump to the tail immediately
-                    self.status = Some("following — reloads stick to the bottom".to_owned());
+                    self.status =
+                        Some("following — reloads stick to the bottom · esc exits".to_owned());
                 } else {
                     self.status = Some("follow off".to_owned());
                 }
@@ -136,7 +141,19 @@ impl App {
                 self.filter.clear();
                 self.recompute_visible(None);
             }
+            KeyCode::Esc if self.follow => {
+                self.follow = false;
+                self.status = Some("follow off".to_owned());
+            }
             KeyCode::Enter | KeyCode::Char('l') if !self.visible.is_empty() => {
+                // Opening an incident consumes the filter: the pick has
+                // been made, so bring the full list back with the chosen
+                // incident still selected.
+                if !self.filter.is_empty() {
+                    let keep = self.selected_rca().map(|r| r.id.clone());
+                    self.filter.clear();
+                    self.recompute_visible(keep);
+                }
                 self.focus = Focus::Content;
             }
             _ => {}
@@ -146,9 +163,13 @@ impl App {
     fn handle_content_key(&mut self, code: KeyCode) {
         let page = self.viewport.height.saturating_sub(1).max(1);
         match code {
-            // Esc peels one layer at a time: search highlights first, then
-            // back to the list.
+            // Esc peels one layer at a time: search highlights, then follow
+            // mode, then back to the list.
             KeyCode::Esc if self.content_search.is_some() => self.clear_content_search(),
+            KeyCode::Esc if self.follow => {
+                self.follow = false;
+                self.status = Some("follow off".to_owned());
+            }
             KeyCode::Esc => {
                 self.focus = Focus::List;
             }

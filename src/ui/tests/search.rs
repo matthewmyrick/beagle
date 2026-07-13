@@ -93,11 +93,59 @@ fn slash_in_content_focus_searches_the_pane_not_the_list() {
 }
 
 #[test]
-fn slash_in_list_focus_still_filters_the_list() {
-    let mut app = app_with(1);
+fn slash_searches_from_list_focus_and_lands_on_the_content_immediately() {
+    let mut app = app_with_redis_summary();
+    press(&mut app, KeyCode::Char('b')); // back to the list
+    assert_eq!(app.focus(), Focus::List);
+
     press(&mut app, KeyCode::Char('/'));
-    assert!(app.search_active());
+    assert!(
+        app.content_search().is_some_and(|s| s.typing),
+        "/ searches regardless of focus"
+    );
+    assert!(!app.search_active(), "the list filter is untouched");
+    assert_eq!(
+        app.focus(),
+        Focus::Content,
+        "/ puts you on the incident you're on, right away"
+    );
+
+    for c in "redis".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(
+        app.focus(),
+        Focus::Content,
+        "still on the content on commit"
+    );
+}
+
+#[test]
+fn f_filters_the_list_and_moves_focus_to_the_incidents_pane() {
+    let mut app = app_with(1);
+    press(&mut app, KeyCode::Enter); // start from content focus
+    assert_eq!(app.focus(), Focus::Content);
+
+    press(&mut app, KeyCode::Char('f'));
+    assert!(app.search_active(), "f owns the list filter now");
     assert!(app.content_search().is_none());
+    assert_eq!(
+        app.focus(),
+        Focus::List,
+        "filtering is list work — focus follows"
+    );
+}
+
+#[test]
+fn slash_on_an_empty_store_explains() {
+    let mut empty = app_with(0);
+    press(&mut empty, KeyCode::Char('/'));
+    assert!(empty.content_search().is_none());
+    assert!(empty
+        .status_line()
+        .expect("status set")
+        .contains("no incident selected"));
 }
 
 #[test]
