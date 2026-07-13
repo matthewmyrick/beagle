@@ -88,7 +88,7 @@ fn tab_keys_on_an_empty_store_explain_instead_of_silence() {
 #[test]
 fn tab_keys_with_a_non_matching_filter_point_at_the_filter() {
     let mut app = app_with(2);
-    press(&mut app, KeyCode::Char('/'));
+    press(&mut app, KeyCode::Char('f'));
     press(&mut app, KeyCode::Char('z')); // matches nothing
     press(&mut app, KeyCode::Enter); // keep filter, leave search mode
     assert_eq!(app.visible_len(), 0);
@@ -167,21 +167,42 @@ fn follow_mode_pins_scroll_to_the_bottom() {
         width: 80,
     };
     assert!(!app.follow());
-    press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('F'));
     assert!(app.follow());
     assert_eq!(
         app.scroll_offsets().0,
         u16::MAX,
         "jumps to tail (draw clamps)"
     );
-    press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('F'));
     assert!(!app.follow());
 }
 
 #[test]
-fn slash_filter_narrows_the_list_and_esc_clears() {
+fn esc_exits_follow_mode_from_either_focus() {
+    let mut app = app_with(1);
+
+    // Content focus: esc peels follow before leaving the pane.
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Char('F'));
+    assert!(app.follow());
+    press(&mut app, KeyCode::Esc);
+    assert!(!app.follow(), "first esc exits follow");
+    assert_eq!(app.focus(), Focus::Content, "still on the content");
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(app.focus(), Focus::List, "second esc leaves the pane");
+
+    // List focus: esc exits follow there too.
+    press(&mut app, KeyCode::Char('F'));
+    assert!(app.follow());
+    press(&mut app, KeyCode::Esc);
+    assert!(!app.follow());
+}
+
+#[test]
+fn f_filter_narrows_the_list_and_esc_clears() {
     let mut app = app_with(3); // titles "RCA 0".."RCA 2"
-    press(&mut app, KeyCode::Char('/'));
+    press(&mut app, KeyCode::Char('f'));
     press(&mut app, KeyCode::Char('2'));
     assert_eq!(app.visible_len(), 1);
     assert_eq!(app.selected_rca().map(|r| r.id.as_str()), Some("rca-2"));
@@ -193,9 +214,9 @@ fn slash_filter_narrows_the_list_and_esc_clears() {
 }
 
 #[test]
-fn typing_q_in_search_mode_filters_instead_of_quitting() {
+fn typing_q_in_filter_mode_filters_instead_of_quitting() {
     let mut app = app_with(2);
-    press(&mut app, KeyCode::Char('/'));
+    press(&mut app, KeyCode::Char('f'));
     assert_eq!(press(&mut app, KeyCode::Char('q')), Flow::Continue);
     assert_eq!(app.filter(), "q");
     assert_eq!(app.visible_len(), 0, "no workspace matches `q`");
@@ -207,7 +228,7 @@ fn typing_q_in_search_mode_filters_instead_of_quitting() {
 #[test]
 fn enter_keeps_filter_and_esc_in_list_mode_clears_it() {
     let mut app = app_with(3);
-    press(&mut app, KeyCode::Char('/'));
+    press(&mut app, KeyCode::Char('f'));
     press(&mut app, KeyCode::Char('1'));
     press(&mut app, KeyCode::Enter);
     assert!(!app.search_active());
@@ -215,4 +236,24 @@ fn enter_keeps_filter_and_esc_in_list_mode_clears_it() {
 
     press(&mut app, KeyCode::Esc); // list-mode esc clears a kept filter
     assert_eq!(app.visible_len(), 3);
+}
+
+#[test]
+fn opening_an_incident_consumes_the_filter_and_restores_the_list() {
+    let mut app = app_with(3); // titles "RCA 0".."RCA 2"
+    press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('2'));
+    press(&mut app, KeyCode::Enter); // commit the filter
+    assert_eq!(app.visible_len(), 1);
+    let picked = app.selected_rca().expect("match").id.clone();
+
+    press(&mut app, KeyCode::Enter); // open the incident
+    assert_eq!(app.focus(), Focus::Content);
+    assert!(app.filter().is_empty(), "the pick consumed the filter");
+    assert_eq!(app.visible_len(), 3, "everyone is back");
+    assert_eq!(
+        app.selected_rca().expect("selected").id,
+        picked,
+        "selection stays on the incident you opened"
+    );
 }

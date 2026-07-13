@@ -149,8 +149,9 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("b / esc", "back to the incident list"),
         ("tab / [ / ], ← / →", "cycle tabs"),
         ("1–8", "jump to a tab"),
-        ("f", "follow: reloads stick to the bottom (tail -f)"),
-        ("/", "filter incidents (list) / search content (pane)"),
+        ("f", "filter the incident list (fuzzy; esc clears)"),
+        ("F", "follow: reloads stick to the bottom (tail -f)"),
+        ("/", "search the incident: every tab, live highlight"),
         ("n / N", "next / previous search match"),
         ("c / C", "copy this tab / whole RCA to clipboard"),
         (

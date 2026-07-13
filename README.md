@@ -116,10 +116,12 @@ marked); pick one with `j`/`k` + enter to install it. On platforms without
 prebuilt binaries, update via `cargo install` instead.
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
-`1`–`9` switch tabs · `/` fuzzy-filter incidents · `T` toolbox · `f` follow
-(tail -f) · `o` open links/PRs · `R` related incidents · `V` sign off final-review · `c` copy tab / `C` copy whole RCA (pbcopy or
-OSC 52) · `e` export to `exports/<slug>.md` · `n/p` cycle diagrams · `h/l`
-pan diagrams · `r` reload · `?` help · `Q` / `ctrl-c` quit.
+`1`–`9` switch tabs · `/` search the incident (all tabs, `n`/`N` between
+hits) · `f` filter the incident list · `F` follow (tail -f) · `T` toolbox ·
+`o` open links/PRs · `R` related incidents · `V` sign off final-review ·
+`c` copy tab / `C` copy whole RCA (pbcopy or OSC 52) · `e` export to
+`exports/<slug>.md` · `n/p` cycle diagrams · `h/l` pan diagrams · `r`
+reload · `?` help · `Q` / `ctrl-c` quit.
 
 ## Track the fix: attached PRs
 

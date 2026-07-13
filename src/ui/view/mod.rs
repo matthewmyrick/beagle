@@ -397,17 +397,17 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let mut spans = vec![Span::styled(
         match app.focus() {
             Focus::List => {
-                "  j/k select · enter open · ←/→ tabs · / filter · T toolbox · R related · c copy · r reload · ? help · Q quit"
+                "  j/k select · enter open · ←/→ tabs · f filter · / search · T toolbox · R related · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
-                "  j/k scroll · ←/→ tabs · / search · h/l pan · f follow · o links · c copy · b back · ? help · Q quit"
+                "  j/k scroll · ←/→ tabs · / search · h/l pan · F follow · o links · c copy · b back · ? help · Q quit"
             }
         },
         Style::default().fg(Color::DarkGray),
     )];
     if app.follow() {
         spans.push(Span::styled(
-            "  ·  following",
+            "  ·  following (esc exits)",
             Style::default().fg(Color::LightYellow),
         ));
     }
