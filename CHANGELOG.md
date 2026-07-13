@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-13
+
 ### Added
 
 - Related incidents: `R` opens a popup of past RCAs ranked by shared
@@ -138,7 +140,8 @@ Initial release.
   every exit path.
 - `/rca` Claude Code skill documenting the authoring workflow.
 
-[Unreleased]: https://github.com/matthewmyrick/beagle/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/matthewmyrick/beagle/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/matthewmyrick/beagle/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/matthewmyrick/beagle/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/matthewmyrick/beagle/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/matthewmyrick/beagle/releases/tag/v0.2.0
