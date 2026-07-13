@@ -130,6 +130,7 @@ fn switching_tab_resets_scroll() {
     app.viewport = ViewportInfo {
         content_lines: 100,
         height: 10,
+        width: 80,
     };
     press(&mut app, KeyCode::Enter);
     press(&mut app, KeyCode::Char(' '));
@@ -144,6 +145,7 @@ fn scroll_clamps_to_content_height() {
     app.viewport = ViewportInfo {
         content_lines: 30,
         height: 10,
+        width: 80,
     };
     press(&mut app, KeyCode::Enter);
     press(&mut app, KeyCode::Char('G'));
@@ -160,6 +162,7 @@ fn follow_mode_pins_scroll_to_the_bottom() {
     app.viewport = ViewportInfo {
         content_lines: 100,
         height: 10,
+        width: 80,
     };
     assert!(!app.follow());
     press(&mut app, KeyCode::Char('f'));

@@ -23,6 +23,10 @@ impl App {
             self.handle_search_key(key.code);
             return Flow::Continue;
         }
+        if self.content_search.as_ref().is_some_and(|s| s.typing) {
+            self.handle_content_search_key(key.code);
+            return Flow::Continue;
+        }
         if self.links.is_some() {
             self.handle_links_key(key.code);
             return Flow::Continue;
@@ -42,6 +46,9 @@ impl App {
             KeyCode::Char('?') => self.show_help = true,
             KeyCode::Char('T') => self.open_toolbox(),
             KeyCode::Char('o') => self.open_links(),
+            // `/` searches what you're looking at: the incident list when
+            // the list is focused, the pane content otherwise.
+            KeyCode::Char('/') if self.focus == Focus::Content => self.start_content_search(),
             KeyCode::Char('/') => self.search_active = true,
             KeyCode::Char('b') => self.focus = Focus::List,
             KeyCode::Char('c') => self.copy_current_tab(),
@@ -73,6 +80,10 @@ impl App {
                     self.switch_tab(*tab);
                 }
             }
+            // A committed search owns n/N until esc clears it — including on
+            // the Diagrams tab, where p still cycles diagrams.
+            KeyCode::Char('n') if self.content_search.is_some() => self.search_step(1),
+            KeyCode::Char('N') if self.content_search.is_some() => self.search_step(-1),
             KeyCode::Char('n') if self.tab == Tab::Diagrams => self.cycle_diagram(1),
             KeyCode::Char('p') if self.tab == Tab::Diagrams => self.cycle_diagram(-1),
             _ => match self.focus {
@@ -129,6 +140,9 @@ impl App {
     fn handle_content_key(&mut self, code: KeyCode) {
         let page = self.viewport.height.saturating_sub(1).max(1);
         match code {
+            // Esc peels one layer at a time: search highlights first, then
+            // back to the list.
+            KeyCode::Esc if self.content_search.is_some() => self.clear_content_search(),
             KeyCode::Esc => {
                 self.focus = Focus::List;
             }

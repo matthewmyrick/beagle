@@ -253,8 +253,11 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
     let block = pane_block(title, focused);
     let inner = block.inner(area);
 
+    let mut text = text.clone();
+    highlight_search_matches(&mut text, app);
+
     // Feed real geometry back so scrolling clamps to actual wrapped height.
-    let mut paragraph = Paragraph::new(text.clone());
+    let mut paragraph = Paragraph::new(text);
     if wrapped {
         paragraph = paragraph.wrap(Wrap { trim: false });
     }
@@ -262,6 +265,7 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
     app.viewport = super::ViewportInfo {
         content_lines,
         height: inner.height,
+        width: inner.width,
     };
     let max_scroll = content_lines.saturating_sub(inner.height);
 
@@ -269,6 +273,28 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
         .block(block)
         .scroll((scroll.min(max_scroll), if wrapped { 0 } else { hscroll }));
     frame.render_widget(paragraph, area);
+}
+
+/// Highlights the matched text itself on the visible tab — the occurrence,
+/// not the whole line, so the eye lands exactly on it. The current hit's
+/// occurrences pop in amber-on-black; other hits get a quieter steel tint.
+fn highlight_search_matches(text: &mut Text<'static>, app: &App) {
+    let Some(query) = app.content_search().map(|s| s.query.clone()) else {
+        return;
+    };
+    for (line_index, is_current) in app.search_highlights(app.tab()) {
+        if let Some(line) = text.lines.get_mut(line_index) {
+            let style = if is_current {
+                Style::default()
+                    .bg(Color::Rgb(214, 160, 30))
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().bg(Color::Rgb(60, 68, 96))
+            };
+            *line = super::search::highlight_occurrences(line, &query, style);
+        }
+    }
 }
 
 fn draw_welcome(frame: &mut Frame, area: Rect) {
@@ -322,13 +348,58 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         frame.render_widget(Paragraph::new(line), area);
         return;
     }
+    // In-content search owns the hint line while it exists; a transient
+    // status message (handled above) still gets its one beat.
+    if let Some(search) = app.content_search() {
+        let line = if search.typing {
+            Line::from(vec![
+                Span::styled("  search: ", Style::default().fg(Color::Yellow)),
+                Span::raw(search.query.clone()),
+                Span::styled("▌", Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    "   enter commit · esc cancel",
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ])
+        } else if search.hits.is_empty() {
+            Line::from(Span::styled(
+                format!(
+                    "  no matches for \"{}\" anywhere in this incident — esc clears",
+                    search.query
+                ),
+                Style::default().fg(Color::Yellow),
+            ))
+        } else {
+            let place = search
+                .hits
+                .get(search.current)
+                .map_or("", |hit| hit.tab.title());
+            Line::from(vec![
+                Span::styled(
+                    format!(
+                        "  match {}/{} for \"{}\" · {place}",
+                        search.current + 1,
+                        search.hits.len(),
+                        search.query,
+                    ),
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::styled(
+                    "   n/N next/prev (across tabs) · esc clear",
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ])
+        };
+        frame.render_widget(Paragraph::new(line), area);
+        return;
+    }
     let mut spans = vec![Span::styled(
         match app.focus() {
             Focus::List => {
                 "  j/k select · enter open · ←/→ tabs · / filter · T toolbox · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
-                "  j/k scroll · ←/→ tabs · h/l pan · f follow · o links · c copy · b back · ? help · Q quit"
+                "  j/k scroll · ←/→ tabs · / search · h/l pan · f follow · o links · c copy · b back · ? help · Q quit"
             }
         },
         Style::default().fg(Color::DarkGray),
