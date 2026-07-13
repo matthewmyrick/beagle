@@ -31,6 +31,10 @@ impl App {
             self.handle_links_key(key.code);
             return Flow::Continue;
         }
+        if self.related.is_some() {
+            self.handle_related_key(key.code);
+            return Flow::Continue;
+        }
         if self.toolbox.is_some() {
             self.handle_toolbox_key(key.code);
             return Flow::Continue;
@@ -46,6 +50,7 @@ impl App {
             KeyCode::Char('?') => self.show_help = true,
             KeyCode::Char('T') => self.open_toolbox(),
             KeyCode::Char('o') => self.open_links(),
+            KeyCode::Char('R') => self.open_related(),
             // `/` searches what you're looking at: the incident list when
             // the list is focused, the pane content otherwise.
             KeyCode::Char('/') if self.focus == Focus::Content => self.start_content_search(),

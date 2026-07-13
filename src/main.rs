@@ -99,6 +99,7 @@ fn run(command: Command) -> Result<(), Error> {
             Ok(())
         }
         Command::PrList { root, id } => run_pr_list(root, &id),
+        Command::Similar { root, id } => run_similar(root, &id),
         Command::Init { root } => {
             let store = Store::open(&effective_root(root)?)?;
             let created = store.init_context()?;
@@ -170,6 +171,35 @@ fn run_pr_list(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
             Some(state) => println!("{} {:<8} {url}", state.glyph(), state.label()),
             None => println!("  {:<8} {url}", "-"),
         }
+    }
+    Ok(())
+}
+
+/// `beagle similar`: related workspaces, highest score first.
+fn run_similar(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    let (summaries, _) = store.list()?;
+    let target = summaries
+        .iter()
+        .find(|rca| rca.id == *id)
+        .ok_or_else(|| Error::Tool {
+            tool: "similar",
+            message: format!("no workspace `{id}` under this root"),
+        })?;
+    let related = beagle::similar::rank(target, &summaries);
+    if related.is_empty() {
+        println!("no related incidents (nothing shares systems or tags with {id})");
+        return Ok(());
+    }
+    for entry in &related {
+        println!(
+            "{:<3} {:<10} {:<14} {:<40} {}",
+            entry.score,
+            entry.rca.meta.severity,
+            entry.rca.meta.status,
+            entry.rca.id,
+            beagle::similar::shared_label(entry),
+        );
     }
     Ok(())
 }

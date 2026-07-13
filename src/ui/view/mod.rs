@@ -23,7 +23,7 @@ use crate::model::RcaSummary;
 use super::{App, Focus, Pane, Tab};
 
 use header::{banner_fits, draw_banner, flow_tabs, header_paragraph, BANNER_COLS};
-use popups::{draw_help, draw_links, draw_toolbox};
+use popups::{draw_help, draw_links, draw_related, draw_toolbox};
 use style::{
     horizontal, inset, pane_block, severity_badge, status_symbol, truncate, vertical, SIDEBAR_WIDTH,
 };
@@ -43,6 +43,7 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
         draw_toolbox(frame, app, frame.area());
     }
     draw_links(frame, app, frame.area());
+    draw_related(frame, app, frame.area());
     if app.help_visible() {
         draw_help(frame, frame.area());
     }
@@ -396,7 +397,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let mut spans = vec![Span::styled(
         match app.focus() {
             Focus::List => {
-                "  j/k select · enter open · ←/→ tabs · / filter · T toolbox · c copy · r reload · ? help · Q quit"
+                "  j/k select · enter open · ←/→ tabs · / filter · T toolbox · R related · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
                 "  j/k scroll · ←/→ tabs · / search · h/l pan · f follow · o links · c copy · b back · ? help · Q quit"

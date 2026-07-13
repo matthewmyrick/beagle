@@ -28,6 +28,20 @@ update the relevant `systems/` file or `toolbox.md`; that knowledge compounds
 across incidents. If none of these files exist yet, suggest `beagle init`
 to the user (don't run it unprompted mid-incident).
 
+## 0.5 Check history
+
+Right after scaffolding, run:
+
+```sh
+beagle similar <slug>
+```
+
+It ranks past RCAs sharing this incident's systems and tags. If something
+ranks, **read its root-cause and remediation before investigating** — the
+same system usually breaks the same way twice — and cite it in
+`root-cause.md` ("similar to <slug>, where …"). The user sees the same
+ranking with `R` in the TUI.
+
 ## 1. Scaffold
 
 ```sh

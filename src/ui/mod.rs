@@ -31,7 +31,7 @@ use crate::error::Result;
 use crate::model::{RcaId, RcaSummary, SectionKind};
 use crate::store::{LoadWarning, Store};
 
-use overlays::LinksPopup;
+use overlays::{LinksPopup, RelatedPopup};
 use pane::PaneKey;
 use search::ContentSearch;
 
@@ -72,6 +72,8 @@ pub struct App {
     pr_states: HashMap<String, crate::prs::PrState>,
     /// The `o` link popup: attached PRs plus URLs found on the current tab.
     links: Option<LinksPopup>,
+    /// The `R` popup: past incidents sharing systems/tags with this one.
+    related: Option<RelatedPopup>,
     /// In-content search over the pane (`/` with content focus).
     content_search: Option<ContentSearch>,
     /// Rendered toolbox overlay content; `Some` while the overlay is open.
@@ -126,6 +128,7 @@ impl App {
             unread: HashSet::new(),
             pr_states: HashMap::new(),
             links: None,
+            related: None,
             content_search: None,
             toolbox: None,
             toolbox_scroll: 0,
