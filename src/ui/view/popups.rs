@@ -110,6 +110,95 @@ pub(super) fn draw_related(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, rect, &mut state);
 }
 
+/// The `S` settings overlay: config fields with their current values, a
+/// toggle/edit affordance per row, and the file path in the title. Every
+/// change is written straight to the config file.
+pub(super) fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
+    use crate::ui::settings::Field;
+
+    let Some(overlay) = app.settings() else {
+        return;
+    };
+    let width = area.width.saturating_sub(8).clamp(44, 90);
+    let height = u16::try_from(Field::ALL.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(4)
+        .min(area.height.saturating_sub(2));
+    let rect = center(area, width, height);
+
+    let items: Vec<ListItem<'_>> = Field::ALL
+        .iter()
+        .map(|field| {
+            let editing_here =
+                overlay.editing.is_some() && Field::ALL.get(overlay.selected) == Some(field);
+            // Set values pop green; unset ones keep the normal foreground
+            // (dark gray was unreadable) — the parentheses already say
+            // "this is a default".
+            let value_style = if overlay.is_set(*field) || editing_here {
+                Style::default().fg(Color::LightGreen)
+            } else {
+                Style::default()
+            };
+            let value = if editing_here {
+                format!("{}▌", overlay.editing.clone().unwrap_or_default())
+            } else {
+                overlay.value_of(*field)
+            };
+            ListItem::new(Line::from(vec![
+                Span::styled(
+                    format!(" {:<8}", field.key()),
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::styled(format!("{value:<28} "), value_style),
+                Span::styled(
+                    field.describe().to_owned(),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]))
+        })
+        .collect();
+
+    let block = Block::default()
+        .title(format!(" Settings — {} ", overlay.path.display()))
+        .title_alignment(Alignment::Center)
+        .title_bottom(
+            Line::from(if overlay.editing.is_some() {
+                " type value · enter save · esc cancel "
+            } else {
+                " enter/space edit or toggle · j/k move · esc close "
+            })
+            .centered(),
+        )
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(40, 44, 60))
+            .add_modifier(Modifier::BOLD),
+    );
+    let mut state = ListState::default();
+    state.select(Some(overlay.selected));
+    frame.render_widget(Clear, rect);
+    frame.render_stateful_widget(list, rect, &mut state);
+
+    if let Some(note) = &overlay.note {
+        let note_rect = Rect {
+            y: rect.y + rect.height.saturating_sub(2),
+            height: 1,
+            x: rect.x + 2,
+            width: rect.width.saturating_sub(4),
+        };
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                note.clone(),
+                Style::default().fg(Color::LightGreen),
+            )),
+            note_rect,
+        );
+    }
+}
+
 /// The toolbox overlay: root `toolbox.md` plus relevant `systems/*.md`,
 /// pre-rendered by the app when opened. Scrollable; geometry is fed back
 /// for clamping, like the content pane.
@@ -162,6 +251,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("o", "links: open attached PRs / URLs on this tab"),
         ("R", "related incidents (shared systems/tags); enter jumps"),
         ("V", "sign off final-review as verified \u{2192} finished"),
+        ("S", "settings: view + edit the config file"),
         ("n / p", "next / previous diagram"),
         ("h / l, ← / →", "pan diagrams horizontally"),
         ("space / pgdn / pgup", "page through content"),

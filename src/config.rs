@@ -115,6 +115,67 @@ pub fn parse(raw: &str) -> std::result::Result<Config, Box<toml::de::Error>> {
     toml::from_str(raw).map_err(Box::new)
 }
 
+/// Sets one `key = value` assignment in the config file, preserving every
+/// other line (comments included): an existing active assignment is
+/// replaced, a commented-out template line (`# key = ...`) is uncommented,
+/// and a missing key is appended. The result is validated before anything
+/// is written, and the write is atomic (temp + rename) — an invalid value
+/// can never corrupt the file. Returns the freshly parsed config.
+///
+/// `raw_value` is inserted verbatim, so strings must arrive quoted
+/// (`"\"vim\""`) and booleans bare (`"true"`).
+///
+/// # Errors
+/// [`Error::ParseConfig`] if the resulting file would not validate,
+/// [`Error::Io`] on write failures.
+pub fn upsert(path: &Path, key: &str, raw_value: &str) -> Result<Config> {
+    let original = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => TEMPLATE.to_owned(),
+        Err(e) => return Err(Error::io(path, e)),
+    };
+    let assignment = format!("{key} = {raw_value}");
+    let mut lines: Vec<String> = original.lines().map(str::to_owned).collect();
+
+    let is_active = |line: &str| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with(&format!("{key} =")) || trimmed.starts_with(&format!("{key}="))
+    };
+    let is_commented = |line: &str| {
+        let trimmed = line.trim_start();
+        trimmed
+            .strip_prefix('#')
+            .map(str::trim_start)
+            .is_some_and(|rest| {
+                rest.starts_with(&format!("{key} =")) || rest.starts_with(&format!("{key}="))
+            })
+    };
+
+    if let Some(line) = lines.iter_mut().find(|line| is_active(line)) {
+        line.clone_from(&assignment);
+    } else if let Some(line) = lines.iter_mut().find(|line| is_commented(line)) {
+        line.clone_from(&assignment);
+    } else {
+        lines.push(assignment);
+    }
+    let mut updated = lines.join("\n");
+    updated.push('\n');
+
+    // Validate before touching the file.
+    let config = parse(&updated).map_err(|source| Error::ParseConfig {
+        path: path.to_owned(),
+        source,
+    })?;
+
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+    }
+    let tmp = path.with_extension("toml.tmp");
+    fs::write(&tmp, &updated).map_err(|e| Error::io(&tmp, e))?;
+    fs::rename(&tmp, path).map_err(|e| Error::io(path, e))?;
+    Ok(config)
+}
+
 /// The editor command for `beagle config`, resolved as: config `editor` (if
 /// the config currently parses) → `$VISUAL` → `$EDITOR` → `vim`. A broken
 /// config falls through to the environment — that is exactly the situation
