@@ -39,6 +39,9 @@ USAGE:
                   [--root <dir>]            document (default: exports/<id>.md)
     beagle init [--root <dir>]            scaffold toolbox.md + systems/ agent
                                             context templates at the root
+    beagle install --skills               install the /beagle agent skill for
+                                            every agent CLI found on this
+                                            machine (claude, codex, opencode)
     beagle config                         edit the config file and validate it
     beagle update [--version <ver>]       install the latest release, or move
                                             to <ver> (upgrade or downgrade)
@@ -124,6 +127,9 @@ pub enum Command {
         /// The workspace slug.
         id: RcaId,
     },
+    /// `beagle install --skills`: install the agent skill for every agent
+    /// CLI on this machine.
+    InstallSkills,
     /// `beagle export`: write the single-file markdown export.
     Export {
         /// Explicit `--root`, if given.
@@ -192,6 +198,13 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
             parse_common_flags(&mut args, &mut root)?;
             Ok(Command::Init { root })
         }
+        Some("install") => match args.next().as_deref() {
+            Some("--skills") => no_arguments(&mut args, "install --skills", Command::InstallSkills),
+            Some(other) => Err(format!(
+                "unknown argument `{other}` for `install` (expected --skills)"
+            )),
+            None => Err("`install` requires `--skills` (the only installable so far)".to_owned()),
+        },
         Some("config") => no_arguments(&mut args, "config", Command::Config),
         Some("update") => subcommands::parse_update(&mut args),
         Some("version") => match args.next().as_deref() {

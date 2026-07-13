@@ -73,6 +73,7 @@ beagle export <slug>      # one markdown file → exports/<slug>.md
 beagle export <slug> --out ~/vault/incidents/<slug>.md   # e.g. an Obsidian vault
 beagle banner             # print the BEAGLE banner
 beagle init               # scaffold toolbox.md + systems/ agent context
+beagle install --skills   # install the /beagle agent skill (claude, codex, opencode)
 beagle config             # edit + validate ~/.config/beagle/config.toml
 beagle version            # print the installed version
 beagle version list       # browse releases; enter installs the selection
@@ -90,7 +91,9 @@ before it starts. `beagle init` scaffolds two things at the store root:
 - `systems/<name>.md` — one file per service (names match `systems` in
   `rca.toml`): its dashboards, log labels, dependencies, known failure modes.
 
-The `/beagle` Claude Code skill reads these before every investigation and
+Run `beagle install --skills` once to install the `/beagle` skill globally
+for every agent CLI on your machine (Claude Code, Codex, opencode) — it
+ships embedded in the binary. The skill reads these before every investigation and
 updates them when it learns something durable. Press `T` in the TUI to see
 the toolbox plus the systems docs for the selected incident — you and the
 agent share the same source of truth.

@@ -6,7 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-07-13
+### Added
+
+- `beagle install --skills`: installs the `/beagle` agent skill (embedded
+  in the binary) for every agent CLI found on the machine — Claude Code
+  (`~/.claude/skills/`), Codex (`~/.codex/skills/`), and opencode
+  (`~/.config/opencode/skill/`, honoring `XDG_CONFIG_HOME`). Detection
+  checks both `PATH` and config directories (shell wrappers hide binaries
+  from `PATH`); missing agents are skipped, existing installs are
+  overwritten so the skill stays in sync with the binary. `beagle update`
+  now reminds you to re-run it after upgrading.
 
 ### Added
 

@@ -29,6 +29,7 @@ pub mod markdown;
 pub mod model;
 pub mod prs;
 pub mod similar;
+pub mod skills;
 pub mod store;
 pub mod ui;
 pub mod update;

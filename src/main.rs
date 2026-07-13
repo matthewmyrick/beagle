@@ -100,6 +100,7 @@ fn run(command: Command) -> Result<(), Error> {
         }
         Command::PrList { root, id } => run_pr_list(root, &id),
         Command::Similar { root, id } => run_similar(root, &id),
+        Command::InstallSkills => run_install_skills(),
         Command::Init { root } => {
             let store = Store::open(&effective_root(root)?)?;
             let created = store.init_context()?;
@@ -171,6 +172,51 @@ fn run_pr_list(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
             Some(state) => println!("{} {:<8} {url}", state.glyph(), state.label()),
             None => println!("  {:<8} {url}", "-"),
         }
+    }
+    Ok(())
+}
+
+/// `beagle install --skills`: write the embedded /beagle skill for every
+/// agent CLI present on this machine.
+fn run_install_skills() -> Result<(), Error> {
+    let home = env::var_os("HOME")
+        .map(PathBuf::from)
+        .ok_or_else(|| Error::Tool {
+            tool: "install",
+            message: "HOME is not set; cannot locate agent config directories".to_owned(),
+        })?;
+    let xdg = env::var_os("XDG_CONFIG_HOME")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from);
+    let path_var = env::var_os("PATH");
+
+    let mut installed_any = false;
+    for target in beagle::skills::agent_targets(&home, xdg.as_deref()) {
+        match beagle::skills::install(&target, path_var.as_deref()) {
+            Ok(beagle::skills::Outcome::Created) => {
+                installed_any = true;
+                println!(
+                    "✓ {:<9} created {}",
+                    target.name,
+                    target.skill_file.display()
+                );
+            }
+            Ok(beagle::skills::Outcome::Updated) => {
+                installed_any = true;
+                println!(
+                    "✓ {:<9} updated {}",
+                    target.name,
+                    target.skill_file.display()
+                );
+            }
+            Ok(beagle::skills::Outcome::NotFound) => {
+                println!("- {:<9} not found on this machine; skipped", target.name);
+            }
+            Err(e) => return Err(Error::io(&target.skill_file, e)),
+        }
+    }
+    if installed_any {
+        println!("new agent sessions will pick up the /beagle skill");
     }
     Ok(())
 }
@@ -333,5 +379,6 @@ fn install_version(version: update::Version) -> Result<(), Error> {
     update::update_to(version, &exe)?;
     println!("✓ beagle {version} installed at {}", exe.display());
     println!("  restart any running beagle TUIs to pick it up");
+    println!("  run `beagle install --skills` to sync the /beagle agent skill");
     Ok(())
 }

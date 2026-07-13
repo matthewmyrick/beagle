@@ -157,6 +157,23 @@ fn log_parses_multi_word_messages_and_root() {
 }
 
 #[test]
+fn install_requires_the_skills_flag() {
+    assert!(matches!(
+        parse(&["install", "--skills"]),
+        Ok(Command::InstallSkills)
+    ));
+    assert!(parse(&["install"]).is_err(), "bare install is an error");
+    assert!(
+        parse(&["install", "--frob"]).is_err(),
+        "unknown installable"
+    );
+    assert!(
+        parse(&["install", "--skills", "extra"]).is_err(),
+        "no trailing arguments"
+    );
+}
+
+#[test]
 fn similar_parses_id_and_root() {
     match parse(&["similar", "my-rca", "--root", "/x"]) {
         Ok(Command::Similar { root, id }) => {
