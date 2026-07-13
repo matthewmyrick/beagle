@@ -65,9 +65,9 @@ pub(super) fn status_symbol(status: Status, tick: usize) -> (&'static str, Style
             INVESTIGATING_FRAMES[tick % INVESTIGATING_FRAMES.len()],
             Style::default().fg(Color::LightRed),
         ),
-        Status::Identified => ("◐", Style::default().fg(Color::Yellow)),
-        Status::Monitoring => ("◒", Style::default().fg(Color::LightBlue)),
-        Status::Resolved => ("✔", Style::default().fg(Color::Green)),
+        Status::Review => ("◐", Style::default().fg(Color::Yellow)),
+        Status::FinalReview => ("◒", Style::default().fg(Color::LightBlue)),
+        Status::Finished => ("✔", Style::default().fg(Color::Green)),
     }
 }
 

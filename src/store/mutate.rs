@@ -137,6 +137,12 @@ fn section_template(kind: SectionKind, title: &str) -> String {
         SectionKind::Remediation => {
             "How to fix it. Immediate mitigation first, then the durable fix."
         }
+        SectionKind::FinalReview => {
+            "How we'll know the fix worked — write this DURING the \
+             investigation. One `- [ ]` checkbox per concrete, checkable \
+             prediction (metrics back to normal, errors gone for 24h, alert \
+             quiet). Worked through after the fix PR merges; `V` signs off."
+        }
         SectionKind::Notes => "Raw evidence: queries, log excerpts, links, and open questions.",
         SectionKind::Log => {
             "What the investigation did, when — appended live, one \

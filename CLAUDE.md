@@ -34,7 +34,7 @@ One workspace per debugged system/incident — it is the whole debug flow's home
 
 Write these files under `rcas/<slug>/` as the investigation progresses — don't
 wait until the end; the user watches live. Update `status` in `rca.toml` as you
-go: `investigating → identified → monitoring → resolved` — the easy way is
+go: `investigating → review → final-review → finished` — the easy way is
 `beagle status <slug> <status>`, which stamps `updated` for you.
 
 | File | Tab | What belongs there |
@@ -44,6 +44,7 @@ go: `investigating → identified → monitoring → resolved` — the easy way 
 | `root-cause.md` | Root Cause | Numbered causal chain from symptom down to root, plus "why it wasn't caught". |
 | `impact.md` | Impact | Quantified: requests, users, duration, money, SLO budget burned. |
 | `remediation.md` | Fix | Immediate mitigation first, then durable fixes with owners and status. |
+| `final-review.md` | Final Review | Verification checklist (`- [ ]` per checkable prediction) written **during** the investigation; worked through after the fix PR merges. |
 | `notes.md` | Notes | Raw evidence: metrics tables, queries, log excerpts, links, open questions. |
 | `log.md` | Log | Live investigation narration — append `beagle log <slug> "..."` at every step. |
 | `diagrams/NN-name.txt` | Diagrams | ASCII diagrams (see below). |

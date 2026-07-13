@@ -11,7 +11,7 @@ fn investigating_symbol_animates_and_others_stay_fixed() {
     let (wrapped, _) = status_symbol(Status::Investigating, INVESTIGATING_FRAMES.len());
     assert_eq!(wrapped, frame0, "frames cycle");
 
-    for status in [Status::Identified, Status::Monitoring, Status::Resolved] {
+    for status in [Status::Review, Status::FinalReview, Status::Finished] {
         let (a, _) = status_symbol(status, 0);
         let (b, _) = status_symbol(status, 7);
         assert_eq!(a, b, "{status} must not animate");

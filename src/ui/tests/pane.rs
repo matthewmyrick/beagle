@@ -13,8 +13,8 @@ fn sections_render_and_missing_tab_content_is_hint_not_error() {
     app.ensure_pane();
     assert!(matches!(app.pane(), Some(Pane::Section(_))));
 
-    // Diagrams dir is empty after scaffold → Empty hint, not an error.
-    press(&mut app, KeyCode::Char('6'));
+    // Diagrams (tab 7) is empty after scaffold → Empty hint, not an error.
+    press(&mut app, KeyCode::Char('7'));
     app.ensure_pane();
     assert!(matches!(app.pane(), Some(Pane::Empty(_))));
 }

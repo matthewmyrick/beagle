@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Final-review lifecycle: a new **Final Review** tab (`final-review.md`,
+  tabs are now 1–9) holds the verification checklist the agent writes
+  *during* the investigation — concrete, checkable predictions of what
+  "fixed" looks like. When **every attached fix PR has merged**, beagle
+  automatically moves the workspace from `review` to `final-review` (fed by
+  the existing `gh` poll); after working the checklist, `V` signs it off as
+  verified → `finished`. Viewing never mutates state.
+
+### Changed
+
+- **Status vocabulary (manifest format):** `identified` → `review`,
+  `monitoring` → `final-review`, `resolved` → `finished`. Old names still
+  parse (manifests and `beagle status` both accept them) but beagle now
+  writes the new names — **binaries older than this release reject the new
+  names** and skip those workspaces with a warning; `beagle update` first.
+  Sidebar order follows the lifecycle: `investigating` on top, then
+  `review`, `final-review`, and `finished` at the very bottom, with
+  severity ordering within each.
+
 ## [0.5.0] - 2026-07-13
 
 ### Added

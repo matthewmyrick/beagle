@@ -60,13 +60,11 @@ fn set_status_rewrites_only_status_and_stamps_updated() {
     let meta = test_meta("Flip", Severity::High);
     store.scaffold(&id, &meta).expect("scaffold");
 
-    let written = store
-        .set_status(&id, Status::Identified)
-        .expect("set status");
-    assert_eq!(written.status, Status::Identified);
+    let written = store.set_status(&id, Status::Review).expect("set status");
+    assert_eq!(written.status, Status::Review);
 
     let back = store.read_meta(&id).expect("re-read");
-    assert_eq!(back.status, Status::Identified);
+    assert_eq!(back.status, Status::Review);
     assert!(back.updated.is_some(), "updated stamped");
     assert_eq!(back.title, meta.title, "other fields preserved");
     assert_eq!(back.created, meta.created);
@@ -79,7 +77,7 @@ fn set_status_on_missing_workspace_is_an_error() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let store = Store::open(tmp.path()).expect("open store");
     assert!(store
-        .set_status(&test_id("ghost"), Status::Resolved)
+        .set_status(&test_id("ghost"), Status::Finished)
         .is_err());
 }
 

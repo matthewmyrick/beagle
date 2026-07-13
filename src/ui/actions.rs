@@ -1,11 +1,37 @@
 //! One-shot user actions: copy a tab or the whole workspace to the
-//! clipboard, and export the workspace to a markdown file.
+//! clipboard, export the workspace to a markdown file, and the `V`
+//! final-review sign-off.
 
-use crate::model::RcaId;
+use crate::model::{RcaId, Status};
 
 use super::App;
 
 impl App {
+    /// `V`: signs off a `final-review` workspace as verified → `finished`.
+    /// Viewing never mutates state; this explicit keypress is the human
+    /// confirming the Final Review checklist held up.
+    pub(crate) fn verify_final_review(&mut self) {
+        let Some(rca) = self.selected_rca() else {
+            self.status = Some("no workspace selected".to_owned());
+            return;
+        };
+        let id = rca.id.clone();
+        match rca.meta.status {
+            Status::FinalReview => match self.store.set_status(&id, Status::Finished) {
+                Ok(_) => {
+                    self.status = Some(format!("{id} verified → finished ✔"));
+                    let _ = self.reload();
+                }
+                Err(e) => self.status = Some(format!("sign-off failed: {e}")),
+            },
+            other => {
+                self.status = Some(format!(
+                    "V signs off a final-review incident — this one is {other}"
+                ));
+            }
+        }
+    }
+
     /// Copies the current tab's raw content (markdown or diagram source) to
     /// the clipboard. Reads from disk on demand — the pane cache holds
     /// styled text, and the raw bytes are what's useful in a paste.

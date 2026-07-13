@@ -52,6 +52,26 @@ fn status_round_trips_through_serde_and_fromstr() {
 }
 
 #[test]
+fn pre_0_6_status_names_still_parse_but_are_never_written() {
+    // Old manifests keep loading (serde aliases + FromStr), so nothing on
+    // disk breaks when the vocabulary changes...
+    for (old, new) in [
+        ("identified", Status::Review),
+        ("monitoring", Status::FinalReview),
+        ("resolved", Status::Finished),
+    ] {
+        let toml_value = toml::Value::String(old.to_owned());
+        let parsed: Status = toml_value.try_into().expect("legacy name deserializes");
+        assert_eq!(parsed, new);
+        assert_eq!(old.parse::<Status>(), Ok(new), "CLI accepts legacy names");
+    }
+    // ...while serialization always emits the new names.
+    let serialized = toml::Value::try_from(Status::FinalReview).expect("serializes");
+    assert_eq!(serialized, toml::Value::String("final-review".to_owned()));
+    assert_eq!(Status::Finished.as_str(), "finished");
+}
+
+#[test]
 fn manifest_rejects_unknown_fields() {
     let toml_src = r#"
         title = "t"
@@ -114,7 +134,7 @@ fn sort_key_puts_active_severe_recent_first() {
             prs: Vec::new(),
         },
     };
-    let resolved = mk(Status::Resolved, Severity::Critical, 100);
+    let resolved = mk(Status::Finished, Severity::Critical, 100);
     let active_high = mk(Status::Investigating, Severity::High, 100);
     let active_crit_old = mk(Status::Investigating, Severity::Critical, 50);
     let active_crit_new = mk(Status::Investigating, Severity::Critical, 200);
