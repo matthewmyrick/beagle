@@ -44,6 +44,7 @@ fn config_editor_wins_over_fallback() {
     let config = Config {
         root: None,
         editor: Some("hx".to_owned()),
+        notify: None,
     };
     assert_eq!(editor(Some(&config)), "hx");
 }

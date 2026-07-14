@@ -185,7 +185,10 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .map(|url| (url.clone(), app.pr_state(url)))
         .collect();
-    let header = header_paragraph(&rca, app.tick(), &prs);
+    let activity = app
+        .last_activity(&rca.id)
+        .and_then(|mtime| mtime.elapsed().ok());
+    let header = header_paragraph(&rca, app.tick(), &prs, activity);
     let header_width = head_width.saturating_sub(1).max(1); // inset by 1 below
     let header_height = u16::try_from(header.line_count(header_width))
         .unwrap_or(2)

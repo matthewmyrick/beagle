@@ -27,6 +27,7 @@ pub mod fuzzy;
 pub mod links;
 pub mod markdown;
 pub mod model;
+pub mod notify;
 pub mod prs;
 pub mod similar;
 pub mod store;

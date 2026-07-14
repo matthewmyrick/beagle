@@ -37,6 +37,23 @@ fn tabs_survive_absurdly_narrow_width() {
 }
 
 #[test]
+fn activity_labels_flip_to_quiet_at_the_threshold() {
+    use std::time::Duration;
+
+    let (label, quiet) = activity_label(Duration::from_secs(4 * 60));
+    assert_eq!(label, "active 4m ago");
+    assert!(!quiet, "under the threshold stays calm");
+
+    let (label, quiet) = activity_label(QUIET_AFTER);
+    assert_eq!(label, "quiet 10m");
+    assert!(quiet, "at the threshold turns yellow");
+
+    let (label, quiet) = activity_label(Duration::from_secs(95 * 60));
+    assert_eq!(label, "quiet 1h 35m");
+    assert!(quiet);
+}
+
+#[test]
 fn unread_tabs_get_a_dot() {
     let mut unread = [false; 9];
     unread[8] = true; // Log

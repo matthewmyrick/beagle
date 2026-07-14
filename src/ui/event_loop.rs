@@ -1,7 +1,7 @@
 //! The blocking event loop: input with a timeout, watcher events over a
 //! channel, and burst-coalesced reloads. Idle CPU is ~0%.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::time::Duration;
 
@@ -17,6 +17,15 @@ use crate::Error; // referenced by rustdoc links in this module
 
 use super::keys::Flow;
 use super::{view, App};
+
+/// What a reload discovered, for announcements and notifications.
+#[derive(Debug, Default)]
+pub(crate) struct ReloadDelta {
+    /// Titles of workspaces that appeared since the last listing.
+    pub arrived: Vec<String>,
+    /// `(title, from, to)` status transitions observed on disk.
+    pub status_changes: Vec<(String, crate::model::Status, crate::model::Status)>,
+}
 
 impl App {
     /// Runs the event loop until the user quits.
@@ -54,8 +63,8 @@ impl App {
             }
             self.advance_merged_reviews();
             if drain(&rx) {
-                let arrived = self.reload();
-                self.status = Some(match arrived.first() {
+                let delta = self.reload();
+                self.status = Some(match delta.arrived.first() {
                     Some(title) => format!("new incident: {title}"),
                     None => "reloaded (files changed on disk)".to_owned(),
                 });
@@ -129,20 +138,33 @@ impl App {
     }
 
     /// Re-lists workspaces, keeping the selection pinned to the same id when
-    /// it survives the reload, and drops the content cache. Returns the
-    /// titles of workspaces that appeared since the last listing, and flags
-    /// changed sections as unread.
-    pub(crate) fn reload(&mut self) -> Vec<String> {
+    /// it survives the reload, and drops the content cache. Returns what
+    /// changed (new workspaces, status transitions) and — when enabled —
+    /// fires desktop notifications for it, so every reload path (watcher,
+    /// manual `r`, auto-advance, sign-off) notifies consistently.
+    pub(crate) fn reload(&mut self) -> ReloadDelta {
         let previous = self.selected_rca().map(|r| r.id.clone());
-        let known: HashSet<RcaId> = self.rcas.iter().map(|r| r.id.clone()).collect();
-        let mut arrived = Vec::new();
+        let known: HashMap<RcaId, crate::model::Status> = self
+            .rcas
+            .iter()
+            .map(|r| (r.id.clone(), r.meta.status))
+            .collect();
+        let mut delta = ReloadDelta::default();
         match self.store.list() {
             Ok((rcas, warnings)) => {
-                arrived = rcas
-                    .iter()
-                    .filter(|r| !known.contains(&r.id))
-                    .map(|r| r.meta.title.clone())
-                    .collect();
+                for rca in &rcas {
+                    match known.get(&rca.id) {
+                        None => delta.arrived.push(rca.meta.title.clone()),
+                        Some(&old) if old != rca.meta.status => {
+                            delta.status_changes.push((
+                                rca.meta.title.clone(),
+                                old,
+                                rca.meta.status,
+                            ));
+                        }
+                        Some(_) => {}
+                    }
+                }
                 self.rcas = rcas;
                 self.warnings = warnings;
             }
@@ -153,7 +175,15 @@ impl App {
         self.refresh_mtimes(true);
         self.recompute_visible(previous);
         self.pane = None;
-        arrived
+        if self.notify_enabled {
+            for title in &delta.arrived {
+                crate::notify::send("beagle — new incident", title);
+            }
+            for (title, _, to) in &delta.status_changes {
+                crate::notify::send(&format!("beagle — {to}"), title);
+            }
+        }
+        delta
     }
 
     /// Re-snapshots every section file's mtime. When `mark_unread` is set,

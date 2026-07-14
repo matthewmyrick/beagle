@@ -37,7 +37,9 @@ Final Review · Diagrams · Notes · Log**. The Log tab is the live investigatio
 agent appends a timestamped line at every step (`beagle log <slug> "..."`),
 and `f` (follow mode) keeps the tab pinned to the newest line, tail-f style.
 Tabs whose files changed since you last looked get a `●` marker, workspaces
-in `investigating` status show a live spinner with ticking elapsed time, and
+in `investigating` status show a live spinner, ticking elapsed time, and a
+liveness read — `active 2m ago`, turning yellow (`quiet 12m`) when the agent
+has gone silent — and
 new workspaces announce themselves in the status bar as agents scaffold them.
 
 ## Install & run
@@ -104,6 +106,7 @@ setting is optional and overridden by flags:
 
 ```toml
 root = "/path/to/oncall"   # default --root, so `beagle` works from anywhere
+notify = true              # desktop pings: new incidents, status changes
 editor = "code -w"         # editor for `beagle config`
 ```
 

@@ -69,6 +69,9 @@ pub struct App {
     /// Follow mode: filesystem reloads keep the current tab scrolled to the
     /// bottom, tail-f style.
     follow: bool,
+    /// Desktop notifications on new incidents and status changes (config
+    /// `notify = true`).
+    notify_enabled: bool,
     /// Last-seen modification time per section file, for change detection.
     mtimes: HashMap<(RcaId, SectionKind), std::time::SystemTime>,
     /// Sections that changed on disk since the user last viewed them.
@@ -145,6 +148,7 @@ impl App {
             pane: None,
             tick: 0,
             follow: false,
+            notify_enabled: false,
             mtimes: HashMap::new(),
             unread: HashSet::new(),
             pr_states: HashMap::new(),
@@ -194,6 +198,16 @@ impl App {
         self.selected = keep
             .and_then(|id| self.visible.iter().position(|&i| self.rcas[i].id == id))
             .unwrap_or(0);
+    }
+
+    /// The newest section-file modification across workspace `id`, straight
+    /// from the mtime snapshot kept for unread tracking — zero extra I/O.
+    pub(crate) fn last_activity(&self, id: &RcaId) -> Option<std::time::SystemTime> {
+        self.mtimes
+            .iter()
+            .filter(|((mtime_id, _), _)| mtime_id == id)
+            .map(|(_, mtime)| *mtime)
+            .max()
     }
 
     /// Whether anything (facets or free text) is narrowing the list.
@@ -343,9 +357,12 @@ impl App {
 /// # Errors
 /// Propagates any [`Error`](crate::Error) from app construction or the
 /// event loop.
-pub fn run(store: Store) -> Result<()> {
+pub fn run(store: Store, notify: bool) -> Result<()> {
     let mut terminal = ratatui::init();
-    let result = App::new(store).and_then(|app| app.run(&mut terminal));
+    let result = App::new(store).and_then(|mut app| {
+        app.notify_enabled = notify;
+        app.run(&mut terminal)
+    });
     ratatui::restore();
     result
 }

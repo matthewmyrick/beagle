@@ -101,10 +101,29 @@ pub(super) fn flow_tabs(selected: Tab, width: u16, unread: &[bool]) -> Vec<Line<
     lines
 }
 
+/// An investigating agent quieter than this is worth a yellow glance —
+/// crashed and hard-at-work look identical otherwise.
+pub(super) const QUIET_AFTER: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// The liveness fragment for an investigating incident: what to say about
+/// the time since the workspace last changed, and whether it deserves the
+/// warning color.
+pub(super) fn activity_label(age: std::time::Duration) -> (String, bool) {
+    let minutes = i64::try_from(age.as_secs() / 60).unwrap_or(i64::MAX);
+    let quiet = age >= QUIET_AFTER;
+    let label = if quiet {
+        format!("quiet {}", minutes_label(minutes))
+    } else {
+        format!("active {} ago", minutes_label(minutes))
+    };
+    (label, quiet)
+}
+
 pub(super) fn header_paragraph(
     rca: &RcaSummary,
     tick: usize,
     prs: &[(String, Option<crate::prs::PrState>)],
+    activity: Option<std::time::Duration>,
 ) -> Paragraph<'static> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
     let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
@@ -129,6 +148,17 @@ pub(super) fn header_paragraph(
             format!(" · {elapsed}"),
             Style::default().fg(Color::Gray),
         ));
+        // Liveness: a spinner says someone is on it; this says whether
+        // they still are.
+        if let Some(age) = activity {
+            let (label, quiet) = activity_label(age);
+            let style = if quiet {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            meta_spans.push(Span::styled(format!(" · {label}"), style));
+        }
     }
     meta_spans.extend([
         Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
@@ -181,7 +211,11 @@ fn pr_line(prs: &[(String, Option<crate::prs::PrState>)]) -> Line<'static> {
 
 /// Human elapsed time since `from`: `3m`, `1h 05m`, `2d 4h`.
 fn elapsed_label(from: time::OffsetDateTime, now: time::OffsetDateTime) -> String {
-    let minutes = (now - from).whole_minutes().max(0);
+    minutes_label((now - from).whole_minutes().max(0))
+}
+
+/// A minute count as a short label: `3m`, `1h 05m`, `2d 4h`.
+fn minutes_label(minutes: i64) -> String {
     if minutes < 60 {
         format!("{minutes}m")
     } else if minutes < 24 * 60 {
