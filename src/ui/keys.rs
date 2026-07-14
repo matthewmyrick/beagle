@@ -35,6 +35,10 @@ impl App {
             self.handle_related_key(key.code);
             return Flow::Continue;
         }
+        if self.settings.is_some() {
+            self.handle_settings_key(key.code);
+            return Flow::Continue;
+        }
         if self.toolbox.is_some() {
             self.handle_toolbox_key(key.code);
             return Flow::Continue;
@@ -52,6 +56,7 @@ impl App {
             KeyCode::Char('o') => self.open_links(),
             KeyCode::Char('R') => self.open_related(),
             KeyCode::Char('V') => self.verify_final_review(),
+            KeyCode::Char('S') => self.open_settings(),
             // `/` always searches keywords across the selected incident;
             // `f` filters the incident list; `F` follows (tail -f). Each
             // also moves the focus to where the action is.

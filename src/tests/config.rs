@@ -4,6 +4,41 @@
 use super::*;
 
 #[test]
+fn upsert_replaces_uncomments_appends_and_preserves_comments() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("config.toml");
+
+    // Missing file: created from the template, key uncommented in place.
+    let config = upsert(&path, "notify", "true").expect("create + set");
+    assert_eq!(config.notify, Some(true));
+    let content = std::fs::read_to_string(&path).expect("read");
+    assert!(content.contains("notify = true"));
+    assert!(
+        content.contains("# Desktop notifications"),
+        "surrounding comments survive: {content}"
+    );
+
+    // Active line: replaced, not duplicated.
+    let config = upsert(&path, "notify", "false").expect("flip");
+    assert_eq!(config.notify, Some(false));
+    let content = std::fs::read_to_string(&path).expect("read");
+    assert_eq!(content.matches("notify =").count(), 1, "{content}");
+
+    // Missing key with no template line: appended.
+    std::fs::write(&path, "# my precious comment\n").expect("write");
+    let config = upsert(&path, "editor", "\"hx\"").expect("append");
+    assert_eq!(config.editor.as_deref(), Some("hx"));
+    let content = std::fs::read_to_string(&path).expect("read");
+    assert!(content.starts_with("# my precious comment\n"));
+    assert!(content.contains("editor = \"hx\""));
+
+    // Invalid value: rejected, file untouched.
+    let before = std::fs::read_to_string(&path).expect("read");
+    assert!(upsert(&path, "notify", "\"not-a-bool\"").is_err());
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), before);
+}
+
+#[test]
 fn template_is_a_valid_all_defaults_config() {
     let config = parse(TEMPLATE).expect("template must parse");
     assert_eq!(config, Config::default(), "template is fully commented");

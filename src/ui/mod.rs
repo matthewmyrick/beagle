@@ -17,6 +17,7 @@ mod keys;
 mod overlays;
 mod pane;
 mod search;
+mod settings;
 mod tabs;
 mod view;
 
@@ -34,6 +35,7 @@ use crate::store::{LoadWarning, Store};
 use overlays::{LinksPopup, RelatedPopup};
 use pane::PaneKey;
 use search::ContentSearch;
+use settings::SettingsOverlay;
 
 /// The whole TUI state.
 pub struct App {
@@ -85,6 +87,8 @@ pub struct App {
     related: Option<RelatedPopup>,
     /// In-content search over the pane (`/` with content focus).
     content_search: Option<ContentSearch>,
+    /// The `S` settings overlay; `Some` while open.
+    settings: Option<SettingsOverlay>,
     /// Rendered toolbox overlay content; `Some` while the overlay is open.
     toolbox: Option<Text<'static>>,
     /// Vertical scroll of the toolbox overlay.
@@ -155,6 +159,7 @@ impl App {
             links: None,
             related: None,
             content_search: None,
+            settings: None,
             toolbox: None,
             toolbox_scroll: 0,
             toolbox_viewport: (0, 0),

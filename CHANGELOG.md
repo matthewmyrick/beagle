@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format follows
   is — `active 2m ago` from the newest section-file write (the mtime
   snapshot already kept for unread markers, zero extra I/O), turning
   yellow (`quiet 12m`) once the agent has been silent past 10 minutes.
+- Settings overlay: `S` opens a floating pane showing every config field
+  (root, editor, notify) with its current value — space toggles booleans,
+  enter inline-edits strings, and every change writes the config file
+  through a comment-preserving, validated, atomic line edit. `notify`
+  applies to the running TUI immediately.
 - Desktop notifications (opt-in, config `notify = true`): new incidents
   and status transitions fire a native notification — `osascript` on
   macOS, `notify-send` on Linux, same shell-out philosophy as the
