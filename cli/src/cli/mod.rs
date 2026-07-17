@@ -47,6 +47,8 @@ USAGE:
     beagle init [--root <dir>]            scaffold toolbox.md + systems/ agent
                                             context templates at the root
     beagle config                         edit the config file and validate it
+    beagle skill [status|install]         show or install the /beagle skill
+                                            for Claude Code and Codex
     beagle update [--version <ver>]       install the latest release, or move
                                             to <ver> (upgrade or downgrade)
     beagle version                        print the installed version
@@ -57,6 +59,15 @@ USAGE:
 The <id> is a lowercase slug ([a-z0-9-], max 64 chars) and becomes the
 directory name under <root>/rcas/. Without --root, the config file's `root`
 is used, then the current directory.";
+
+/// What `beagle skill` should do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkillAction {
+    /// Report where each agent's skill stands (default).
+    Status,
+    /// Write the bundled skill for each agent.
+    Install,
+}
 
 /// A fully parsed invocation. Parsing happens once, here at the boundary;
 /// everything downstream takes typed values. `root` stays optional until
@@ -165,6 +176,11 @@ pub enum Command {
     },
     /// `beagle config`: edit and validate the config file.
     Config,
+    /// `beagle skill`: show or install the `/beagle` skill for agents.
+    Skill {
+        /// What to do: report status or install.
+        action: SkillAction,
+    },
     /// `beagle update`: install a release over the running binary.
     Update {
         /// Target version (`--version`); latest when absent.
@@ -220,6 +236,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
             Ok(Command::Init { root })
         }
         Some("config") => no_arguments(&mut args, "config", Command::Config),
+        Some("skill") => subcommands::parse_skill(&mut args),
         Some("update") => subcommands::parse_update(&mut args),
         Some("version") => match args.next().as_deref() {
             None => Ok(Command::Version),

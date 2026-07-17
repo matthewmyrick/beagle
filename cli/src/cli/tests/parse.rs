@@ -283,3 +283,27 @@ fn unarchive_parses_id_and_root() {
     }
     assert!(parse(&["unarchive"]).is_err(), "id is required");
 }
+
+#[test]
+fn skill_parses_status_install_and_default() {
+    assert!(matches!(
+        parse(&["skill"]),
+        Ok(Command::Skill {
+            action: SkillAction::Status
+        })
+    ));
+    assert!(matches!(
+        parse(&["skill", "status"]),
+        Ok(Command::Skill {
+            action: SkillAction::Status
+        })
+    ));
+    assert!(matches!(
+        parse(&["skill", "install"]),
+        Ok(Command::Skill {
+            action: SkillAction::Install
+        })
+    ));
+    assert!(parse(&["skill", "frobnicate"]).is_err());
+    assert!(parse(&["skill", "install", "extra"]).is_err());
+}

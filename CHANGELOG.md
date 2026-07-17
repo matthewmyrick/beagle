@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-17
+
+### Added
+
+- The `/beagle` skill (the authoring guide agents follow) now ships
+  **inside the binary**, and `beagle update` offers to install or refresh
+  it after fetching a new release — for **Claude Code**
+  (`~/.claude/skills/beagle/SKILL.md`) and **Codex**
+  (`~/.codex/prompts/beagle.md`), whichever are set up on the machine. The
+  prompt is interactive-only and best-effort: declining or a write failure
+  never fails the update.
+- `beagle skill status` reports where each agent's copy stands; `beagle
+  skill install` writes (or refreshes) it on demand. Claude keeps the
+  skill's YAML frontmatter; the Codex prompt gets the body only.
+
 ## [0.8.0] - 2026-07-17
 
 ### Added

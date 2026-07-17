@@ -30,6 +30,7 @@ pub mod model;
 pub mod notify;
 pub mod prs;
 pub mod similar;
+pub mod skill;
 pub mod store;
 pub mod ui;
 pub mod update;
