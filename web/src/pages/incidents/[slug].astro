@@ -71,7 +71,7 @@ const dateLabel = isResolved(incident.status) ? "Resolved" : "Reported";
           {incident.diagrams.map((diagram) => (
             <figure class="diagram">
               <figcaption>{diagram.name}</figcaption>
-              <pre>{diagram.text}</pre>
+              <pre set:html={diagram.html} />
             </figure>
           ))}
         </section>

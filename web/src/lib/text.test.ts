@@ -1,17 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { stripAnsi, stripLeadingHeading, stripScaffoldHint } from "./text";
-
-describe("stripAnsi", () => {
-  it("removes SGR color codes, keeps the text and alignment", () => {
-    const input = "[1;31mBUG[0m ── pool: 8";
-    expect(stripAnsi(input)).toBe("BUG ── pool: 8");
-  });
-
-  it("leaves plain text untouched", () => {
-    expect(stripAnsi("no codes here")).toBe("no codes here");
-  });
-});
+import { stripLeadingHeading, stripScaffoldHint } from "./text";
 
 describe("stripLeadingHeading", () => {
   it("drops a leading # heading and the blank line after it", () => {

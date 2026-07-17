@@ -1,14 +1,6 @@
 // Small pure text helpers for turning RCA files into public content.
 // Pure and dependency-free so they unit-test without a DOM or filesystem.
 
-// eslint-disable-next-line no-control-regex -- matching ANSI escapes is the point
-const ANSI = /\[[0-9;]*m/g;
-
-/** Removes ANSI SGR color codes from diagram text (the web renders plain). */
-export function stripAnsi(text: string): string {
-  return text.replace(ANSI, "");
-}
-
 /**
  * Drops a leading `# Heading` line from a section's markdown — the public
  * page supplies its own section heading, so the file's title would double

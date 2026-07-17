@@ -13,8 +13,8 @@ import path from "node:path";
 import { marked } from "marked";
 import { parse as parseToml } from "smol-toml";
 
+import { ansiToHtml } from "./ansi";
 import { plainLead, renderMarkdown } from "./render";
-import { stripAnsi } from "./text";
 
 const RCAS_DIR = process.env.BEAGLE_RCAS_DIR
   ? path.resolve(process.env.BEAGLE_RCAS_DIR)
@@ -38,7 +38,8 @@ export interface RenderedSection {
 
 export interface Diagram {
   name: string;
-  text: string;
+  /** ANSI colors converted to styled HTML spans; safe for `set:html`. */
+  html: string;
 }
 
 export interface Incident {
@@ -158,7 +159,7 @@ function readDiagrams(dir: string): Diagram[] {
     .sort()
     .map((name) => ({
       name,
-      text: stripAnsi(fs.readFileSync(path.join(diagramsDir, name), "utf8")),
+      html: ansiToHtml(fs.readFileSync(path.join(diagramsDir, name), "utf8")),
     }));
 }
 

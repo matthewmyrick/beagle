@@ -433,3 +433,57 @@ a:hover {
   line-height: 1.4;
   white-space: pre;
 }
+
+/* ANSI diagram colors — red = broken, green = healthy, yellow = degraded.
+   Tuned to read on the code background in both themes. */
+.ansi-bold {
+  font-weight: 700;
+}
+.ansi-dim {
+  opacity: 0.6;
+}
+.ansi-red {
+  color: #d64545;
+}
+.ansi-green {
+  color: #2f8f47;
+}
+.ansi-yellow {
+  color: #b07d1e;
+}
+.ansi-blue {
+  color: #3b6fd4;
+}
+.ansi-cyan {
+  color: #2596a3;
+}
+.ansi-magenta {
+  color: #a54ca5;
+}
+.ansi-white {
+  color: var(--fg);
+}
+.ansi-black {
+  color: var(--fg-faint);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ansi-red {
+    color: #ff6b6b;
+  }
+  .ansi-green {
+    color: #5bbf74;
+  }
+  .ansi-yellow {
+    color: #e8b44a;
+  }
+  .ansi-blue {
+    color: #6b9bff;
+  }
+  .ansi-cyan {
+    color: #4dd0d8;
+  }
+  .ansi-magenta {
+    color: #d48bd4;
+  }
+}
