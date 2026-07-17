@@ -1,0 +1,9 @@
+title = "Ledger export pipeline stuck — nightly close blocked"
+severity = "critical"
+status = "investigating"
+created = "2026-07-17T13:40:32.558291Z"
+systems = [
+    "ledger-export",
+    "postgres-primary",
+]
+tags = []

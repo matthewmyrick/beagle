@@ -8,6 +8,13 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# The Rust CLI/TUI lives under cli/ (the repo is heading toward a
+# cli/ + web/ + desktop/ monorepo — see #41); every cargo invocation
+# runs there.
+defaults:
+  run:
+    working-directory: cli
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -17,6 +24,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
       - name: Format
         run: cargo fmt --all -- --check
       - name: Lint (pedantic, zero warnings)
