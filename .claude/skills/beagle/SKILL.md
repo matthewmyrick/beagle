@@ -150,6 +150,3 @@ until reset — always close with `\e[0m`.
 The TUI renders a markdown subset: `#`/`##`/`###`, `-` bullets (indent to
 nest), ``` fences, `>` quotes, `---`, `**bold**`, `` `code` ``. Tables, links,
 and images render as plain text — put tabular data in code fences.
-
-A fully worked example (tone, depth, diagram style):
-`rcas/2026-06-30-sendgrid-webhook-signature-failures/`.
