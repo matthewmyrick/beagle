@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "desktop",
+  "productName": "Beagle",
   "version": "0.1.0",
-  "identifier": "com.matthewmyrick.desktop",
+  "identifier": "com.matthewmyrick.beagle",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "desktop",
-        "width": 800,
-        "height": 600
+        "title": "beagle \u2014 RCA workspaces",
+        "width": 1150,
+        "height": 780
       }
     ],
     "security": {
