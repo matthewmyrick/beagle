@@ -88,11 +88,12 @@ impl App {
 
             if event::poll(Duration::from_millis(250))? {
                 match event::read()? {
-                    Event::Key(key)
-                        if key.kind == KeyEventKind::Press
-                            && self.handle_key(key) == Flow::Quit =>
-                    {
-                        return Ok(());
+                    Event::Key(key) if key.kind == KeyEventKind::Press => {
+                        match self.handle_key(key) {
+                            Flow::Quit => return Ok(()),
+                            Flow::Edit(path) => self.open_in_editor(terminal, &path),
+                            Flow::Continue => {}
+                        }
                     }
                     Event::Mouse(mouse) => self.handle_mouse(mouse),
                     // Resize triggers a redraw on the next loop turn anyway.
@@ -100,6 +101,45 @@ impl App {
                 }
             }
         }
+    }
+
+    /// `E`: suspend the TUI, open `path` in the user's editor (same
+    /// resolution as `beagle config`: config `editor` → `$VISUAL` →
+    /// `$EDITOR` → vim), and restore. Editor failures land in the status
+    /// bar — a typoed `$EDITOR` must never take the TUI down. The user's
+    /// own edit is not flagged unread for them.
+    fn open_in_editor(&mut self, terminal: &mut DefaultTerminal, path: &std::path::Path) {
+        use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+        use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
+
+        let editor = crate::config::editor(crate::config::load_default().ok().flatten().as_ref());
+        let mut parts = editor.split_whitespace();
+        let program = parts.next().unwrap_or("vim").to_owned();
+        let args: Vec<&str> = parts.collect();
+
+        let _ = crossterm::execute!(std::io::stdout(), DisableMouseCapture, LeaveAlternateScreen);
+        let _ = crossterm::terminal::disable_raw_mode();
+        let status = std::process::Command::new(&program)
+            .args(&args)
+            .arg(path)
+            .status();
+        let _ = crossterm::terminal::enable_raw_mode();
+        let _ = crossterm::execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture);
+        let _ = terminal.clear(); // the editor drew over everything
+
+        let _ = self.reload();
+        // The reload flagged the file the user just wrote as unread — but
+        // they have quite literally read it. Watcher events queued behind
+        // this see an unchanged mtime snapshot, so the flag stays clear.
+        if let (Some(kind), Some(rca)) = (self.tab.section(), self.selected_rca()) {
+            let key = (rca.id.clone(), kind);
+            self.unread.remove(&key);
+        }
+        self.status = Some(match status {
+            Ok(code) if code.success() => format!("edited {}", path.display()),
+            Ok(code) => format!("editor `{editor}` exited with {code}"),
+            Err(e) => format!("editor `{editor}` failed to launch: {e}"),
+        });
     }
 
     /// `review` → `final-review` the moment every attached fix PR has
