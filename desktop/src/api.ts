@@ -3,6 +3,7 @@
 // so the IPC surface stays greppable in one file.
 
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 import type { CorpusLine } from "./lib/finder";
 import type { Listing } from "./types";
@@ -43,4 +44,19 @@ export async function unarchiveWorkspace(id: string): Promise<string> {
 /** Every searchable line across all workspaces — the finder's corpus. */
 export async function searchCorpus(): Promise<CorpusLine[]> {
   return invoke<CorpusLine[]>("search_corpus");
+}
+
+/** Attaches a remediation PR URL; false when it was already attached. */
+export async function addPr(id: string, url: string): Promise<boolean> {
+  return invoke<boolean>("add_pr", { id, url });
+}
+
+/** Live PR states via gh: url → "open" | "draft" | "merged" | "closed". */
+export async function prStates(urls: string[]): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>("pr_states", { urls });
+}
+
+/** Opens a URL in the system browser. */
+export async function openInBrowser(url: string): Promise<void> {
+  return openUrl(url);
 }

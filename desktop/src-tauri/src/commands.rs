@@ -5,6 +5,7 @@
 //! resolution identical to the CLI's (`--root` flag aside): config file
 //! `root`, then the current directory.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use beagle::model::{RcaId, SectionKind};
@@ -166,4 +167,32 @@ pub fn search_corpus() -> Result<Vec<dto::CorpusLine>, String> {
         }
     }
     Ok(corpus)
+}
+
+/// Attaches a remediation PR URL to the workspace manifest. Returns
+/// `false` when the URL was already attached (idempotent, like the CLI).
+#[tauri::command]
+pub fn add_pr(id: &str, url: &str) -> Result<bool, String> {
+    let store = open_store()?;
+    store.add_pr(&parse_id(id)?, url).map_err(|e| e.to_string())
+}
+
+/// Live PR states via the `gh` CLI, url → lowercase label ("open",
+/// "draft", "merged", "closed"). Async so the shell-outs run off the main
+/// thread; without `gh` the map is empty and PRs render as plain links —
+/// degraded, never broken.
+#[tauri::command]
+pub async fn pr_states(urls: Vec<String>) -> Result<HashMap<String, String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if !beagle::prs::gh_available() {
+            return HashMap::new();
+        }
+        urls.iter()
+            .filter_map(|url| {
+                beagle::prs::state_of(url).map(|state| (url.clone(), state.label().to_owned()))
+            })
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }

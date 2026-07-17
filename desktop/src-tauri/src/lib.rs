@@ -23,7 +23,9 @@ pub fn run() {
             commands::read_diagram,
             commands::archive_workspace,
             commands::unarchive_workspace,
-            commands::search_corpus
+            commands::search_corpus,
+            commands::add_pr,
+            commands::pr_states
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

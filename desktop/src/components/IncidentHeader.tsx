@@ -4,12 +4,14 @@
 import type { JSX } from "react";
 
 import { ArchiveButton } from "./ArchiveButton";
+import { PrChips } from "./PrChips";
 import { Brand } from "./Brand";
 import type { Theme } from "../lib/theme";
 import type { Workspace } from "../types";
 
 interface IncidentHeaderProps {
   selected: Workspace | null;
+  prStates: Record<string, string>;
   theme: Theme;
   onToggleTheme: () => void;
   onArchiveDone: () => void;
@@ -18,6 +20,7 @@ interface IncidentHeaderProps {
 
 export function IncidentHeader({
   selected,
+  prStates,
   theme,
   onToggleTheme,
   onArchiveDone,
@@ -37,6 +40,12 @@ export function IncidentHeader({
                 onError={onError}
               />
             </p>
+            <PrChips
+              workspace={selected}
+              states={prStates}
+              onChanged={onArchiveDone}
+              onError={onError}
+            />
           </>
         ) : null}
       </header>

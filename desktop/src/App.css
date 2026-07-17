@@ -666,3 +666,78 @@ kbd {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* ---------- PR chips ---------- */
+
+.pr-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pr-label {
+  color: var(--fg-dim);
+  font-size: 0.78rem;
+}
+
+.pr-chip {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg);
+  padding: 2px 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.pr-chip:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.pr-chip.merged {
+  color: var(--done);
+  border-color: var(--done);
+}
+
+.pr-chip.closed {
+  color: var(--error-fg);
+}
+
+.pr-attach {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  color: var(--fg-dim);
+  padding: 2px 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  transition: color 0.15s ease;
+}
+
+.pr-attach:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.pr-input {
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--fg);
+  padding: 2px 12px;
+  font: inherit;
+  font-size: 0.78rem;
+  width: 300px;
+}
+
+.pr-input:focus {
+  outline: none;
+}

@@ -15,6 +15,7 @@ import { TabBar } from "./components/TabBar";
 import { useActions } from "./hooks/useActions";
 import { useIncidents } from "./hooks/useIncidents";
 import { useKeybindings } from "./hooks/useKeybindings";
+import { usePrStates } from "./hooks/usePrStates";
 import { useTheme } from "./hooks/useTheme";
 import { filterWorkspaces } from "./lib/filter";
 import type { CorpusLine } from "./lib/finder";
@@ -73,6 +74,7 @@ export default function App(): JSX.Element {
   );
 
   const { selected } = incidents;
+  const prStates = usePrStates(selected?.prs ?? []);
   return (
     <main className="app">
       <Sidebar
@@ -93,6 +95,7 @@ export default function App(): JSX.Element {
         ) : null}
         <IncidentHeader
           selected={selected}
+          prStates={prStates}
           theme={theme}
           onToggleTheme={toggleTheme}
           onArchiveDone={incidents.reload}
