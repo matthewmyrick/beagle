@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-17
+
+### Added
+
+- **Per-event notifications** and a **beagle-branded icon**. A new
+  `[notify_events]` config table picks which lifecycle moments fire a
+  desktop notification when `notify` is on — `new_incident`,
+  `investigating`, `review`, `agent`, `final_review`, `finished` — so you
+  can ping only on, say, a fix merging to verify. Omit the table to get
+  every event (unchanged behavior). Notifications now carry the beagle
+  logo where the platform notifier supports it: `notify-send -i` on
+  Linux, `terminal-notifier -appIcon` on macOS when installed (plain
+  `osascript` otherwise). The logo is embedded and written to the cache
+  once; a missing notifier stays a silent no-op.
+
 ## [0.11.0] - 2026-07-17
 
 ### Added

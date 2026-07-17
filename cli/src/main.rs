@@ -54,12 +54,13 @@ fn run(command: Command) -> Result<(), Error> {
             Ok(())
         }
         Command::Tui { root } => {
-            let notify = config::load_default()
-                .ok()
-                .flatten()
-                .and_then(|c| c.notify)
-                .unwrap_or(false);
-            ui::run(Store::open(&effective_root(root)?)?, notify)
+            let config = config::load_default().ok().flatten();
+            let notify = config.as_ref().and_then(|c| c.notify).unwrap_or(false);
+            // Absent `[notify_events]` means every event fires.
+            let events = config
+                .and_then(|c| c.notify_events)
+                .unwrap_or_else(config::NotifyEvents::all);
+            ui::run(Store::open(&effective_root(root)?)?, notify, events)
         }
         Command::New {
             root,
