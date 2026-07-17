@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { JSX } from "react";
 
 import { listDiagrams, readDiagram } from "../api";
+import { ansiToHtml } from "../lib/ansi";
 
 interface DiagramViewProps {
   id: string;
@@ -98,7 +99,13 @@ export function DiagramView({ id, onError }: DiagramViewProps): JSX.Element {
         </button>
       </div>
       {current ? (
-        <pre className="diagram-content">{diagram.body ?? "(diagram vanished)"}</pre>
+        <pre
+          className="diagram-content"
+          // ansiToHtml HTML-escapes the text; only our own <span> tags are emitted.
+          dangerouslySetInnerHTML={{
+            __html: ansiToHtml(diagram.body ?? "(diagram vanished)"),
+          }}
+        />
       ) : (
         <div className="section-hint">loading…</div>
       )}
