@@ -34,6 +34,8 @@ USAGE:
     beagle publish <id> [--root <dir>]    mark an RCA public (the web app
                                             builds only published RCAs)
     beagle unpublish <id> [--root <dir>]  make an RCA private again
+    beagle handoff <id> [--root <dir>]    launch the configured agent on a
+                                            reviewed RCA ([handoff] in config)
     beagle status <id> <status>           set a workspace's status; a running
                   [--root <dir>]            TUI picks the change up live
                                             (investigating|review|final-review|finished)
@@ -130,6 +132,13 @@ pub enum Command {
         id: RcaId,
         /// Whether to publish (`true`) or unpublish (`false`).
         published: bool,
+    },
+    /// `beagle handoff`: launch the configured agent on an RCA.
+    Handoff {
+        /// Explicit `--root`, if given.
+        root: Option<PathBuf>,
+        /// The workspace slug.
+        id: RcaId,
     },
     /// `beagle status`: set a workspace's status.
     SetStatus {
@@ -239,6 +248,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
         Some("unarchive") => subcommands::parse_unarchive(&mut args, root),
         Some("publish") => subcommands::parse_set_published(&mut args, root, "publish", true),
         Some("unpublish") => subcommands::parse_set_published(&mut args, root, "unpublish", false),
+        Some("handoff") => subcommands::parse_handoff(&mut args, root),
         Some("status") => subcommands::parse_status(&mut args, root),
         Some("log") => subcommands::parse_log(&mut args, root),
         Some("pr") => subcommands::parse_pr(&mut args, root),

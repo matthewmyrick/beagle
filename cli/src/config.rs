@@ -39,6 +39,14 @@ pub const TEMPLATE: &str = "\
 # Desktop notifications while the TUI runs: new incidents and status
 # changes (osascript on macOS, notify-send on Linux). Off by default.
 # notify = true
+
+# Agent hand-off (`beagle handoff <slug>`): the agent beagle launches on a
+# reviewed RCA. The composed prompt (the prompt file below, then the RCA
+# write-up) is piped to the command's stdin; it runs in the store root with
+# BEAGLE_RCA_SLUG / BEAGLE_RCA_DIR set.
+# [handoff]
+# command = [\"codex\", \"exec\"]      # or [\"claude\", \"-p\"], or any argv
+# prompt = \"~/.config/beagle/handoff-prompt.md\"
 ";
 
 /// Parsed contents of the config file. All fields optional; the empty file
@@ -57,6 +65,26 @@ pub struct Config {
     /// Off unless explicitly enabled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notify: Option<bool>,
+    /// The agent hand-off (`beagle handoff <slug>`): what to launch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff: Option<HandoffConfig>,
+}
+
+/// Configures `beagle handoff`: the agent beagle launches on a reviewed
+/// RCA, and the prompt that drives it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HandoffConfig {
+    /// The agent command as argv, e.g. `["codex", "exec"]` or
+    /// `["claude", "-p"]`. beagle pipes the composed prompt (your prompt
+    /// file plus the RCA write-up) to its stdin and runs it in the store
+    /// root, with `BEAGLE_RCA_SLUG` / `BEAGLE_RCA_DIR` in the environment.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub command: Vec<String>,
+    /// A markdown prompt file with the task instructions for the agent.
+    /// `~` is expanded. Optional — without it, only the write-up is sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<PathBuf>,
 }
 
 /// Where the config file lives: `$BEAGLE_CONFIG` if set, else

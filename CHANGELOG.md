@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-17
+
+### Added
+
+- `beagle handoff <slug>` — launch a configured agent on a reviewed RCA
+  (the `agent` lifecycle stage). It composes your task prompt plus the
+  RCA write-up, pipes them to the agent's stdin, and runs it in the store
+  root with `BEAGLE_RCA_SLUG` / `BEAGLE_RCA_DIR` / `BEAGLE_RCA_ROOT` in the
+  environment; the agent's output streams to the terminal and the run is
+  book-ended in the workspace log. Configure it with a `[handoff]` section
+  (`command` argv + optional `prompt` file). Explicit-trigger by design —
+  beagle never launches an agent on its own. Poll for work with
+  `beagle list --status agent`.
+
 ## [0.10.0] - 2026-07-17
 
 ### Added

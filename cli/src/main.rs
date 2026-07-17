@@ -94,6 +94,7 @@ fn run(command: Command) -> Result<(), Error> {
             id,
             published,
         } => run_set_published(root, &id, published),
+        Command::Handoff { root, id } => run_handoff(root, &id),
         Command::SetStatus { root, id, status } => {
             let store = Store::open(&effective_root(root)?)?;
             store.set_status(&id, status)?;
@@ -216,6 +217,102 @@ fn run_set_published(root: Option<PathBuf>, id: &RcaId, published: bool) -> Resu
         println!("{id} is private again");
     }
     Ok(())
+}
+
+/// `beagle handoff <slug>`: launch the configured agent on a reviewed RCA.
+/// The composed prompt (config prompt file + the RCA write-up) is piped to
+/// the agent's stdin; it runs in the store root with the RCA's identity in
+/// the environment, and its output streams to the terminal. Book-ended in
+/// the workspace log so the live view shows the hand-off.
+fn run_handoff(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
+    let handoff = config::load_default()?
+        .and_then(|c| c.handoff)
+        .filter(|h| !h.command.is_empty())
+        .ok_or_else(|| Error::Tool {
+            tool: "handoff",
+            message: "no agent configured — add a [handoff] section with a \
+                      `command` to your config (`beagle config`)"
+                .to_owned(),
+        })?;
+
+    let store = Store::open(&effective_root(root)?)?;
+    store.read_meta(id)?; // proves the workspace exists
+
+    let prompt = match handoff.prompt {
+        Some(path) => {
+            let path = expand_tilde(&path);
+            Some(fs::read_to_string(&path).map_err(|e| Error::io(&path, e))?)
+        }
+        None => None,
+    };
+    let write_up = store.export_markdown(id)?;
+    let input = beagle::handoff::compose_input(id.as_str(), prompt.as_deref(), &write_up);
+
+    let workspace = store.workspace_dir(id);
+    // `command` is non-empty (filtered above), so `split_first` is `Some`.
+    let Some((program, args)) = handoff.command.split_first() else {
+        return Ok(());
+    };
+    println!("→ handing {id} to `{program}` …");
+    let _ = store.append_log(id, &format!("agent hand-off started (`{program}`)"));
+
+    let status = run_agent(program, args, store.root(), id, &workspace, &input);
+    match status {
+        Ok(status) if status.success() => {
+            let _ = store.append_log(id, "agent hand-off finished");
+            println!("✓ hand-off complete");
+            Ok(())
+        }
+        Ok(status) => {
+            let _ = store.append_log(id, &format!("agent hand-off exited with {status}"));
+            Err(Error::Tool {
+                tool: "handoff",
+                message: format!("`{program}` exited with {status}"),
+            })
+        }
+        Err(e) => Err(Error::Tool {
+            tool: "handoff",
+            message: format!("could not launch `{program}`: {e}"),
+        }),
+    }
+}
+
+/// Spawns the hand-off agent: stdin fed the composed prompt, stdout/stderr
+/// inherited so its work streams live, run in the store root with the RCA
+/// in the environment.
+fn run_agent(
+    program: &str,
+    args: &[String],
+    root: &std::path::Path,
+    id: &RcaId,
+    workspace: &std::path::Path,
+    input: &str,
+) -> std::io::Result<std::process::ExitStatus> {
+    use std::io::Write as _;
+    use std::process::{Command as Proc, Stdio};
+
+    let mut child = Proc::new(program)
+        .args(args)
+        .current_dir(root)
+        .env("BEAGLE_RCA_SLUG", id.as_str())
+        .env("BEAGLE_RCA_DIR", workspace)
+        .env("BEAGLE_RCA_ROOT", root)
+        .stdin(Stdio::piped())
+        .spawn()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(input.as_bytes())?;
+    } // drop closes stdin so the agent sees EOF
+    child.wait()
+}
+
+/// Expands a leading `~` in a path to `$HOME`.
+fn expand_tilde(path: &std::path::Path) -> PathBuf {
+    if let Ok(rest) = path.strip_prefix("~") {
+        if let Some(home) = env::var_os("HOME") {
+            return PathBuf::from(home).join(rest);
+        }
+    }
+    path.to_owned()
 }
 
 /// `beagle pr list`: attached PRs, with live state when `gh` works.

@@ -121,8 +121,9 @@ Then the sections:
 Edit `rca.toml` as the investigation progresses:
 
 - `status`: `investigating` → `review` (fix reviewed) → `agent`
-  (optional — an automated agent polls `beagle list --status agent` and
-  does remediation from a prompt) → `final-review` (beagle flips here
+  (optional — set it here and `beagle handoff <slug>` launches a
+  configured agent to do remediation from a prompt; poll for work with
+  `beagle list --status agent`) → `final-review` (beagle flips here
   automatically when every attached PR merges, from `review` or `agent`)
   → `finished` (the user signs off with `V` after working your Final
   Review checklist). Skip `agent` if you don't run one. Old names

@@ -328,3 +328,15 @@ fn publish_and_unpublish_parse_id_and_root() {
     }
     assert!(parse(&["publish"]).is_err(), "id required");
 }
+
+#[test]
+fn handoff_parses_id_and_root() {
+    match parse(&["handoff", "my-rca", "--root", "/r"]).expect("parse") {
+        Command::Handoff { root, id } => {
+            assert_eq!(id.as_str(), "my-rca");
+            assert_eq!(root, Some(std::path::PathBuf::from("/r")));
+        }
+        other => panic!("wrong command: {other:?}"),
+    }
+    assert!(parse(&["handoff"]).is_err(), "id is required");
+}
