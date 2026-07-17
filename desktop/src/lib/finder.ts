@@ -1,7 +1,7 @@
 // Ranking for the \ global finder, pure and testable: fuzzy-score every
 // corpus line against the query, best first, capped, with the matched
-// character positions for highlighting. An empty query lists the corpus
-// in natural order so the popup is useful on open.
+// character positions for highlighting. An empty query matches nothing —
+// the popup opens quiet and fills as you type.
 
 import { indices } from "./fuzzy";
 
@@ -24,7 +24,7 @@ export const MAX_RESULTS = 100;
 
 export function rankCorpus(corpus: readonly CorpusLine[], query: string): FinderHit[] {
   if (query === "") {
-    return corpus.slice(0, MAX_RESULTS).map((entry) => ({ entry, positions: [] }));
+    return [];
   }
   return corpus
     .map((entry) => ({ entry, match: indices(query, entry.text) }))

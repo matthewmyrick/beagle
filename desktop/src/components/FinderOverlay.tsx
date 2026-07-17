@@ -126,7 +126,10 @@ export function FinderOverlay({
         />
         <ul className="finder-results">
           {corpus === null ? <li className="finder-empty">building corpus…</li> : null}
-          {corpus !== null && hits.length === 0 ? (
+          {corpus !== null && query === "" ? (
+            <li className="finder-empty">type to search every incident, tab, and line</li>
+          ) : null}
+          {corpus !== null && query !== "" && hits.length === 0 ? (
             <li className="finder-empty">no matches</li>
           ) : null}
           {hits.map((hit, index) => (

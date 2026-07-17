@@ -273,11 +273,16 @@ pub(super) fn draw_finder(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    let block = Block::default()
-        .title(format!(
-            " find everywhere ({} lines) — type to filter · ↑/↓ move · enter jump · esc ",
+    let title = if finder.query.is_empty() {
+        " find everywhere — type to search · esc closes ".to_owned()
+    } else {
+        format!(
+            " find everywhere ({} matches) — ↑/↓ move · enter jump · esc ",
             finder.matches.len()
-        ))
+        )
+    };
+    let block = Block::default()
+        .title(title)
         .title_alignment(Alignment::Center)
         .title_bottom(Line::from(format!(" \\ {}▌ ", finder.query)).left_aligned())
         .borders(Borders::ALL)

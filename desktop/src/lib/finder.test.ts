@@ -21,8 +21,8 @@ describe("rankCorpus", () => {
     line({ text: "unrelated chatter" }),
   ];
 
-  it("lists the corpus unranked on an empty query", () => {
-    expect(rankCorpus(corpus, "")).toHaveLength(3);
+  it("matches nothing on an empty query — the popup opens quiet", () => {
+    expect(rankCorpus(corpus, "")).toEqual([]);
   });
 
   it("ranks fuzzy matches and drops non-matches", () => {

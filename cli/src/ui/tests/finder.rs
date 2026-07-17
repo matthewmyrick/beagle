@@ -8,25 +8,26 @@ use crate::ui::testutil::{app_with, press};
 use crate::ui::{Focus, Tab};
 
 #[test]
-fn backslash_opens_over_a_corpus_of_titles_and_lines() {
+fn backslash_opens_quiet_and_fills_as_you_type() {
     let mut app = app_with(2);
     press(&mut app, KeyCode::Char('\\'));
     let finder = app.finder().expect("finder open");
     assert!(finder.query.is_empty());
     assert!(
-        !finder.matches.is_empty(),
-        "empty query lists the corpus so the popup is useful immediately"
+        finder.matches.is_empty(),
+        "an empty query matches nothing — the popup opens quiet"
     );
-    // Title entries lead each workspace: a global jump-to. Which workspace
-    // comes first is a sort tie here (identical status/severity/second),
-    // so assert shape, not identity.
+
+    for c in "rca".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    let finder = app.finder().expect("still open");
+    assert!(!finder.matches.is_empty(), "typing fills the results");
+    // Title entries exist in the corpus: a global jump-to. Which workspace
+    // ranks first is scoring's business; assert shape on the top hit.
     let first = finder.entry(0).expect("entry");
-    assert_eq!(first.tab, Tab::Summary);
-    assert_eq!(first.line, 0);
-    assert_eq!(
-        first.text, first.title,
-        "a title entry's text is the incident title"
-    );
+    assert!(!first.text.is_empty());
+    assert!(first.id.as_str().starts_with("rca-"));
 
     press(&mut app, KeyCode::Esc);
     assert!(app.finder().is_none(), "esc closes");
@@ -115,6 +116,13 @@ fn enter_reveals_an_archived_incident_before_jumping() {
 fn arrows_move_the_selection_clamped() {
     let mut app = app_with(1);
     press(&mut app, KeyCode::Char('\\'));
+    for c in "rca".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    assert!(
+        app.finder().expect("open").matches.len() > 1,
+        "needs at least two hits to walk"
+    );
     press(&mut app, KeyCode::Up);
     assert_eq!(app.finder().expect("open").selected, 0, "clamped at top");
     press(&mut app, KeyCode::Down);
