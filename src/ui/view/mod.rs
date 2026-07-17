@@ -40,6 +40,11 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
         &[Constraint::Length(sidebar_width), Constraint::Min(0)],
     );
 
+    app.mouse.sidebar = if app.sidebar_collapsed() {
+        Rect::default()
+    } else {
+        sidebar
+    };
     if !app.sidebar_collapsed() {
         draw_sidebar(frame, app, sidebar);
     }
@@ -57,7 +62,7 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     }
 }
 
-fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
     let focused = app.focus() == Focus::List;
     let title = if app.has_active_filter() {
         use std::fmt::Write as _;
@@ -113,6 +118,9 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         state.select(Some(app.selected_index()));
     }
     frame.render_stateful_widget(list, area, &mut state);
+    // Rendering scrolled the list to keep the selection visible; the mouse
+    // handler needs the resulting first-visible row to map clicks.
+    app.mouse.sidebar_offset = state.offset();
 }
 
 /// Background of the selected sidebar row.
@@ -235,6 +243,8 @@ fn pad_line(spans: Vec<Span<'static>>, base: Style) -> Line<'static> {
 
 fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
     let Some(rca) = app.selected_rca().cloned() else {
+        app.mouse.tabs.clear();
+        app.mouse.content = area;
         draw_welcome(frame, area);
         return;
     };
@@ -274,7 +284,7 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .map(|tab| app.is_unread(&rca.id, *tab))
         .collect();
-    let tab_lines = flow_tabs(app.tab(), head_width, &unread);
+    let (tab_lines, tab_hits) = flow_tabs(app.tab(), head_width, &unread);
     let tab_height = u16::try_from(tab_lines.len()).unwrap_or(1);
 
     let banner_height = if banner_cols > 0 {
@@ -296,6 +306,24 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
     if banner_cols > 0 {
         draw_banner(frame, banner_col);
     }
+
+    // Label positions → clickable screen rects for the mouse handler.
+    app.mouse.tabs = tab_hits
+        .iter()
+        .filter(|hit| hit.line < tab_bar.height)
+        .map(|hit| {
+            (
+                hit.tab,
+                Rect {
+                    x: tab_bar.x + hit.x,
+                    y: tab_bar.y + hit.line,
+                    width: hit.width.min(tab_bar.width.saturating_sub(hit.x)),
+                    height: 1,
+                },
+            )
+        })
+        .collect();
+    app.mouse.content = body;
 
     draw_content(frame, app, body);
 }

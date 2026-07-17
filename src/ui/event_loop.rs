@@ -94,6 +94,7 @@ impl App {
                     {
                         return Ok(());
                     }
+                    Event::Mouse(mouse) => self.handle_mouse(mouse),
                     // Resize triggers a redraw on the next loop turn anyway.
                     _ => {}
                 }

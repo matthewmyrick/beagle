@@ -15,13 +15,13 @@ fn rendered(lines: &[Line<'_>]) -> Vec<String> {
 
 #[test]
 fn tabs_fit_on_one_line_when_wide() {
-    let lines = flow_tabs(Tab::Summary, 200, &[false; 9]);
+    let (lines, _) = flow_tabs(Tab::Summary, 200, &[false; 9]);
     assert_eq!(lines.len(), 1);
 }
 
 #[test]
 fn tabs_flow_to_more_lines_when_narrow_and_keep_every_label() {
-    let lines = flow_tabs(Tab::Notes, 40, &[false; 9]);
+    let (lines, _) = flow_tabs(Tab::Notes, 40, &[false; 9]);
     assert!(lines.len() > 1, "40 cols cannot fit all seven tabs");
     let all: String = rendered(&lines).join("");
     for (i, tab) in Tab::ALL.iter().enumerate() {
@@ -32,7 +32,7 @@ fn tabs_flow_to_more_lines_when_narrow_and_keep_every_label() {
 
 #[test]
 fn tabs_survive_absurdly_narrow_width() {
-    let lines = flow_tabs(Tab::Summary, 1, &[false; 9]);
+    let (lines, _) = flow_tabs(Tab::Summary, 1, &[false; 9]);
     assert_eq!(lines.len(), Tab::ALL.len(), "one label per line");
 }
 
@@ -57,7 +57,7 @@ fn activity_labels_flip_to_quiet_at_the_threshold() {
 fn unread_tabs_get_a_dot() {
     let mut unread = [false; 9];
     unread[8] = true; // Log
-    let lines = flow_tabs(Tab::Summary, 200, &unread);
+    let (lines, _) = flow_tabs(Tab::Summary, 200, &unread);
     let all: String = rendered(&lines).join("");
     assert!(all.contains(" 9 Log● "), "dot on the unread tab: {all}");
     assert!(!all.contains("Summary●"), "read tabs stay plain");
@@ -66,7 +66,7 @@ fn unread_tabs_get_a_dot() {
 #[test]
 fn no_line_exceeds_the_given_width_when_labels_fit() {
     let width: usize = 30;
-    let lines = flow_tabs(
+    let (lines, _) = flow_tabs(
         Tab::Impact,
         u16::try_from(width).expect("fits"),
         &[false; 9],

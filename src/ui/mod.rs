@@ -14,6 +14,7 @@
 mod actions;
 mod event_loop;
 mod keys;
+mod mouse;
 mod overlays;
 mod pane;
 mod search;
@@ -113,6 +114,9 @@ pub struct App {
     pub(crate) toolbox_viewport: (u16, u16),
     /// Set by the draw pass; used to clamp scrolling to real content height.
     pub(crate) viewport: ViewportInfo,
+    /// Hit regions fed back by the draw pass, mapping mouse positions onto
+    /// the pane / row / tab under the cursor.
+    pub(crate) mouse: MouseMap,
 }
 
 /// What filter mode is doing with keystrokes: nothing (`Off`), toggling
@@ -126,6 +130,22 @@ pub(crate) enum FilterInput {
     Facets,
     /// Keys type into the fuzzy query.
     Typing,
+}
+
+/// Where things were drawn last frame, for mouse hit-testing. Like
+/// [`ViewportInfo`], this is geometry feedback from the (otherwise pure)
+/// draw pass — mouse events arrive in screen coordinates and have to be
+/// mapped back onto panes, sidebar rows, and tab labels.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct MouseMap {
+    /// The sidebar block, borders included. Zero-sized while collapsed.
+    pub sidebar: ratatui::layout::Rect,
+    /// The content body (below the header and tab bar).
+    pub content: ratatui::layout::Rect,
+    /// One clickable rect per tab label, in screen coordinates.
+    pub tabs: Vec<(Tab, ratatui::layout::Rect)>,
+    /// First visible sidebar item (the list scrolls), for row mapping.
+    pub sidebar_offset: usize,
 }
 
 /// Geometry facts the draw pass feeds back for scroll clamping.
@@ -183,6 +203,7 @@ impl App {
             toolbox_scroll: 0,
             toolbox_viewport: (0, 0),
             viewport: ViewportInfo::default(),
+            mouse: MouseMap::default(),
         };
         // Baseline snapshot: nothing is "unread" at startup.
         app.refresh_mtimes(false);
@@ -415,10 +436,21 @@ impl App {
 /// event loop.
 pub fn run(store: Store, notify: bool) -> Result<()> {
     let mut terminal = ratatui::init();
+    // Mouse capture must be torn down on every exit path — left on, it
+    // garbles the user's shell (scrolling emits escape codes). The panic
+    // hook wraps the one `ratatui::init` installed, so capture is released
+    // before the terminal is restored even when we panic.
+    let _ = crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture);
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
+        previous_hook(info);
+    }));
     let result = App::new(store).and_then(|mut app| {
         app.notify_enabled = notify;
         app.run(&mut terminal)
     });
+    let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
     ratatui::restore();
     result
 }

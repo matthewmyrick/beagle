@@ -264,7 +264,7 @@ impl App {
         }
     }
 
-    fn select(&mut self, index: usize) {
+    pub(super) fn select(&mut self, index: usize) {
         if self.visible.is_empty() {
             self.selected = 0;
             return;
@@ -277,7 +277,7 @@ impl App {
         }
     }
 
-    fn switch_tab(&mut self, tab: Tab) {
+    pub(super) fn switch_tab(&mut self, tab: Tab) {
         // Tabs belong to a selected incident. With nothing visible the
         // welcome screen has no tab bar, so a silent state change would
         // read as a broken keybinding — say why instead.
@@ -315,7 +315,7 @@ impl App {
 
     /// Clamps vertical scroll to the real content height so the view can
     /// never scroll into the void.
-    fn scroll_to(&mut self, target: u16) {
+    pub(super) fn scroll_to(&mut self, target: u16) {
         let max = self
             .viewport
             .content_lines
