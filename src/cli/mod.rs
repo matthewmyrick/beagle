@@ -23,7 +23,12 @@ USAGE:
                   [--root <dir>]
     beagle list [--status <status>]       print workspaces to stdout,
                   [--severity <sev>]           optionally filtered
+                  [--archived]                 include archived workspaces
                   [--root <dir>]
+    beagle archive <id> [--force]         move a finished RCA to
+                  [--root <dir>]            rcas/archive/ (kept, but out of
+                                            the sidebar; --force skips the
+                                            finished-status check)
     beagle status <id> <status>           set a workspace's status; a running
                   [--root <dir>]            TUI picks the change up live
                                             (investigating|review|final-review|finished)
@@ -82,6 +87,17 @@ pub enum Command {
         status: Option<Status>,
         /// Only workspaces with this severity (`--severity`).
         severity: Option<Severity>,
+        /// Include archived workspaces (`--archived`).
+        archived: bool,
+    },
+    /// `beagle archive`: move a finished workspace to `rcas/archive/`.
+    Archive {
+        /// Explicit `--root`, if given.
+        root: Option<PathBuf>,
+        /// The workspace slug.
+        id: RcaId,
+        /// Skip the finished-status check (`--force`).
+        force: bool,
     },
     /// `beagle status`: set a workspace's status.
     SetStatus {
@@ -182,6 +198,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
             Ok(Command::Tui { root })
         }
         Some("list") => subcommands::parse_list(&mut args, root),
+        Some("archive") => subcommands::parse_archive(&mut args, root),
         Some("status") => subcommands::parse_status(&mut args, root),
         Some("log") => subcommands::parse_log(&mut args, root),
         Some("pr") => subcommands::parse_pr(&mut args, root),

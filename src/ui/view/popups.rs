@@ -237,6 +237,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("f", "filter list: i/r/v/f status · c/h/m/l sev · / text"),
         ("F", "follow: reloads stick to the bottom (tail -f)"),
         ("s", "hide / show the sidebar (full-width content)"),
+        ("a", "show / hide archived incidents (dimmed)"),
         ("/", "search the incident: every tab, live highlight"),
         ("n / N", "next / previous search match"),
         ("c / C", "copy this tab / whole RCA to clipboard"),

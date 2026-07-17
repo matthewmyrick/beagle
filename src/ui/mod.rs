@@ -38,7 +38,7 @@ use search::ContentSearch;
 use settings::SettingsOverlay;
 
 /// The whole TUI state.
-#[allow(clippy::struct_excessive_bools)] // independent UI toggles (help, follow, notify, sidebar), not an encoded state machine
+#[allow(clippy::struct_excessive_bools)] // independent UI toggles (help, follow, notify, sidebar, archive), not an encoded state machine
 pub struct App {
     store: Store,
     rcas: Vec<RcaSummary>,
@@ -79,6 +79,9 @@ pub struct App {
     /// Never true while the list has focus — anything that returns focus
     /// to the list brings the sidebar back.
     sidebar_collapsed: bool,
+    /// Archived incidents shown in the list (`a`), rendered dimmed. Off by
+    /// default: the sidebar is about *now*.
+    show_archived: bool,
     /// Desktop notifications on new incidents and status changes (config
     /// `notify = true`).
     notify_enabled: bool,
@@ -142,7 +145,7 @@ impl App {
     /// # Errors
     /// Fails only if the `rcas/` directory itself is unreadable.
     pub fn new(store: Store) -> Result<Self> {
-        let listing = store.list()?;
+        let listing = store.list_all()?;
         let visible = (0..listing.summaries.len()).collect();
         let mut app = Self {
             store,
@@ -166,6 +169,7 @@ impl App {
             tick: 0,
             follow: false,
             sidebar_collapsed: false,
+            show_archived: false,
             notify_enabled: false,
             mtimes: HashMap::new(),
             checklists: HashMap::new(),
@@ -194,6 +198,7 @@ impl App {
             .rcas
             .iter()
             .enumerate()
+            .filter(|(_, rca)| self.show_archived || !rca.archived)
             .filter(|(_, rca)| {
                 self.facet_statuses.is_empty() || self.facet_statuses.contains(&rca.meta.status)
             })
@@ -346,6 +351,15 @@ impl App {
 
     pub(crate) fn sidebar_collapsed(&self) -> bool {
         self.sidebar_collapsed
+    }
+
+    pub(crate) fn show_archived(&self) -> bool {
+        self.show_archived
+    }
+
+    /// How many loaded workspaces are archived.
+    pub(crate) fn archived_count(&self) -> usize {
+        self.rcas.iter().filter(|rca| rca.archived).count()
     }
 
     /// Whether `tab` of workspace `id` changed on disk since last viewed.

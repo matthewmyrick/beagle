@@ -67,6 +67,7 @@ impl App {
             }
             KeyCode::Char('b') => self.focus = Focus::List,
             KeyCode::Char('s') => self.toggle_sidebar(),
+            KeyCode::Char('a') => self.toggle_archived(),
             KeyCode::Char('c') => self.copy_current_tab(),
             KeyCode::Char('C') => self.copy_workspace(),
             KeyCode::Char('e') => self.export_current(),
@@ -115,6 +116,20 @@ impl App {
             self.sidebar_collapsed = false;
         }
         Flow::Continue
+    }
+
+    /// `a`: toggle archived incidents into or out of the list, keeping the
+    /// current selection when it survives the toggle.
+    fn toggle_archived(&mut self) {
+        self.show_archived = !self.show_archived;
+        let keep = self.selected_rca().map(|rca| rca.id.clone());
+        self.recompute_visible(keep);
+        let archived = self.archived_count();
+        self.status = Some(if self.show_archived {
+            format!("showing {archived} archived (dimmed) — a hides them")
+        } else {
+            "archived hidden — a shows them".to_owned()
+        });
     }
 
     /// `s`: collapse the sidebar for a full-width content pane, or bring

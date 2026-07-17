@@ -20,6 +20,7 @@ fn summary(id: &str, systems: &[&str], tags: &[&str], created: i64) -> RcaSummar
             tags: tags.iter().map(ToString::to_string).collect(),
             prs: Vec::new(),
         },
+        archived: false,
     }
 }
 

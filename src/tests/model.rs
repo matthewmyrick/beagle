@@ -133,6 +133,7 @@ fn sort_key_puts_active_severe_recent_first() {
             tags: Vec::new(),
             prs: Vec::new(),
         },
+        archived: false,
     };
     let resolved = mk(Status::Finished, Severity::Critical, 100);
     let active_high = mk(Status::Investigating, Severity::High, 100);

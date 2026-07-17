@@ -150,7 +150,7 @@ impl App {
             .map(|r| (r.id.clone(), r.meta.status))
             .collect();
         let mut delta = ReloadDelta::default();
-        match self.store.list() {
+        match self.store.list_all() {
             Ok(listing) => {
                 for rca in &listing.summaries {
                     match known.get(&rca.id) {
