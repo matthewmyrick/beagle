@@ -77,7 +77,7 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     let block = pane_block(title, focused);
 
     let tick = app.tick();
-    let items: Vec<ListItem<'_>> = app
+    let mut items: Vec<ListItem<'_>> = app
         .visible_rcas()
         .enumerate()
         .map(|(row, rca)| {
@@ -90,6 +90,12 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
             ))
         })
         .collect();
+    // Broken workspaces render at the bottom, unselectable but never
+    // hidden: a directory that exists on disk must not silently vanish
+    // from the incident list.
+    for broken in app.broken() {
+        items.push(ListItem::new(broken_list_item(broken)));
+    }
     // Selection styling is baked into the items (rca_list_item): a
     // highlight_style here would be patched over every span in the row and
     // wipe out the severity badge's own background — the selected row then
@@ -171,6 +177,32 @@ fn rca_list_item(
         ));
     }
     vec![title, pad_line(detail_spans, base)]
+}
+
+/// The two sidebar lines for a workspace that failed to load: an
+/// unmissable marker plus the reason, so "why did my incident disappear"
+/// answers itself in-app.
+fn broken_list_item(broken: &crate::store::BrokenWorkspace) -> Vec<Line<'static>> {
+    let width = usize::from(SIDEBAR_WIDTH).saturating_sub(2);
+    vec![
+        Line::from(vec![
+            Span::styled(
+                " ⚠ ",
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Red)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" {}", truncate(&broken.dir_name, width.saturating_sub(5))),
+                Style::default().fg(Color::LightRed),
+            ),
+        ]),
+        Line::from(Span::styled(
+            format!("   {}", truncate(&broken.reason, width.saturating_sub(3))),
+            Style::default().fg(Color::Red),
+        )),
+    ]
 }
 
 /// Pads a sidebar line with a filler span so a selection background covers

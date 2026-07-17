@@ -71,6 +71,29 @@ pub const SYSTEMS_DIR: &str = "systems";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadWarning(pub String);
 
+/// A workspace directory that exists on disk but could not be loaded
+/// (missing or invalid manifest). Listed so it can be *shown* broken
+/// instead of silently disappearing from the TUI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrokenWorkspace {
+    /// The directory name under `rcas/` (may not even be a valid slug).
+    pub dir_name: String,
+    /// Why it failed to load, human-readable.
+    pub reason: String,
+}
+
+/// Everything a workspace listing produced: loadable incidents, broken
+/// directories, and non-workspace warnings.
+#[derive(Debug, Default)]
+pub struct Listing {
+    /// Loadable workspaces, sorted for the sidebar.
+    pub summaries: Vec<RcaSummary>,
+    /// Directories that exist but could not load, sorted by name.
+    pub broken: Vec<BrokenWorkspace>,
+    /// Problems that are not tied to a specific workspace directory.
+    pub warnings: Vec<LoadWarning>,
+}
+
 /// A diagram file inside a workspace's `diagrams/` directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramEntry {
@@ -121,7 +144,9 @@ impl Store {
 
     /// Lists every workspace, sorted for the sidebar (open incidents first,
     /// then severity, then newest). Unreadable or corrupt workspaces are
-    /// skipped and reported as warnings rather than failing the listing.
+    /// returned as [`Listing::broken`] — never silently dropped: a
+    /// workspace that exists on disk must stay visible, with the reason it
+    /// could not load.
     ///
     /// This reads only the small manifests — section content stays on disk
     /// until a tab asks for it.
@@ -129,16 +154,17 @@ impl Store {
     /// # Errors
     /// Returns [`Error::Io`] only if the `rcas/` directory itself cannot be
     /// read.
-    pub fn list(&self) -> Result<(Vec<RcaSummary>, Vec<LoadWarning>)> {
+    pub fn list(&self) -> Result<Listing> {
         let entries = fs::read_dir(&self.rcas_root).map_err(|e| Error::io(&self.rcas_root, e))?;
 
-        let mut summaries = Vec::new();
-        let mut warnings = Vec::new();
+        let mut listing = Listing::default();
         for entry in entries {
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(e) => {
-                    warnings.push(LoadWarning(format!("unreadable directory entry: {e}")));
+                    listing
+                        .warnings
+                        .push(LoadWarning(format!("unreadable directory entry: {e}")));
                     continue;
                 }
             };
@@ -148,12 +174,16 @@ impl Store {
             }
             let dir_name = entry.file_name().to_string_lossy().into_owned();
             match Self::load_summary(&dir_name, &path) {
-                Ok(summary) => summaries.push(summary),
-                Err(e) => warnings.push(LoadWarning(format!("skipped `{dir_name}`: {e}"))),
+                Ok(summary) => listing.summaries.push(summary),
+                Err(e) => listing.broken.push(BrokenWorkspace {
+                    dir_name,
+                    reason: e.to_string(),
+                }),
             }
         }
-        summaries.sort_by_key(RcaSummary::sort_key);
-        Ok((summaries, warnings))
+        listing.summaries.sort_by_key(RcaSummary::sort_key);
+        listing.broken.sort_by(|a, b| a.dir_name.cmp(&b.dir_name));
+        Ok(listing)
     }
 
     fn load_summary(dir_name: &str, dir: &Path) -> Result<RcaSummary> {
