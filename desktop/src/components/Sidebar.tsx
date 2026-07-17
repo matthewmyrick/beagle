@@ -16,6 +16,7 @@ interface SidebarProps {
   onFilterChange: (value: string) => void;
   filterRef: RefObject<HTMLInputElement | null>;
   hiddenArchived: number;
+  onShowArchived: () => void;
 }
 
 export function Sidebar({
@@ -26,6 +27,7 @@ export function Sidebar({
   onFilterChange,
   filterRef,
   hiddenArchived,
+  onShowArchived,
 }: SidebarProps): JSX.Element {
   return (
     <nav className="sidebar" aria-label="Incidents">
@@ -60,9 +62,9 @@ export function Sidebar({
         ))}
       </ul>
       {hiddenArchived > 0 ? (
-        <p className="sidebar-footnote">
-          {hiddenArchived} archived hidden — a shows them
-        </p>
+        <button type="button" className="sidebar-footnote" onClick={onShowArchived}>
+          {hiddenArchived} archived hidden — show
+        </button>
       ) : null}
     </nav>
   );

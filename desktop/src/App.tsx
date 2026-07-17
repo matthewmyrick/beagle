@@ -5,11 +5,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 
-import { ArchiveButton } from "./components/ArchiveButton";
-import { Brand } from "./components/Brand";
 import { DiagramView } from "./components/DiagramView";
 import { FinderOverlay } from "./components/FinderOverlay";
 import { HelpOverlay } from "./components/HelpOverlay";
+import { IncidentHeader } from "./components/IncidentHeader";
 import { SectionView } from "./components/SectionView";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
@@ -84,29 +83,21 @@ export default function App(): JSX.Element {
         onFilterChange={setFilter}
         filterRef={filterRef}
         hiddenArchived={hiddenArchived}
+        onShowArchived={() => {
+          setShowArchived(true);
+        }}
       />
       <section className="content">
         {incidents.error !== null ? (
           <div className="error-banner">{incidents.error}</div>
         ) : null}
-        <div className="content-top">
-          <header className="incident-header">
-            {selected !== null ? (
-              <>
-                <h1>{selected.title}</h1>
-                <p className="incident-meta">
-                  {selected.status} · {selected.severity} · {selected.systems.join(", ")}
-                  <ArchiveButton
-                    workspace={selected}
-                    onDone={incidents.reload}
-                    onError={incidents.onError}
-                  />
-                </p>
-              </>
-            ) : null}
-          </header>
-          <Brand theme={theme} onToggleTheme={toggleTheme} />
-        </div>
+        <IncidentHeader
+          selected={selected}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onArchiveDone={incidents.reload}
+          onError={incidents.onError}
+        />
         {selected !== null ? (
           <>
             <TabBar activeFile={incidents.activeFile} onSelect={incidents.selectTab} />

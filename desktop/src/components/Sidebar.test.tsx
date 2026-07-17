@@ -12,6 +12,7 @@ const filterProps = {
   onFilterChange: (): undefined => undefined,
   filterRef: createRef<HTMLInputElement>(),
   hiddenArchived: 0,
+  onShowArchived: (): undefined => undefined,
 };
 
 function workspace(overrides: Partial<Workspace>): Workspace {
@@ -60,5 +61,23 @@ describe("Sidebar", () => {
       />,
     );
     expect(screen.getByText(/archived/)).toBeDefined();
+  });
+});
+
+describe("archived footnote", () => {
+  it("is a button that reveals the archive", () => {
+    const onShowArchived = vi.fn();
+    render(
+      <Sidebar
+        workspaces={[]}
+        selectedId={null}
+        onSelect={() => undefined}
+        {...filterProps}
+        hiddenArchived={2}
+        onShowArchived={onShowArchived}
+      />,
+    );
+    fireEvent.click(screen.getByText(/2 archived hidden/));
+    expect(onShowArchived).toHaveBeenCalled();
   });
 });
