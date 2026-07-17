@@ -197,8 +197,26 @@ impl App {
                     Some(old) => mtime > *old,
                     None => true, // file appeared since the last snapshot
                 };
-                if changed && mark_unread {
-                    self.unread.insert(key.clone());
+                if changed {
+                    if mark_unread {
+                        self.unread.insert(key.clone());
+                    }
+                    // Re-scan checkboxes only for files that actually
+                    // changed — the checklist cache mirrors this snapshot.
+                    let stats = self
+                        .store
+                        .read_section(&rca.id, kind)
+                        .ok()
+                        .flatten()
+                        .map(|content| crate::markdown::checklist_stats(&content));
+                    match stats {
+                        Some((checked, total)) if total > 0 => {
+                            self.checklists.insert(key.clone(), (checked, total));
+                        }
+                        _ => {
+                            self.checklists.remove(&key);
+                        }
+                    }
                 }
                 self.mtimes.insert(key, mtime);
             }

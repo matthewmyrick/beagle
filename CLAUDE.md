@@ -58,9 +58,11 @@ don't invent new ones.
 ## Markdown that renders well
 
 The TUI renders a deliberate subset: `#`/`##`/`###` headings, `-` bullets
-(nesting via indentation), ```` ``` ```` code fences, `>` blockquotes, `---`
-rules, `**bold**`, and `` `inline code` ``. Tables, images, and links render as
-plain text — put tabular data in a code fence so columns align.
+(nesting via indentation), `- [ ]`/`- [x]` checklists (rendered as ☐/☑;
+aggregate progress shows in the sidebar and header), ```` ``` ```` code
+fences, `>` blockquotes, `---` rules, `**bold**`, and `` `inline code` ``.
+Tables, images, and links render as plain text — put tabular data in a code
+fence so columns align.
 
 ## Diagrams
 

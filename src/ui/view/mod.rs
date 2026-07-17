@@ -86,6 +86,7 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
                 tick,
                 app.has_unread(&rca.id),
                 row == app.selected_index(),
+                app.checklist_progress(&rca.id),
             ))
         })
         .collect();
@@ -112,6 +113,7 @@ fn rca_list_item(
     tick: usize,
     has_unread: bool,
     selected: bool,
+    progress: Option<(usize, usize)>,
 ) -> Vec<Line<'static>> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
     let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
@@ -145,11 +147,23 @@ fn rca_list_item(
     let mut detail_spans = vec![
         Span::styled(format!("  {symbol} "), tinted(symbol_style)),
         Span::styled(rca.meta.status.to_string(), tinted(symbol_style)),
-        Span::styled(
-            format!("  {}", truncate(rca.id.as_str(), 20)),
-            tinted(Style::default().fg(Color::DarkGray)),
-        ),
     ];
+    if let Some((checked, total)) = progress {
+        // Checklist progress across all sections: green once complete.
+        let style = if checked == total {
+            Style::default().fg(Color::LightGreen)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+        detail_spans.push(Span::styled(
+            format!("  ☑ {checked}/{total}"),
+            tinted(style),
+        ));
+    }
+    detail_spans.push(Span::styled(
+        format!("  {}", truncate(rca.id.as_str(), 20)),
+        tinted(Style::default().fg(Color::DarkGray)),
+    ));
     if has_unread {
         detail_spans.push(Span::styled(
             " ●",
@@ -196,7 +210,13 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
     let activity = app
         .last_activity(&rca.id)
         .and_then(|mtime| mtime.elapsed().ok());
-    let header = header_paragraph(&rca, app.tick(), &prs, activity);
+    let header = header_paragraph(
+        &rca,
+        app.tick(),
+        &prs,
+        activity,
+        app.checklist_progress(&rca.id),
+    );
     let header_width = head_width.saturating_sub(1).max(1); // inset by 1 below
     let header_height = u16::try_from(header.line_count(header_width))
         .unwrap_or(2)

@@ -27,7 +27,7 @@ fn sample_summary(severity: Severity) -> crate::model::RcaSummary {
 fn selected_row_keeps_the_badge_background_and_tints_the_rest() {
     let rca = sample_summary(Severity::High);
 
-    let selected = rca_list_item(&rca, 0, false, true);
+    let selected = rca_list_item(&rca, 0, false, true, None);
     let badge = &selected[0].spans[0];
     assert_eq!(
         badge.style.bg,
@@ -50,7 +50,7 @@ fn selected_row_keeps_the_badge_background_and_tints_the_rest() {
         );
     }
 
-    let unselected = rca_list_item(&rca, 0, false, false);
+    let unselected = rca_list_item(&rca, 0, false, false, None);
     assert_eq!(
         unselected[0].spans[0].style.bg,
         Some(Color::LightRed),
@@ -60,6 +60,36 @@ fn selected_row_keeps_the_badge_background_and_tints_the_rest() {
         unselected[0].spans[2].style.bg, None,
         "no tint off-selection"
     );
+}
+
+/// Checklist progress renders in the detail line — green once complete,
+/// absent when the workspace has no checkboxes.
+#[test]
+fn sidebar_detail_line_shows_checklist_progress() {
+    let rca = sample_summary(Severity::High);
+
+    let partial = rca_list_item(&rca, 0, false, false, Some((2, 7)));
+    let detail: String = partial[1]
+        .spans
+        .iter()
+        .map(|s| s.content.as_ref())
+        .collect();
+    assert!(
+        detail.contains("☑ 2/7"),
+        "progress in detail line: {detail}"
+    );
+
+    let complete = rca_list_item(&rca, 0, false, false, Some((4, 4)));
+    let progress_span = complete[1]
+        .spans
+        .iter()
+        .find(|s| s.content.contains("4/4"))
+        .expect("progress span");
+    assert_eq!(progress_span.style.fg, Some(Color::LightGreen));
+
+    let none = rca_list_item(&rca, 0, false, false, None);
+    let detail: String = none[1].spans.iter().map(|s| s.content.as_ref()).collect();
+    assert!(!detail.contains('☑'), "no progress without checkboxes");
 }
 
 /// Renders a full frame into a test backend and checks every banner art

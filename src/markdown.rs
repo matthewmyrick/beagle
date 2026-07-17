@@ -73,6 +73,25 @@ fn render_line(raw: &str) -> Line<'static> {
         .strip_prefix("- ")
         .or_else(|| trimmed.strip_prefix("* "))
     {
+        if let Some((done, text)) = checkbox(rest) {
+            // Checked items dim so the unchecked work stands out — a
+            // checklist tab reads as a progress tracker at a glance.
+            let (glyph, glyph_style, text_style) = if done {
+                (
+                    "☑ ",
+                    Style::default().fg(Color::Green),
+                    Style::default().fg(Color::DarkGray),
+                )
+            } else {
+                ("☐ ", Style::default().fg(Color::Yellow), Style::default())
+            };
+            let mut spans = vec![
+                Span::raw(" ".repeat(indent)),
+                Span::styled(glyph, glyph_style),
+            ];
+            spans.extend(inline_spans(text, text_style));
+            return Line::from(spans);
+        }
         let mut spans = vec![
             Span::raw(" ".repeat(indent)),
             Span::styled("• ", Style::default().fg(Color::Yellow)),
@@ -81,6 +100,57 @@ fn render_line(raw: &str) -> Line<'static> {
         return Line::from(spans);
     }
     Line::from(inline_spans(raw, Style::default()))
+}
+
+/// The checkbox at the start of a bullet's content, if any: `[ ]`, `[x]`,
+/// or `[X]`, either alone or followed by a space and the item text.
+/// Anything else (`[x]done`, `[y] ...`) is an ordinary bullet.
+fn checkbox(rest: &str) -> Option<(bool, &str)> {
+    let (done, after) = if let Some(after) = rest.strip_prefix("[ ]") {
+        (false, after)
+    } else if let Some(after) = rest
+        .strip_prefix("[x]")
+        .or_else(|| rest.strip_prefix("[X]"))
+    {
+        (true, after)
+    } else {
+        return None;
+    };
+    match after.strip_prefix(' ') {
+        Some(text) => Some((done, text)),
+        None if after.is_empty() => Some((done, "")),
+        None => None,
+    }
+}
+
+/// Counts markdown checkboxes in `source`: `(checked, total)`. Follows the
+/// renderer's rules — code fences are skipped, `- ` and `* ` bullets at any
+/// indent count, `[x]`/`[X]` are checked.
+#[must_use]
+pub fn checklist_stats(source: &str) -> (usize, usize) {
+    let mut checked = 0;
+    let mut total = 0;
+    let mut in_code_fence = false;
+    for raw in source.lines() {
+        if raw.trim_start().starts_with("```") {
+            in_code_fence = !in_code_fence;
+            continue;
+        }
+        if in_code_fence {
+            continue;
+        }
+        let trimmed = raw.trim_start();
+        if let Some(rest) = trimmed
+            .strip_prefix("- ")
+            .or_else(|| trimmed.strip_prefix("* "))
+        {
+            if let Some((done, _)) = checkbox(rest) {
+                total += 1;
+                checked += usize::from(done);
+            }
+        }
+    }
+    (checked, total)
 }
 
 fn heading(text: &str, color: Color, top_level: bool) -> Line<'static> {
