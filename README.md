@@ -91,6 +91,8 @@ beagle export <slug> --out ~/vault/incidents/<slug>.md   # e.g. an Obsidian vaul
 beagle banner             # print the BEAGLE banner
 beagle init               # scaffold toolbox.md + systems/ agent context
 beagle config             # edit + validate ~/.config/beagle/config.toml
+beagle skill status       # is the /beagle skill installed for Claude Code / Codex?
+beagle skill install      # install (or refresh) the /beagle skill for both
 beagle version            # print the installed version
 beagle version list       # browse releases; enter installs the selection
 beagle update             # self-update to the latest release
@@ -132,6 +134,14 @@ to any released version, older or newer, so a bad release is one command to
 back out of. `beagle version list` shows every release (latest and current
 marked); pick one with `j`/`k` + enter to install it. On platforms without
 prebuilt binaries, update via `cargo install` instead.
+
+Every beagle binary bundles the `/beagle` skill (the authoring guide agents
+follow — [`.claude/skills/beagle/SKILL.md`](.claude/skills/beagle/SKILL.md)).
+After an update, beagle checks whether the copy installed for **Claude Code**
+(`~/.claude/skills/beagle/SKILL.md`) and **Codex**
+(`~/.codex/prompts/beagle.md`) is stale and offers to refresh it — so the
+skill tracks the binary. Run it anytime with `beagle skill install`, or check
+with `beagle skill status`.
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
 `1`–`9` switch tabs · `/` search the incident (all tabs, `n`/`N` between

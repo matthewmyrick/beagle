@@ -6,7 +6,25 @@ use std::path::PathBuf;
 use beagle::model::{RcaId, Severity, Status};
 use beagle::update;
 
-use super::{take_value, Command};
+use super::{take_value, Command, SkillAction};
+
+pub(super) fn parse_skill(args: &mut impl Iterator<Item = String>) -> Result<Command, String> {
+    let action = match args.next().as_deref() {
+        None | Some("status") => SkillAction::Status,
+        Some("install") => SkillAction::Install,
+        Some(other) => {
+            return Err(format!(
+                "unknown `skill` subcommand `{other}` (expected status|install)"
+            ))
+        }
+    };
+    if let Some(extra) = args.next() {
+        return Err(format!(
+            "`skill {action:?}` takes no further arguments (got `{extra}`)"
+        ));
+    }
+    Ok(Command::Skill { action })
+}
 
 pub(super) fn parse_update(args: &mut impl Iterator<Item = String>) -> Result<Command, String> {
     let mut version: Option<update::Version> = None;
