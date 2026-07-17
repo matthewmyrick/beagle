@@ -606,9 +606,14 @@ kbd {
   font: inherit;
 }
 
-.finder-row:hover,
 .finder-row.selected {
   background: var(--bg-selected);
+}
+
+.finder-match {
+  background: none;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .finder-context {

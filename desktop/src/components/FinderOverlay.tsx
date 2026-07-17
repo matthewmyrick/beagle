@@ -1,12 +1,14 @@
 // The \ global finder: telescope-style discovery across every incident,
-// tab, and line. Type to re-rank, ↑/↓ to move, enter jumps, esc closes.
+// tab, and line. Type to re-rank, ↑/↓ or hover to move the single
+// selection, enter or click jumps, esc closes. Matched characters
+// highlight in the accent color.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 
 import { searchCorpus } from "../api";
-import { rankCorpus } from "../lib/finder";
-import type { CorpusLine } from "../lib/finder";
+import { rankCorpus, toRuns } from "../lib/finder";
+import type { CorpusLine, FinderHit } from "../lib/finder";
 import { SECTIONS } from "../lib/sections";
 
 interface FinderOverlayProps {
@@ -19,6 +21,22 @@ function tabTitle(file: string): string {
   return SECTIONS.find((section) => section.file === file)?.title ?? file;
 }
 
+function HitText({ hit }: { hit: FinderHit }): JSX.Element {
+  return (
+    <span className="finder-text">
+      {toRuns(hit.entry.text, hit.positions).map((run, i) =>
+        run.matched ? (
+          <mark key={i} className="finder-match">
+            {run.text}
+          </mark>
+        ) : (
+          <span key={i}>{run.text}</span>
+        ),
+      )}
+    </span>
+  );
+}
+
 export function FinderOverlay({
   onJump,
   onClose,
@@ -28,6 +46,7 @@ export function FinderOverlay({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const selectedRef = useRef<HTMLLIElement | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -49,19 +68,24 @@ export function FinderOverlay({
   const hits = useMemo(() => rankCorpus(corpus ?? [], query), [corpus, query]);
   const clamped = Math.min(selected, Math.max(0, hits.length - 1));
 
+  // Keyboard selection must stay visible as it walks past the fold.
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ block: "nearest" });
+  }, [clamped]);
+
   const handleKey = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === "Escape") {
       onClose();
     } else if (event.key === "ArrowDown") {
       event.preventDefault();
-      setSelected((current) => Math.min(hits.length - 1, current + 1));
+      setSelected(Math.min(hits.length - 1, clamped + 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setSelected((current) => Math.max(0, current - 1));
+      setSelected(Math.max(0, clamped - 1));
     } else if (event.key === "Enter") {
       const hit = hits[clamped];
       if (hit !== undefined) {
-        onJump(hit);
+        onJump(hit.entry);
       }
     }
   };
@@ -94,18 +118,24 @@ export function FinderOverlay({
             <li className="finder-empty">no matches</li>
           ) : null}
           {hits.map((hit, index) => (
-            <li key={`${hit.id}:${hit.file}:${String(hit.line)}`}>
+            <li
+              key={`${hit.entry.id}:${hit.entry.file}:${String(hit.entry.line)}`}
+              ref={index === clamped ? selectedRef : null}
+            >
               <button
                 type="button"
                 className={index === clamped ? "finder-row selected" : "finder-row"}
+                onMouseEnter={() => {
+                  setSelected(index);
+                }}
                 onClick={() => {
-                  onJump(hit);
+                  onJump(hit.entry);
                 }}
               >
                 <span className="finder-context">
-                  {hit.title} · {tabTitle(hit.file)}
+                  {hit.entry.title} · {tabTitle(hit.entry.file)}
                 </span>
-                <span className="finder-text">{hit.text}</span>
+                <HitText hit={hit} />
               </button>
             </li>
           ))}
