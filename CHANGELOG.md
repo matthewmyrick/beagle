@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-17
+
 ### Fixed
 
 - Workspaces that fail to load (invalid status name, corrupt manifest, or
@@ -20,6 +22,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Collapsible sidebar: `s` collapses the incident list so the content
+  pane takes the full terminal width (wide diagrams get every column);
+  `s` again — or any back-to-list key (`b`, `esc`, `f`) — brings it back.
+  The sidebar is never collapsed while the list has focus.
 - Agent liveness: `investigating` headers now show how fresh the workspace
   is — `active 2m ago` from the newest section-file write (the mtime
   snapshot already kept for unread markers, zero extra I/O), turning
