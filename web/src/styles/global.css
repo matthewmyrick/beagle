@@ -23,8 +23,25 @@
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
+/* Dark theme: applied on an explicit choice, and as the default when
+   the visitor's OS prefers dark and they haven't chosen otherwise. */
+:root[data-theme="dark"] {
+  --bg: #12141a;
+  --bg-soft: #191c24;
+  --bg-code: #0f1117;
+  --fg: #e6e8ee;
+  --fg-soft: #a0a6b4;
+  --fg-faint: #6f7684;
+  --border: #262a35;
+  --accent: #e8b44a;
+  --accent-soft: rgba(232, 180, 74, 0.12);
+  --resolved: #5bbf74;
+  --resolved-soft: rgba(91, 191, 116, 0.14);
+  --ongoing: #e8b44a;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #12141a;
     --bg-soft: #191c24;
     --bg-code: #0f1117;
@@ -107,6 +124,33 @@ a:hover {
   border-radius: 8px;
 }
 
+.theme-toggle {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.theme-toggle:hover {
+  transform: rotate(18deg) scale(1.08);
+  border-color: var(--accent);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .site-tagline {
   color: var(--fg-faint);
   font-size: 0.85rem;
@@ -162,15 +206,6 @@ a:hover {
 
 .index-hero {
   padding: 56px 0 8px;
-}
-
-.hero-logo {
-  display: block;
-  width: 76px;
-  height: 76px;
-  border-radius: 18px;
-  margin-bottom: 18px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
 .index-hero h1 {
