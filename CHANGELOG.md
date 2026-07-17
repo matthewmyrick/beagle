@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-17
+
+### Changed
+
+- Repository layout: the Rust crate moved wholesale into `cli/` (history
+  preserved), the first step toward the cli/web/desktop monorepo (#41).
+  CI and the release workflow follow it. **No behavior changes**, and
+  release assets keep the exact same names and layout, so `beagle
+  update` keeps working across the move. From a checkout:
+  `cargo install --path cli`, or
+  `cargo run --manifest-path cli/Cargo.toml`.
+
 ## [0.7.0] - 2026-07-17
 
 ### Added

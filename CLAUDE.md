@@ -23,7 +23,7 @@ Prefer the CLI (it validates and scaffolds everything):
 ```sh
 beagle new <slug> --title "One-line incident title" --severity high \
   --system payments-api --system redis-sessions
-# or: cargo run -- new ...
+# or, from a checkout: cargo run --manifest-path cli/Cargo.toml -- new ...
 ```
 
 Slug rules: lowercase `[a-z0-9-]`, max 64 chars. Convention:

@@ -55,7 +55,7 @@ Or with cargo:
 
 ```sh
 cargo install --git https://github.com/matthewmyrick/beagle   # from GitHub
-cargo install --path .                                           # from a checkout
+cargo install --path cli                                         # from a checkout
 ```
 
 Then:

@@ -47,7 +47,8 @@ ranking with `R` in the TUI.
 ```sh
 beagle new <slug> --title "One-line incident title" --severity <sev> \
   --system <name> --system <name>
-# not installed? use: cargo run -q -- new ...
+# not installed? from a beagle checkout:
+#   cargo run -q --manifest-path cli/Cargo.toml -- new ...
 ```
 
 - Slug: lowercase `[a-z0-9-]`, ≤64 chars, convention `YYYY-MM-DD-short-description`.

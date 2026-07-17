@@ -15,12 +15,17 @@ env:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
       - name: Format
         run: cargo fmt --all -- --check
       - name: Lint (pedantic, zero warnings)
@@ -32,7 +37,7 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
           if [ "$tag" != "$version" ]; then
-            echo "::error::tag v$tag does not match Cargo.toml version $version"
+            echo "::error::tag v$tag does not match cli/Cargo.toml version $version"
             exit 1
           fi
 
@@ -60,15 +65,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+          workspaces: cli
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
+        working-directory: cli
       - name: Package
         # Asset names are version-less so
         # `releases/latest/download/beagle-<target>.tar.gz` always works.
+        # Runs at the repo root: the binary comes from cli/target, the
+        # docs from the root — the asset layout is unchanged, which the
+        # self-updater (`beagle update`) depends on.
         run: |
           name="beagle-${{ matrix.target }}"
           mkdir "$name"
-          cp "target/${{ matrix.target }}/release/beagle" "$name/"
+          cp "cli/target/${{ matrix.target }}/release/beagle" "$name/"
           cp README.md LICENSE CHANGELOG.md "$name/"
           tar czf "$name.tar.gz" "$name"
           shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"

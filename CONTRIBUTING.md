@@ -31,7 +31,8 @@ is debugging production is unacceptable. Read this document and
 rustup default stable
 rustup component add rustfmt clippy
 
-# the loop
+# the loop — the Rust crate lives under cli/
+cd cli
 cargo fmt                                  # format
 cargo clippy --all-targets -- -D warnings  # lint (pedantic, zero warnings)
 cargo test                                 # unit + integration tests
