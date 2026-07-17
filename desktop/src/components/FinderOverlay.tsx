@@ -47,6 +47,12 @@ export function FinderOverlay({
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const selectedRef = useRef<HTMLLIElement | null>(null);
+  // Rows re-render and scroll under a stationary cursor, which fires
+  // synthetic hover events; selection must only follow *real* pointer
+  // movement, and only keyboard moves may scroll the list — otherwise
+  // hover → scroll → new row under cursor → hover… cascades.
+  const lastInteraction = useRef<"keyboard" | "mouse">("keyboard");
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -69,8 +75,11 @@ export function FinderOverlay({
   const clamped = Math.min(selected, Math.max(0, hits.length - 1));
 
   // Keyboard selection must stay visible as it walks past the fold.
+  // Mouse-driven selection never scrolls — the pointer is already there.
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: "nearest" });
+    if (lastInteraction.current === "keyboard") {
+      selectedRef.current?.scrollIntoView({ block: "nearest" });
+    }
   }, [clamped]);
 
   const handleKey = (event: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -78,9 +87,11 @@ export function FinderOverlay({
       onClose();
     } else if (event.key === "ArrowDown") {
       event.preventDefault();
+      lastInteraction.current = "keyboard";
       setSelected(Math.min(hits.length - 1, clamped + 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
+      lastInteraction.current = "keyboard";
       setSelected(Math.max(0, clamped - 1));
     } else if (event.key === "Enter") {
       const hit = hits[clamped];
@@ -107,6 +118,7 @@ export function FinderOverlay({
           placeholder="find everywhere…"
           value={query}
           onChange={(event) => {
+            lastInteraction.current = "keyboard";
             setQuery(event.target.value);
             setSelected(0);
           }}
@@ -125,8 +137,15 @@ export function FinderOverlay({
               <button
                 type="button"
                 className={index === clamped ? "finder-row selected" : "finder-row"}
-                onMouseEnter={() => {
-                  setSelected(index);
+                onMouseMove={(event) => {
+                  const moved =
+                    lastPointer.current?.x !== event.clientX ||
+                    lastPointer.current.y !== event.clientY;
+                  lastPointer.current = { x: event.clientX, y: event.clientY };
+                  if (moved && index !== clamped) {
+                    lastInteraction.current = "mouse";
+                    setSelected(index);
+                  }
                 }}
                 onClick={() => {
                   onJump(hit.entry);
