@@ -251,3 +251,35 @@ fn unarchive_restores_a_workspace_and_round_trips() {
     let err = store.unarchive(&missing).expect_err("missing");
     assert!(err.to_string().contains("no workspace"), "got: {err}");
 }
+
+#[test]
+fn publish_sets_the_flag_and_stamps_a_date_idempotently() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("open store");
+    let id = test_id("public-rca");
+    store
+        .scaffold(&id, &test_meta("Public", Severity::High))
+        .expect("scaffold");
+
+    // Fresh workspaces are private.
+    assert!(!store.read_meta(&id).expect("meta").published);
+
+    assert!(store.set_published(&id, true).expect("publish"));
+    let meta = store.read_meta(&id).expect("meta");
+    assert!(meta.published);
+    let stamp = meta.published_at.expect("published_at stamped");
+
+    // Re-publishing keeps the original timestamp (idempotent).
+    store.set_published(&id, true).expect("republish");
+    assert_eq!(
+        store.read_meta(&id).expect("meta").published_at,
+        Some(stamp),
+        "published_at is not re-stamped"
+    );
+
+    // Unpublishing clears both.
+    assert!(!store.set_published(&id, false).expect("unpublish"));
+    let meta = store.read_meta(&id).expect("meta");
+    assert!(!meta.published);
+    assert!(meta.published_at.is_none());
+}

@@ -1,0 +1,39 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    <link rel="icon" href="/logo.png" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <img class="brand-logo" src="/logo.png" alt="" width="30" height="30" />
+          Beagle
+        </a>
+        <span class="site-tagline">Incident history</span>
+      </div>
+    </header>
+    <slot />
+    <footer class="site-footer">
+      <div class="wrap">
+        <span>Public postmortems</span>
+        <span>Written with beagle</span>
+      </div>
+    </footer>
+  </body>
+</html>

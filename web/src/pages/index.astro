@@ -1,0 +1,37 @@
+---
+import IncidentCard from "../components/IncidentCard.astro";
+import Base from "../layouts/Base.astro";
+import { getPublishedIncidents } from "../lib/rcas";
+
+const incidents = getPublishedIncidents();
+---
+
+<Base
+  title="Incident History"
+  description="Public postmortems: what happened, the impact, and how we resolved it."
+>
+  <main class="wrap">
+    <section class="index-hero">
+      <h1>Incident history</h1>
+      <p>
+        Public postmortems for past incidents — what happened, who it affected, and how we
+        put it right.
+      </p>
+    </section>
+
+    {
+      incidents.length === 0 ? (
+        <div class="empty-state">
+          No published incidents yet. Publish one with{" "}
+          <code>beagle publish &lt;slug&gt;</code>.
+        </div>
+      ) : (
+        <ul class="incident-list">
+          {incidents.map((incident) => (
+            <IncidentCard incident={incident} />
+          ))}
+        </ul>
+      )
+    }
+  </main>
+</Base>

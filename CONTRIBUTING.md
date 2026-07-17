@@ -32,6 +32,7 @@ The repo is a monorepo. Each component has its own standards and checks:
 |---|---|---|---|
 | `cli/` | The Rust TUI + CLI | `docs/CODING_STANDARDS.md` | `cargo fmt` / pedantic `clippy -D warnings` / `cargo test` |
 | `desktop/` | Tauri 2 + React desktop app | `docs/CODING_STANDARDS_TS.md` (frontend) + the Rust rules (`src-tauri/`) | `npm run check` + cargo fmt/clippy in `src-tauri/` |
+| `web/` | Astro static site — public postmortems | `docs/CODING_STANDARDS_TS.md` | `npm run check` (prettier / astro check / vitest) |
 
 The on-disk RCA format under `rcas/` is the **shared public API** — every
 component reads the same files. Changing it needs a migration note and an

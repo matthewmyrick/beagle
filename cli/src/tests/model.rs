@@ -132,6 +132,8 @@ fn sort_key_puts_active_severe_recent_first() {
             systems: Vec::new(),
             tags: Vec::new(),
             prs: Vec::new(),
+            published: false,
+            published_at: None,
         },
         archived: false,
     };

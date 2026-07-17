@@ -14,6 +14,8 @@ pub(crate) fn test_meta(title: &str, severity: Severity) -> RcaMeta {
         systems: vec!["payments-api".to_owned()],
         tags: vec!["latency".to_owned()],
         prs: Vec::new(),
+        published: false,
+        published_at: None,
     }
 }
 

@@ -19,6 +19,8 @@ fn summary(id: &str, systems: &[&str], tags: &[&str], created: i64) -> RcaSummar
             systems: systems.iter().map(ToString::to_string).collect(),
             tags: tags.iter().map(ToString::to_string).collect(),
             prs: Vec::new(),
+            published: false,
+            published_at: None,
         },
         archived: false,
     }

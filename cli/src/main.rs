@@ -88,12 +88,12 @@ fn run(command: Command) -> Result<(), Error> {
             archived,
         } => run_list(root, status, severity, archived),
         Command::Archive { root, id, force } => run_archive(root, &id, force),
-        Command::Unarchive { root, id } => {
-            let store = Store::open(&effective_root(root)?)?;
-            let dest = store.unarchive(&id)?;
-            println!("unarchived {id} → {}", dest.display());
-            Ok(())
-        }
+        Command::Unarchive { root, id } => run_unarchive(root, &id),
+        Command::SetPublished {
+            root,
+            id,
+            published,
+        } => run_set_published(root, &id, published),
         Command::SetStatus { root, id, status } => {
             let store = Store::open(&effective_root(root)?)?;
             store.set_status(&id, status)?;
@@ -195,6 +195,26 @@ fn run_archive(root: Option<PathBuf>, id: &RcaId, force: bool) -> Result<(), Err
     let store = Store::open(&effective_root(root)?)?;
     let dest = store.archive(id, force)?;
     println!("archived {id} → {}", dest.display());
+    Ok(())
+}
+
+/// `beagle unarchive`: move an archived workspace back to the active list.
+fn run_unarchive(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    let dest = store.unarchive(id)?;
+    println!("unarchived {id} → {}", dest.display());
+    Ok(())
+}
+
+/// `beagle publish` / `beagle unpublish`: toggle an RCA's public flag.
+fn run_set_published(root: Option<PathBuf>, id: &RcaId, published: bool) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    store.set_published(id, published)?;
+    if published {
+        println!("{id} is now public — rebuild the web app to include it");
+    } else {
+        println!("{id} is private again");
+    }
     Ok(())
 }
 

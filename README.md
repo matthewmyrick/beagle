@@ -47,6 +47,7 @@ new workspaces announce themselves in the status bar as agents scaffold them.
 ```text
 cli/        the Rust TUI + CLI (everything documented below)
 desktop/    Tauri 2 + React desktop app (see desktop/README.md)
+web/        Astro static site: public postmortems (see web/README.md)
 docs/       coding standards per component
 ```
 
