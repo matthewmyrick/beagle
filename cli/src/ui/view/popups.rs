@@ -228,12 +228,18 @@ pub(super) fn draw_toolbox(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 /// The `\` global finder: prompt on top, ranked results under it, matched
-/// characters highlighted. Centered and large — it's a discovery surface,
-/// not a status line.
+/// characters highlighted. Centered, and sized to its content: a slim
+/// bar while the query is empty, one row per match as results arrive,
+/// capped well short of the full screen — the incident stays visible
+/// behind it.
 pub(super) fn draw_finder(frame: &mut Frame, app: &App, area: Rect) {
     let Some(finder) = app.finder() else { return };
     let width = area.width.saturating_sub(6).clamp(30, 110);
-    let height = area.height.saturating_sub(4).clamp(8, 30);
+    let max_height = area.height.saturating_sub(4).min(30).max(3);
+    let height = u16::try_from(finder.matches.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(2) // the borders carry the title and the prompt
+        .clamp(3, max_height);
     let rect = center(area, width, height);
     let inner_width = usize::from(width.saturating_sub(2));
 
