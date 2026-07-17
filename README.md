@@ -42,6 +42,14 @@ liveness read — `active 2m ago`, turning yellow (`quiet 12m`) when the agent
 has gone silent — and
 new workspaces announce themselves in the status bar as agents scaffold them.
 
+## Repository layout
+
+```text
+cli/        the Rust TUI + CLI (everything documented below)
+desktop/    Tauri 2 + React desktop viewer (early; see desktop/README.md)
+docs/       coding standards per component
+```
+
 ## Install & run
 
 From a release binary (macOS arm64/x86_64, Linux x86_64 — static musl):

@@ -24,6 +24,19 @@ is debugging production is unacceptable. Read this document and
 4. **Warnings are errors in CI.** `cargo clippy --all-targets -- -D warnings`
    must pass, including the pedantic set enabled in `Cargo.toml`.
 
+## Which component?
+
+The repo is a monorepo. Each component has its own standards and checks:
+
+| Directory | What | Standards | Checks |
+|---|---|---|---|
+| `cli/` | The Rust TUI + CLI | `docs/CODING_STANDARDS.md` | `cargo fmt` / pedantic `clippy -D warnings` / `cargo test` |
+| `desktop/` | Tauri 2 + React desktop app | `docs/CODING_STANDARDS_TS.md` (frontend) + the Rust rules (`src-tauri/`) | `npm run check` + cargo fmt/clippy in `src-tauri/` |
+
+The on-disk RCA format under `rcas/` is the **shared public API** — every
+component reads the same files. Changing it needs a migration note and an
+update to `CLAUDE.md`, regardless of which component you touch.
+
 ## Development workflow
 
 ```sh

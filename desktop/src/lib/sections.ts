@@ -1,0 +1,21 @@
+// The eight markdown sections every workspace can contain, in tab order.
+// Mirrors `SectionKind` in the CLI crate — file names are the on-disk
+// format, which is the public API shared by every beagle frontend.
+
+export interface Section {
+  /** File name inside the workspace directory. */
+  readonly file: string;
+  /** Human-readable tab title. */
+  readonly title: string;
+}
+
+export const SECTIONS: readonly Section[] = [
+  { file: "summary.md", title: "Summary" },
+  { file: "timeline.md", title: "Timeline" },
+  { file: "root-cause.md", title: "Root Cause" },
+  { file: "impact.md", title: "Impact" },
+  { file: "remediation.md", title: "Fix" },
+  { file: "final-review.md", title: "Final Review" },
+  { file: "notes.md", title: "Notes" },
+  { file: "log.md", title: "Log" },
+] as const;

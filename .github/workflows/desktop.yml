@@ -1,0 +1,60 @@
+name: desktop
+
+# Runs only when the desktop app changes — the first path-filtered,
+# per-component pipeline of the monorepo (#42). The cli workflow (ci.yml)
+# remains the always-on required check.
+on:
+  push:
+    branches: [main]
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - name: Format (prettier)
+        run: npm run format:check
+      - name: Lint (strict type-checked, zero warnings)
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test (vitest)
+        run: npm run test
+
+  rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Lint (pedantic, zero warnings)
+        run: cargo clippy --all-targets -- -D warnings

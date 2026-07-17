@@ -1,0 +1,168 @@
+:root {
+  color-scheme: dark;
+  --bg: #14161f;
+  --bg-raised: #1b1e2b;
+  --bg-selected: #282c3c;
+  --fg: #d8dce8;
+  --fg-dim: #8890a4;
+  --accent: #e8b44a;
+  --border: #2a2e40;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--bg-raised);
+  overflow-y: auto;
+}
+
+.sidebar-heading {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim);
+  padding: 12px 14px 4px;
+  margin: 0;
+}
+
+.sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.sidebar-row:hover {
+  background: var(--bg-selected);
+}
+
+.sidebar-row.selected {
+  background: var(--bg-selected);
+  border-left-color: var(--accent);
+}
+
+.sidebar-row.archived {
+  opacity: 0.45;
+}
+
+.severity-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #14161f;
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.row-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.row-detail {
+  font-size: 0.75rem;
+  color: var(--fg-dim);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.incident-header {
+  padding: 16px 20px 0;
+}
+
+.incident-header h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.incident-meta {
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+  margin: 4px 0 0;
+}
+
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 12px 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--fg-dim);
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.section-content {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 16px 20px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.section-hint {
+  padding: 24px 20px;
+  color: var(--fg-dim);
+}
+
+.error-banner {
+  background: #4a1f24;
+  color: #ffb3b3;
+  padding: 8px 20px;
+  font-size: 0.85rem;
+}
