@@ -24,6 +24,7 @@ pub mod clipboard;
 pub mod config;
 pub mod error;
 pub mod fuzzy;
+pub mod handoff;
 pub mod links;
 pub mod markdown;
 pub mod model;

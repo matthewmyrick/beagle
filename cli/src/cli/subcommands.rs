@@ -265,6 +265,24 @@ pub(super) fn parse_unarchive(
     Ok(Command::Unarchive { root, id })
 }
 
+pub(super) fn parse_handoff(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`handoff` requires an <id> slug as its first argument")?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `handoff`")),
+        }
+    }
+    Ok(Command::Handoff { root, id })
+}
+
 pub(super) fn parse_set_published(
     args: &mut impl Iterator<Item = String>,
     mut root: Option<PathBuf>,

@@ -82,6 +82,7 @@ beagle list               # print workspaces to stdout
 beagle list --status investigating --severity high       # filtered
 beagle new <slug> --title "..." [--severity high] [--system payments-api]...
 beagle status <slug> investigating   # flip status; a running TUI updates live
+beagle handoff <slug>     # launch the configured agent on a reviewed RCA
 beagle log <slug> "checking redis pool"  # append to the live Log tab
 beagle similar <slug>     # past RCAs sharing systems/tags, ranked (R in the TUI)
 beagle archive <slug>     # move a finished RCA to rcas/archive/ (a shows them)
@@ -127,6 +128,10 @@ setting is optional and overridden by flags:
 root = "/path/to/oncall"   # default --root, so `beagle` works from anywhere
 notify = true              # desktop pings: new incidents, status changes
 editor = "code -w"         # editor for `beagle config`
+
+[handoff]                   # `beagle handoff <slug>`: the agent to launch
+command = ["codex", "exec"] # argv; the prompt + write-up go to its stdin
+prompt = "~/.config/beagle/handoff-prompt.md"
 ```
 
 `beagle update` downloads the release binary for your platform, **verifies

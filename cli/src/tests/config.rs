@@ -80,6 +80,7 @@ fn config_editor_wins_over_fallback() {
         root: None,
         editor: Some("hx".to_owned()),
         notify: None,
+        handoff: None,
     };
     assert_eq!(editor(Some(&config)), "hx");
 }
