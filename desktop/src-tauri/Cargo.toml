@@ -1,6 +1,6 @@
 [package]
 name = "beagle-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Beagle desktop app: a native viewer for RCA workspaces"
 authors = ["Matthew Myrick"]
 license = "MIT"
@@ -11,6 +11,15 @@ edition = "2021"
 # The `_lib` suffix keeps the lib name distinct from the bin on Windows.
 name = "beagle_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+# The binary is named "Beagle" (not the crate name) so `tauri dev` runs
+# an executable called Beagle — macOS shows the executable name in the
+# dock and menu bar in dev, and this is what makes it say "Beagle" there.
+# Matches `mainBinaryName` in tauri.conf.json; bundled builds already use
+# `productName`.
+[[bin]]
+name = "Beagle"
+path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
