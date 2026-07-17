@@ -11,13 +11,22 @@
 /// shows the full list unchanged.
 #[must_use]
 pub fn score(needle: &str, haystack: &str) -> Option<i32> {
+    indices(needle, haystack).map(|(score, _)| score)
+}
+
+/// Like [`score`], but also returns the char offsets (into `haystack`) of
+/// the matched characters — what a picker highlights. An empty needle
+/// matches with score 0 and no positions.
+#[must_use]
+pub fn indices(needle: &str, haystack: &str) -> Option<(i32, Vec<usize>)> {
     if needle.is_empty() {
-        return Some(0);
+        return Some((0, Vec::new()));
     }
     let needle: Vec<char> = needle.chars().map(|c| c.to_ascii_lowercase()).collect();
     let hay: Vec<char> = haystack.chars().map(|c| c.to_ascii_lowercase()).collect();
 
     let mut total = 0i32;
+    let mut positions = Vec::with_capacity(needle.len());
     let mut ni = 0usize;
     let mut last_hit: Option<usize> = None;
 
@@ -34,13 +43,14 @@ pub fn score(needle: &str, haystack: &str) -> Option<i32> {
                 total += 3; // start of a word
             }
             last_hit = Some(hi);
+            positions.push(hi);
             ni += 1;
         }
     }
 
     // Slight penalty for long haystacks so tight matches rank first.
     let length_penalty = i32::try_from(hay.len()).unwrap_or(i32::MAX) / 16;
-    (ni == needle.len()).then_some(total - length_penalty)
+    (ni == needle.len()).then_some((total - length_penalty, positions))
 }
 
 #[cfg(test)]

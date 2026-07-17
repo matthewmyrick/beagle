@@ -13,6 +13,7 @@
 
 mod actions;
 mod event_loop;
+mod finder;
 mod keys;
 mod mouse;
 mod overlays;
@@ -103,6 +104,8 @@ pub struct App {
     related: Option<RelatedPopup>,
     /// In-content search over the pane (`/` with content focus).
     content_search: Option<ContentSearch>,
+    /// The `\` global fuzzy finder; `Some` while its popup is open.
+    finder: Option<finder::Finder>,
     /// The `S` settings overlay; `Some` while open.
     settings: Option<SettingsOverlay>,
     /// Rendered toolbox overlay content; `Some` while the overlay is open.
@@ -198,6 +201,7 @@ impl App {
             links: None,
             related: None,
             content_search: None,
+            finder: None,
             settings: None,
             toolbox: None,
             toolbox_scroll: 0,
