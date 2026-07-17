@@ -18,3 +18,13 @@ export async function listWorkspaces(): Promise<Listing> {
 export async function readSection(id: string, file: string): Promise<string | null> {
   return invoke<string | null>("read_section", { id, file });
 }
+
+/** The workspace's diagram file names, sorted. */
+export async function listDiagrams(id: string): Promise<string[]> {
+  return invoke<string[]>("list_diagrams", { id });
+}
+
+/** One diagram's text, ANSI-stripped; `null` if it vanished. */
+export async function readDiagram(id: string, name: string): Promise<string | null> {
+  return invoke<string | null>("read_diagram", { id, name });
+}

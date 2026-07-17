@@ -5,10 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import type { JSX } from "react";
 
 import { listWorkspaces, readSection } from "./api";
+import { DiagramView } from "./components/DiagramView";
 import { Sidebar } from "./components/Sidebar";
 import { SectionView } from "./components/SectionView";
 import { TabBar } from "./components/TabBar";
-import { SECTIONS } from "./lib/sections";
+import { DIAGRAMS_TAB, SECTIONS } from "./lib/sections";
 import type { Listing, Workspace } from "./types";
 import "./App.css";
 
@@ -40,7 +41,7 @@ export default function App(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    if (selectedId === null) {
+    if (selectedId === null || activeFile === DIAGRAMS_TAB.file) {
       return undefined;
     }
     let stale = false;
@@ -63,6 +64,10 @@ export default function App(): JSX.Element {
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
     setActiveFile(FIRST_SECTION);
+  }, []);
+
+  const handleError = useCallback((message: string) => {
+    setError(message);
   }, []);
 
   // Loading is derived, not stored: the pane is loading whenever the last
@@ -94,11 +99,15 @@ export default function App(): JSX.Element {
               </p>
             </header>
             <TabBar activeFile={activeFile} onSelect={setActiveFile} />
-            <SectionView
-              content={current?.body ?? null}
-              loading={loading}
-              file={activeFile}
-            />
+            {activeFile === DIAGRAMS_TAB.file ? (
+              <DiagramView id={selected.id} onError={handleError} />
+            ) : (
+              <SectionView
+                content={current?.body ?? null}
+                loading={loading}
+                file={activeFile}
+              />
+            )}
           </>
         ) : (
           <div className="section-hint">

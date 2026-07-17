@@ -77,3 +77,37 @@ pub fn read_section(id: &str, file: &str) -> Result<Option<String>, String> {
         .read_section(&parse_id(id)?, parse_kind(file)?)
         .map_err(|e| e.to_string())
 }
+
+/// The workspace's diagram file names, sorted (the `01-` prefix
+/// convention). Empty when there is no diagrams directory.
+#[tauri::command]
+pub fn list_diagrams(id: &str) -> Result<Vec<String>, String> {
+    let store = open_store()?;
+    Ok(store
+        .list_diagrams(&parse_id(id)?)
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|entry| entry.name)
+        .collect())
+}
+
+/// One diagram's text with ANSI colors stripped — the webview gets plain
+/// alignment-safe text; colored rendering is a follow-up. `None` when the
+/// file vanished since listing.
+#[tauri::command]
+pub fn read_diagram(id: &str, name: &str) -> Result<Option<String>, String> {
+    let store = open_store()?;
+    let id = parse_id(id)?;
+    let Some(entry) = store
+        .list_diagrams(&id)
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|entry| entry.name == name)
+    else {
+        return Ok(None);
+    };
+    Ok(store
+        .read_diagram(&entry)
+        .map_err(|e| e.to_string())?
+        .map(|content| beagle::ansi::strip(&content)))
+}

@@ -166,3 +166,49 @@ body {
   padding: 8px 20px;
   font-size: 0.85rem;
 }
+
+.diagram-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.diagram-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px 0;
+}
+
+.diagram-nav button {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+  padding: 3px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.diagram-nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.diagram-name {
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+}
+
+.diagram-content {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 16px 20px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  white-space: pre;
+}

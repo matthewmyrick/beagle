@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { SECTIONS } from "../lib/sections";
+import { TABS } from "../lib/sections";
 
 interface TabBarProps {
   activeFile: string;
@@ -12,7 +12,7 @@ interface TabBarProps {
 export function TabBar({ activeFile, onSelect }: TabBarProps): JSX.Element {
   return (
     <div className="tab-bar" role="tablist">
-      {SECTIONS.map((section, index) => (
+      {TABS.map((section, index) => (
         <button
           key={section.file}
           type="button"

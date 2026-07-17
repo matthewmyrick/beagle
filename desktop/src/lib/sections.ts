@@ -19,3 +19,16 @@ export const SECTIONS: readonly Section[] = [
   { file: "notes.md", title: "Notes" },
   { file: "log.md", title: "Log" },
 ] as const;
+
+/** The Diagrams pseudo-tab: not a markdown section, rendered unwrapped. */
+export const DIAGRAMS_TAB: Section = { file: "__diagrams__", title: "Diagrams" };
+
+/**
+ * Every tab in TUI order: the six narrative sections, Diagrams, then
+ * Notes and Log.
+ */
+export const TABS: readonly Section[] = [
+  ...SECTIONS.slice(0, 6),
+  DIAGRAMS_TAB,
+  ...SECTIONS.slice(6),
+];
