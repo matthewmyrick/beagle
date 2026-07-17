@@ -164,6 +164,15 @@ a:hover {
   padding: 56px 0 8px;
 }
 
+.hero-logo {
+  display: block;
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
 .index-hero h1 {
   font-size: 2rem;
   margin: 0 0 6px;
