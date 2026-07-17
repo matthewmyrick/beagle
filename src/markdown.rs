@@ -107,15 +107,14 @@ fn render_line(raw: &str) -> Line<'static> {
 /// or `[X]`, either alone or followed by a space and the item text.
 /// Anything else (`[x]done`, `[y] ...`) is an ordinary bullet.
 fn checkbox(rest: &str) -> Option<(bool, &str)> {
-    let (done, after) = if let Some(after) = rest.strip_prefix("[ ]") {
-        (false, after)
-    } else if let Some(after) = rest
-        .strip_prefix("[x]")
-        .or_else(|| rest.strip_prefix("[X]"))
-    {
-        (true, after)
-    } else {
-        return None;
+    let (done, after) = match rest.strip_prefix("[ ]") {
+        Some(after) => (false, after),
+        None => {
+            let after = rest
+                .strip_prefix("[x]")
+                .or_else(|| rest.strip_prefix("[X]"))?;
+            (true, after)
+        }
     };
     match after.strip_prefix(' ') {
         Some(text) => Some((done, text)),
