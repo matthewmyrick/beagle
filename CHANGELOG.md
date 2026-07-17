@@ -6,6 +6,35 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-17
+
+### Added
+
+- Archive flow: `beagle archive <slug>` moves a finished RCA to
+  `rcas/archive/<slug>` — out of the sidebar, never out of the knowledge
+  base (refuses unless status is `finished`; `--force` overrides). The
+  TUI hides archived incidents by default; `a` toggles them in, rendered
+  dimmed and sorted below everything active. `beagle list --archived`
+  includes them, and reads, exports, `beagle log`, and similar-ranking
+  (`R` / `beagle similar`) work on archived workspaces transparently.
+  The `archive` slug is reserved at scaffold time (#19).
+- Mouse support: the wheel scrolls whatever is under the cursor (content
+  pane, sidebar selection, or an open overlay); left-click selects a
+  sidebar row, switches to a clicked tab label, focuses the content
+  pane, or closes the help sheet. Capture is released on every exit
+  path, panics included; keys remain the primary interface (#20).
+- `E` opens the current tab's backing file in your editor (config
+  `editor` → `$VISUAL` → `$EDITOR` → vim — the same resolution as
+  `beagle config`), suspending and restoring the TUI around it. On the
+  Diagrams tab it opens the diagram on screen. Your own edit is not
+  flagged unread for you; editor failures land in the status bar (#21).
+- Global fuzzy finder: `\` opens a telescope-style popup over every
+  line of every incident (archived included) plus incident titles. A
+  few fuzzy characters re-rank results live with matched characters
+  highlighted; enter jumps straight to the incident, tab, and line —
+  revealing filtered or archived targets as needed. Distinct from `/`,
+  which stays the precise in-incident search (#25).
+
 ## [0.6.1] - 2026-07-17
 
 ### Fixed
