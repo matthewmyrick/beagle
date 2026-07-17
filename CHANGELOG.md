@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Broken-workspace rows now show a compact, path-free reason. A missing
+  manifest reads `no rca.toml — not a beagle workspace` and a corrupt one
+  leads with the TOML error itself — previously both led with the
+  manifest's absolute path, which is exactly what a narrow sidebar
+  truncates away (`i/o error at /Users/matthew…`).
+
 ## [0.6.0] - 2026-07-17
 
 ### Fixed
