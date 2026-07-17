@@ -1,0 +1,12 @@
+title = "Checkout timeouts during a config rollout"
+severity = "high"
+status = "finished"
+created = "2026-07-17T20:39:43.814699Z"
+updated = "2026-07-17T20:40:51.460283Z"
+systems = [
+    "checkout-api",
+    "config-service",
+]
+tags = []
+published = true
+published_at = "2026-07-17T20:40:51.460274Z"

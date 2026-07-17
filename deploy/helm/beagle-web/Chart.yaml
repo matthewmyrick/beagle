@@ -1,0 +1,14 @@
+apiVersion: v2
+name: beagle-web
+description: The beagle public postmortem site, optionally gated by GitHub SSO
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/matthewmyrick/beagle
+sources:
+  - https://github.com/matthewmyrick/beagle
+keywords:
+  - beagle
+  - postmortem
+  - status-page
+  - rca

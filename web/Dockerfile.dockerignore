@@ -1,0 +1,9 @@
+# Build context is the repo root; keep the image build lean.
+.git
+**/node_modules
+**/dist
+**/.astro
+cli/target
+desktop/src-tauri/target
+desktop/node_modules
+exports
