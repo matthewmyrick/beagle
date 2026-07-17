@@ -192,9 +192,7 @@ prs = ["https://github.com/org/repo/pull/123"]   # optional; `beagle pr add`
 ```
 
 Any section may be absent (the tab shows a hint instead); a corrupt manifest
-skips that workspace with a status-bar warning and never crashes the TUI. The
-repo ships one fully worked example under `rcas/` — run `cargo run` here to
-explore it.
+skips that workspace with a status-bar warning and never crashes the TUI.
 
 ## Design goals
 

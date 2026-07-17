@@ -74,9 +74,6 @@ plain text — put tabular data in a code fence so columns align.
   `perl -pi -e 's/BUG/\e[1;31mBUG\e[0m/' <file>`. Red = broken, green =
   healthy, yellow = degraded. Always close with `\e[0m`.
 
-See `rcas/2026-06-30-sendgrid-webhook-signature-failures/` for a fully worked
-example of tone, depth, and diagram style.
-
 ## Working on the TUI code itself
 
 Read `CONTRIBUTING.md` and `docs/CODING_STANDARDS.md` first. Non-negotiables:
