@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-17
+
+### Added
+
+- `beagle unarchive <slug>` moves an archived RCA back to the active
+  list — the previously missing inverse of `archive` (also available in
+  the desktop app's header).
+- Git-style root discovery: without `--root` or a config `root`, beagle
+  now walks up from the working directory to the nearest ancestor
+  containing `rcas/` — run it from any subdirectory of an oncall
+  checkout and it finds the right workspaces instead of scaffolding an
+  empty `rcas/` where you stand.
+
+### Changed
+
+- The `\` finder opens quiet: an empty query matches nothing, and the
+  popup is a slim bar that grows a row per match (capped) as you type,
+  shrinking as the query narrows — the incident stays visible behind it.
+- The CLI self-updater explicitly skips the repo's new `desktop-v*`
+  release tags (the desktop app releases independently); `beagle
+  update` continues to track `v*` only.
+
 ## [0.7.1] - 2026-07-17
 
 ### Changed
