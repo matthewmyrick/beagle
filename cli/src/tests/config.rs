@@ -80,7 +80,35 @@ fn config_editor_wins_over_fallback() {
         root: None,
         editor: Some("hx".to_owned()),
         notify: None,
+        notify_events: None,
         handoff: None,
     };
     assert_eq!(editor(Some(&config)), "hx");
+}
+
+#[test]
+fn notify_events_parses_a_partial_table() {
+    use crate::config::parse;
+    let cfg = parse("notify = true\n[notify_events]\nfinal_review = true\nfinished = true\n")
+        .expect("parses");
+    let events = cfg.notify_events.expect("table present");
+    assert!(events.final_review && events.finished);
+    assert!(!events.investigating && !events.review && !events.agent && !events.new_incident);
+}
+
+#[test]
+fn notify_events_all_enables_every_event() {
+    use crate::config::NotifyEvents;
+    let all = NotifyEvents::all();
+    assert!(
+        all.new_incident
+            && all.investigating
+            && all.review
+            && all.agent
+            && all.final_review
+            && all.finished
+    );
+    // Absent by default (off).
+    assert_eq!(NotifyEvents::default(), NotifyEvents::default());
+    assert!(!NotifyEvents::default().finished);
 }

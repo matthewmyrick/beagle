@@ -127,6 +127,10 @@ setting is optional and overridden by flags:
 ```toml
 root = "/path/to/oncall"   # default --root, so `beagle` works from anywhere
 notify = true              # desktop pings: new incidents, status changes
+
+[notify_events]            # optional: only fire these (omit = all events)
+final_review = true        # e.g. only ping me when a fix merges to verify
+investigating = true
 editor = "code -w"         # editor for `beagle config`
 
 [handoff]                   # `beagle handoff <slug>`: the agent to launch

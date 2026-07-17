@@ -41,9 +41,12 @@ fn settings_overlay_edits_write_the_config_file() {
     let content = std::fs::read_to_string(&path).expect("config re-read");
     assert!(content.contains("notify = false"));
     assert_eq!(
-        content.matches("notify").count(),
-        2,
-        "one active + template comment text"
+        content
+            .lines()
+            .filter(|l| l.trim_start().starts_with("notify ="))
+            .count(),
+        1,
+        "exactly one active notify line — the toggle never duplicates it"
     );
 
     // Inline-edit the editor field; q types instead of closing.

@@ -182,6 +182,20 @@ impl App {
         let _ = self.reload();
     }
 
+    /// Whether a transition *to* `status` should fire a notification, per
+    /// the configured `[notify_events]` filter.
+    fn notifies_for(&self, status: crate::model::Status) -> bool {
+        use crate::model::Status;
+        let e = &self.notify_events;
+        match status {
+            Status::Investigating => e.investigating,
+            Status::Review => e.review,
+            Status::Agent => e.agent,
+            Status::FinalReview => e.final_review,
+            Status::Finished => e.finished,
+        }
+    }
+
     /// Re-lists workspaces, keeping the selection pinned to the same id when
     /// it survives the reload, and drops the content cache. Returns what
     /// changed (new workspaces, status transitions) and — when enabled —
@@ -222,11 +236,15 @@ impl App {
         self.recompute_visible(previous);
         self.pane = None;
         if self.notify_enabled {
-            for title in &delta.arrived {
-                crate::notify::send("beagle — new incident", title);
+            if self.notify_events.new_incident {
+                for title in &delta.arrived {
+                    crate::notify::send("beagle — new incident", title);
+                }
             }
             for (title, _, to) in &delta.status_changes {
-                crate::notify::send(&format!("beagle — {to}"), title);
+                if self.notifies_for(*to) {
+                    crate::notify::send(&format!("beagle — {to}"), title);
+                }
             }
         }
         delta

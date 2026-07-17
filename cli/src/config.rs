@@ -40,6 +40,16 @@ pub const TEMPLATE: &str = "\
 # changes (osascript on macOS, notify-send on Linux). Off by default.
 # notify = true
 
+# Which events notify (only when notify is on). Omit this table to get all
+# of them; include it to fire only the events you set to true.
+# [notify_events]
+# new_incident = true
+# investigating = true
+# review = false
+# agent = false
+# final_review = true
+# finished = true
+
 # Agent hand-off (`beagle handoff <slug>`): the agent beagle launches on a
 # reviewed RCA. The composed prompt (the prompt file below, then the RCA
 # write-up) is piped to the command's stdin; it runs in the store root with
@@ -62,12 +72,62 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editor: Option<String>,
     /// Desktop notifications from the TUI (new incidents, status changes).
-    /// Off unless explicitly enabled.
+    /// Off unless explicitly enabled. The master switch — see
+    /// `notify_events` to pick which events fire.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notify: Option<bool>,
+    /// Which lifecycle events fire a notification, when `notify` is on. An
+    /// absent table means every event fires; a present one fires only the
+    /// events set to `true`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notify_events: Option<NotifyEvents>,
     /// The agent hand-off (`beagle handoff <slug>`): what to launch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff: Option<HandoffConfig>,
+}
+
+/// Per-event notification flags. Any omitted event defaults to off, so a
+/// `[notify_events]` table with only `final_review = true` notifies on
+/// nothing else. Use [`NotifyEvents::all`] for "every event" (the default
+/// when the table is absent entirely).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(clippy::struct_excessive_bools)] // independent per-event flags, not an encoded state
+pub struct NotifyEvents {
+    /// A new incident appeared under `rcas/`.
+    #[serde(default)]
+    pub new_incident: bool,
+    /// A workspace moved to `investigating`.
+    #[serde(default)]
+    pub investigating: bool,
+    /// A workspace moved to `review`.
+    #[serde(default)]
+    pub review: bool,
+    /// A workspace moved to `agent`.
+    #[serde(default)]
+    pub agent: bool,
+    /// A workspace moved to `final-review`.
+    #[serde(default)]
+    pub final_review: bool,
+    /// A workspace moved to `finished`.
+    #[serde(default)]
+    pub finished: bool,
+}
+
+impl NotifyEvents {
+    /// Every event enabled — the default when no `[notify_events]` table is
+    /// configured but notifications are on.
+    #[must_use]
+    pub fn all() -> Self {
+        Self {
+            new_incident: true,
+            investigating: true,
+            review: true,
+            agent: true,
+            final_review: true,
+            finished: true,
+        }
+    }
 }
 
 /// Configures `beagle handoff`: the agent beagle launches on a reviewed
