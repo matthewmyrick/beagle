@@ -111,3 +111,24 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}
+
+  # GitHub's releases/latest tracks the most recently created release,
+  # which a desktop release would otherwise claim — breaking the README's
+  # `releases/latest/download/beagle-*.tar.gz` install one-liner. Keep
+  # `latest` pinned to the newest CLI (v*) release. Tag convention: `v*`
+  # is grandfathered as the CLI's track (every installed self-updater
+  # only parses vX.Y.Z); new components get prefixed tags (desktop-v*).
+  latest-pointer:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Re-point releases/latest at the newest CLI release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cli_tag="$(gh release list --limit 100 --json tagName \
+            --jq '[.[].tagName | select(startswith("v"))][0]')"
+          if [ -n "$cli_tag" ]; then
+            gh release edit "$cli_tag" --latest
+          fi
