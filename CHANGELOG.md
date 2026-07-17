@@ -22,6 +22,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Checklist rendering: `- [ ]` / `- [x]` bullets render as ☐/☑ glyphs —
+  checked items green, unchecked with a yellow box — and aggregate
+  progress surfaces as `☑ 3/7` in the sidebar detail line and the
+  workspace header, turning green when complete. Counts re-scan only
+  when a file's mtime changes; fenced code is ignored.
 - Collapsible sidebar: `s` collapses the incident list so the content
   pane takes the full terminal width (wide diagrams get every column);
   `s` again — or any back-to-list key (`b`, `esc`, `f`) — brings it back.
