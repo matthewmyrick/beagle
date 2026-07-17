@@ -70,3 +70,19 @@ fn non_array_release_bodies_error_with_context() {
 fn repo_slug_is_owner_slash_name() {
     assert_eq!(repo_slug(), "matthewmyrick/beagle");
 }
+
+#[test]
+fn parse_releases_skips_desktop_tags() {
+    // The repo publishes desktop releases under desktop-v* tags in the
+    // same GitHub release list; the CLI updater must ignore them — this
+    // invariant keeps `beagle update` safe in the multi-component repo.
+    let json = r#"[
+        {"tag_name": "desktop-v0.1.0"},
+        {"tag_name": "v0.7.1"},
+        {"tag_name": "desktop-v0.2.0"},
+        {"tag_name": "v0.7.0"}
+    ]"#;
+    let releases = parse_releases(json).expect("parses");
+    let tags: Vec<String> = releases.iter().map(|r| r.version.tag()).collect();
+    assert_eq!(tags, ["v0.7.1", "v0.7.0"], "desktop tags are skipped");
+}

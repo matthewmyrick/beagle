@@ -1,0 +1,113 @@
+name: release-desktop
+
+# Pushing a tag like desktop-v0.1.0 gates the desktop app's checks,
+# cross-builds the Tauri bundles (macOS arm64 + x86_64 dmg/app, Linux
+# AppImage + deb), and publishes them to a GitHub Release under that tag.
+# CLI releases keep their own v* tags and workflow (release.yml); the CLI
+# self-updater skips desktop-v* tags when listing releases.
+on:
+  push:
+    tags: ["desktop-v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+        working-directory: desktop
+      - name: Frontend checks (prettier, eslint, tsc, vitest)
+        run: npm run check
+        working-directory: desktop
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - name: Rust checks
+        working-directory: desktop/src-tauri
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets -- -D warnings
+      - name: Tag must match the desktop version everywhere
+        run: |
+          tag="${GITHUB_REF_NAME#desktop-v}"
+          conf="$(jq -r .version desktop/src-tauri/tauri.conf.json)"
+          pkg="$(jq -r .version desktop/package.json)"
+          crate="$(cargo metadata --no-deps --format-version 1 \
+            --manifest-path desktop/src-tauri/Cargo.toml \
+            | jq -r '.packages[] | select(.name == "beagle-desktop") | .version')"
+          for v in "$conf" "$pkg" "$crate"; do
+            if [ "$tag" != "$v" ]; then
+              echo "::error::tag desktop-v$tag does not match version $v (conf=$conf pkg=$pkg crate=$crate)"
+              exit 1
+            fi
+          done
+
+  build:
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tauri system dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+          key: ${{ matrix.target }}
+      - run: npm ci
+        working-directory: desktop
+      - name: Build and publish bundles
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: "Beagle Desktop ${{ github.ref_name }}"
+          releaseBody: |
+            The Beagle desktop app. macOS bundles are unsigned for now —
+            right-click → Open on first launch (or
+            `xattr -dr com.apple.quarantine "/Applications/Beagle.app"`).
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}

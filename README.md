@@ -46,9 +46,14 @@ new workspaces announce themselves in the status bar as agents scaffold them.
 
 ```text
 cli/        the Rust TUI + CLI (everything documented below)
-desktop/    Tauri 2 + React desktop viewer (early; see desktop/README.md)
+desktop/    Tauri 2 + React desktop app (see desktop/README.md)
 docs/       coding standards per component
 ```
+
+Each component releases independently: `v*` tags cut CLI binaries (this
+is what `beagle update` tracks), `desktop-v*` tags cut desktop bundles
+(macOS dmg, Linux AppImage/deb) — grab those from the
+[releases page](https://github.com/matthewmyrick/beagle/releases).
 
 ## Install & run
 
