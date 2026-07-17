@@ -69,7 +69,14 @@ beagle log <slug> "p99 dashboard normal; checking Redis pool saturation"
 
 This is the user's live view of what you're doing (the Log tab; they often
 sit on it in follow mode). A silent minute looks like a stuck agent — log
-before long queries. Then the sections:
+before long queries.
+
+**Keep a plan as a checklist:** put your investigation plan in `notes.md`
+(or `summary.md`) as `- [ ]` items and tick them (`- [x]`) as evidence
+lands. The TUI renders them as ☐/☑ and shows aggregate progress in the
+sidebar — the user watches boxes tick instead of wondering where you are.
+
+Then the sections:
 
 1. `summary.md` — what broke in ≤3 sentences + current state. **Write first,
    keep it current**; it's the tab responders read.
@@ -148,5 +155,6 @@ until reset — always close with `\e[0m`.
 ## Rendering constraints
 
 The TUI renders a markdown subset: `#`/`##`/`###`, `-` bullets (indent to
-nest), ``` fences, `>` quotes, `---`, `**bold**`, `` `code` ``. Tables, links,
-and images render as plain text — put tabular data in code fences.
+nest), `- [ ]`/`- [x]` checklists (☐/☑, with aggregate progress in the
+sidebar), ``` fences, `>` quotes, `---`, `**bold**`, `` `code` ``. Tables,
+links, and images render as plain text — put tabular data in code fences.

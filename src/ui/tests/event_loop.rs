@@ -184,3 +184,33 @@ fn v_signs_off_final_review_and_explains_elsewhere() {
         Status::Finished
     );
 }
+
+#[test]
+fn checklist_progress_aggregates_sections_and_tracks_reloads() {
+    use crate::ui::testutil::app_with;
+
+    let mut app = app_with(1);
+    let id = crate::model::RcaId::new("rca-0").expect("id");
+    assert_eq!(app.checklist_progress(&id), None, "no checkboxes yet");
+
+    let dir = app.store.workspace_dir(&id);
+    std::fs::write(dir.join("summary.md"), "- [x] a\n- [ ] b\n").expect("write");
+    std::fs::write(dir.join("final-review.md"), "- [ ] c\n").expect("write");
+    app.reload();
+    assert_eq!(
+        app.checklist_progress(&id),
+        Some((1, 3)),
+        "counts aggregate across sections"
+    );
+
+    // Ticking a box updates the cached count on the next reload. The
+    // mtime snapshot has second granularity on some filesystems, so
+    // backdate the old snapshot instead of sleeping.
+    let key = (id.clone(), crate::model::SectionKind::FinalReview);
+    let old = *app.mtimes.get(&key).expect("snapshot");
+    app.mtimes
+        .insert(key, old - std::time::Duration::from_secs(2));
+    std::fs::write(dir.join("final-review.md"), "- [x] c\n").expect("write");
+    app.reload();
+    assert_eq!(app.checklist_progress(&id), Some((2, 3)));
+}

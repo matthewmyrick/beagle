@@ -124,6 +124,7 @@ pub(super) fn header_paragraph(
     tick: usize,
     prs: &[(String, Option<crate::prs::PrState>)],
     activity: Option<std::time::Duration>,
+    progress: Option<(usize, usize)>,
 ) -> Paragraph<'static> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
     let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
@@ -159,6 +160,16 @@ pub(super) fn header_paragraph(
             };
             meta_spans.push(Span::styled(format!(" · {label}"), style));
         }
+    }
+    if let Some((checked, total)) = progress {
+        // Checklist progress across the workspace's sections, next to the
+        // status — the same count the sidebar shows.
+        let style = if checked == total {
+            Style::default().fg(Color::LightGreen)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+        meta_spans.push(Span::styled(format!(" · ☑ {checked}/{total}"), style));
     }
     meta_spans.extend([
         Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),

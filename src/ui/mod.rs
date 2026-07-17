@@ -84,6 +84,10 @@ pub struct App {
     notify_enabled: bool,
     /// Last-seen modification time per section file, for change detection.
     mtimes: HashMap<(RcaId, SectionKind), std::time::SystemTime>,
+    /// Checkbox counts per section, `(checked, total)`, re-scanned only
+    /// when the mtime snapshot says the file changed. Sections without
+    /// checkboxes have no entry.
+    checklists: HashMap<(RcaId, SectionKind), (usize, usize)>,
     /// Sections that changed on disk since the user last viewed them.
     unread: HashSet<(RcaId, SectionKind)>,
     /// Live PR states (url → state), fed by the background `gh` poller.
@@ -164,6 +168,7 @@ impl App {
             sidebar_collapsed: false,
             notify_enabled: false,
             mtimes: HashMap::new(),
+            checklists: HashMap::new(),
             unread: HashSet::new(),
             pr_states: HashMap::new(),
             links: None,
@@ -352,6 +357,19 @@ impl App {
     /// Whether any section of workspace `id` is unread.
     pub(crate) fn has_unread(&self, id: &RcaId) -> bool {
         self.unread.iter().any(|(unread_id, _)| unread_id == id)
+    }
+
+    /// Aggregate checkbox progress across every section of workspace `id`:
+    /// `(checked, total)`, or `None` when no section has a checklist.
+    pub(crate) fn checklist_progress(&self, id: &RcaId) -> Option<(usize, usize)> {
+        let (checked, total) = self
+            .checklists
+            .iter()
+            .filter(|((list_id, _), _)| list_id == id)
+            .fold((0, 0), |(c, t), (_, &(checked, total))| {
+                (c + checked, t + total)
+            });
+        (total > 0).then_some((checked, total))
     }
 
     /// Every unique attached-PR URL across all workspaces, sorted, for the
