@@ -38,6 +38,7 @@ use search::ContentSearch;
 use settings::SettingsOverlay;
 
 /// The whole TUI state.
+#[allow(clippy::struct_excessive_bools)] // independent UI toggles (help, follow, notify, sidebar), not an encoded state machine
 pub struct App {
     store: Store,
     rcas: Vec<RcaSummary>,
@@ -71,6 +72,10 @@ pub struct App {
     /// Follow mode: filesystem reloads keep the current tab scrolled to the
     /// bottom, tail-f style.
     follow: bool,
+    /// Sidebar collapsed (`s`): the content pane takes the full width.
+    /// Never true while the list has focus — anything that returns focus
+    /// to the list brings the sidebar back.
+    sidebar_collapsed: bool,
     /// Desktop notifications on new incidents and status changes (config
     /// `notify = true`).
     notify_enabled: bool,
@@ -152,6 +157,7 @@ impl App {
             pane: None,
             tick: 0,
             follow: false,
+            sidebar_collapsed: false,
             notify_enabled: false,
             mtimes: HashMap::new(),
             unread: HashSet::new(),
@@ -322,6 +328,10 @@ impl App {
 
     pub(crate) fn follow(&self) -> bool {
         self.follow
+    }
+
+    pub(crate) fn sidebar_collapsed(&self) -> bool {
+        self.sidebar_collapsed
     }
 
     /// Whether `tab` of workspace `id` changed on disk since last viewed.

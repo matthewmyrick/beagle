@@ -228,10 +228,6 @@ pub(super) fn draw_toolbox(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
-    let width = 62.min(area.width.saturating_sub(4));
-    let height = 24.min(area.height.saturating_sub(2));
-    let popup = center(area, width, height);
-
     let rows = [
         ("j / k, ↓ / ↑", "select incident or scroll content"),
         ("enter / l", "focus the content pane"),
@@ -240,6 +236,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("1–8", "jump to a tab"),
         ("f", "filter list: i/r/v/f status · c/h/m/l sev · / text"),
         ("F", "follow: reloads stick to the bottom (tail -f)"),
+        ("s", "hide / show the sidebar (full-width content)"),
         ("/", "search the incident: every tab, live highlight"),
         ("n / N", "next / previous search match"),
         ("c / C", "copy this tab / whole RCA to clipboard"),
@@ -266,6 +263,15 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
             Span::raw(*action),
         ])
     }));
+
+    // Sized to the actual row count (plus borders) so the last rows are
+    // never silently clipped as keys are added.
+    let width = 62.min(area.width.saturating_sub(4));
+    let height = u16::try_from(lines.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(2)
+        .min(area.height.saturating_sub(2));
+    let popup = center(area, width, height);
 
     let block = Block::default()
         .title(" keys (any key to close) ")

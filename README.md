@@ -121,7 +121,8 @@ prebuilt binaries, update via `cargo install` instead.
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
 `1`–`9` switch tabs · `/` search the incident (all tabs, `n`/`N` between
 hits) · `f` filter the list (i/r/v/f status · c/h/m/l severity · `/` free text,
-stacking + toggling) · `F` follow (tail -f) · `T` toolbox ·
+stacking + toggling) · `F` follow (tail -f) · `s` collapse/expand the
+sidebar · `T` toolbox ·
 `o` open links/PRs · `R` related incidents · `V` sign off final-review · `S` settings ·
 `c` copy tab / `C` copy whole RCA (pbcopy or OSC 52) · `e` export to
 `exports/<slug>.md` · `n/p` cycle diagrams · `h/l` pan diagrams · `r`
