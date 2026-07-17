@@ -74,13 +74,14 @@ fn render_line(raw: &str) -> Line<'static> {
         .or_else(|| trimmed.strip_prefix("* "))
     {
         if let Some((done, text)) = checkbox(rest) {
-            // Checked items dim so the unchecked work stands out — a
-            // checklist tab reads as a progress tracker at a glance.
+            // Checked items go green — on a verification checklist a tick
+            // means "this held". Unchecked stay normal (not red/yellow):
+            // pending is the default state, not a warning.
             let (glyph, glyph_style, text_style) = if done {
                 (
                     "☑ ",
                     Style::default().fg(Color::Green),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(Color::Green),
                 )
             } else {
                 ("☐ ", Style::default().fg(Color::Yellow), Style::default())

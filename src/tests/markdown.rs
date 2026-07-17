@@ -61,7 +61,7 @@ fn empty_input_is_empty_output() {
 }
 
 #[test]
-fn checkboxes_render_as_glyphs_with_checked_dimmed() {
+fn checkboxes_render_as_glyphs_with_checked_green() {
     let text = to_text("- [ ] open item\n- [x] done item\n- [X] also done");
     let unchecked = &text.lines[0];
     assert_eq!(unchecked.spans[1].content, "☐ ");
@@ -75,8 +75,8 @@ fn checkboxes_render_as_glyphs_with_checked_dimmed() {
     assert_eq!(checked.spans[1].content, "☑ ");
     assert_eq!(
         checked.spans[2].style.fg,
-        Some(Color::DarkGray),
-        "done items dim"
+        Some(Color::Green),
+        "done items go green"
     );
     assert_eq!(
         text.lines[2].spans[1].content, "☑ ",
