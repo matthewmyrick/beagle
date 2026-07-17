@@ -17,9 +17,16 @@ fn backslash_opens_over_a_corpus_of_titles_and_lines() {
         !finder.matches.is_empty(),
         "empty query lists the corpus so the popup is useful immediately"
     );
-    // Title entries first per workspace: a global jump-to.
+    // Title entries lead each workspace: a global jump-to. Which workspace
+    // comes first is a sort tie here (identical status/severity/second),
+    // so assert shape, not identity.
     let first = finder.entry(0).expect("entry");
-    assert_eq!(first.text, "RCA 0");
+    assert_eq!(first.tab, Tab::Summary);
+    assert_eq!(first.line, 0);
+    assert_eq!(
+        first.text, first.title,
+        "a title entry's text is the incident title"
+    );
 
     press(&mut app, KeyCode::Esc);
     assert!(app.finder().is_none(), "esc closes");
