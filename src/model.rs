@@ -251,15 +251,19 @@ pub struct RcaSummary {
     pub id: RcaId,
     /// The parsed manifest.
     pub meta: RcaMeta,
+    /// Whether the workspace lives under `rcas/archive/` — out of the way
+    /// but never deleted; the TUI hides archived incidents by default.
+    pub archived: bool,
 }
 
 impl RcaSummary {
-    /// Sort key: open investigations first, then by severity, then newest
-    /// first. This is the sidebar ordering.
+    /// Sort key: active before archived, open investigations first, then by
+    /// severity, then newest first. This is the sidebar ordering.
     #[must_use]
-    pub fn sort_key(&self) -> (Status, Severity, i64) {
+    pub fn sort_key(&self) -> (bool, Status, Severity, i64) {
         // Negate the timestamp so larger (newer) sorts first under `Ord`.
         (
+            self.archived,
             self.meta.status,
             self.meta.severity,
             -self.meta.created.unix_timestamp(),

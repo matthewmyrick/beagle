@@ -83,7 +83,9 @@ fn run(command: Command) -> Result<(), Error> {
             root,
             status,
             severity,
-        } => run_list(root, status, severity),
+            archived,
+        } => run_list(root, status, severity, archived),
+        Command::Archive { root, id, force } => run_archive(root, &id, force),
         Command::SetStatus { root, id, status } => {
             let store = Store::open(&effective_root(root)?)?;
             store.set_status(&id, status)?;
@@ -107,19 +109,7 @@ fn run(command: Command) -> Result<(), Error> {
         }
         Command::PrList { root, id } => run_pr_list(root, &id),
         Command::Similar { root, id } => run_similar(root, &id),
-        Command::Init { root } => {
-            let store = Store::open(&effective_root(root)?)?;
-            let created = store.init_context()?;
-            if created.is_empty() {
-                println!("toolbox.md and systems/ already present; nothing created");
-            } else {
-                for path in created {
-                    println!("created {}", path.display());
-                }
-                println!("fill these in — agents read them before every investigation (T shows them in the TUI)");
-            }
-            Ok(())
-        }
+        Command::Init { root } => run_init(root),
         Command::Config => run_config(),
         Command::Update { version } => {
             let version = match version {
@@ -145,17 +135,23 @@ fn run_list(
     root: Option<PathBuf>,
     status: Option<Status>,
     severity: Option<Severity>,
+    archived: bool,
 ) -> Result<(), Error> {
     let store = Store::open(&effective_root(root)?)?;
-    let listing = store.list()?;
+    let listing = if archived {
+        store.list_all()?
+    } else {
+        store.list()?
+    };
     let (summaries, warnings) = (listing.summaries, listing.warnings);
     for rca in summaries
         .iter()
         .filter(|rca| status.map_or(true, |s| rca.meta.status == s))
         .filter(|rca| severity.map_or(true, |s| rca.meta.severity == s))
     {
+        let marker = if rca.archived { "  [archived]" } else { "" };
         println!(
-            "{:<10} {:<14} {:<30} {}",
+            "{:<10} {:<14} {:<30} {}{marker}",
             rca.meta.severity, rca.meta.status, rca.id, rca.meta.title,
         );
     }
@@ -165,6 +161,31 @@ fn run_list(
     for warning in &warnings {
         eprintln!("warning: {}", warning.0);
     }
+    Ok(())
+}
+
+/// `beagle init`: scaffold toolbox.md + systems/ agent context templates.
+fn run_init(root: Option<PathBuf>) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    let created = store.init_context()?;
+    if created.is_empty() {
+        println!("toolbox.md and systems/ already present; nothing created");
+    } else {
+        for path in created {
+            println!("created {}", path.display());
+        }
+        println!(
+            "fill these in — agents read them before every investigation (T shows them in the TUI)"
+        );
+    }
+    Ok(())
+}
+
+/// `beagle archive`: move a finished workspace to `rcas/archive/`.
+fn run_archive(root: Option<PathBuf>, id: &RcaId, force: bool) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    let dest = store.archive(id, force)?;
+    println!("archived {id} → {}", dest.display());
     Ok(())
 }
 
@@ -186,10 +207,12 @@ fn run_pr_list(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
     Ok(())
 }
 
-/// `beagle similar`: related workspaces, highest score first.
+/// `beagle similar`: related workspaces, highest score first. Archived
+/// incidents stay in the candidate set — the archive *is* the knowledge
+/// base this command exists to mine.
 fn run_similar(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
     let store = Store::open(&effective_root(root)?)?;
-    let summaries = store.list()?.summaries;
+    let summaries = store.list_all()?.summaries;
     let target = summaries
         .iter()
         .find(|rca| rca.id == *id)

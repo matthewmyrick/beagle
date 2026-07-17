@@ -408,3 +408,25 @@ fn collapsing_on_an_empty_store_does_not_panic() {
     press(&mut app, KeyCode::Esc);
     assert!(!app.sidebar_collapsed());
 }
+
+#[test]
+fn a_toggles_archived_incidents_into_the_list() {
+    let mut app = app_with(2);
+    let id = crate::model::RcaId::new("rca-1").expect("id");
+    app.store
+        .set_status(&id, crate::model::Status::Finished)
+        .expect("finish");
+    app.store.archive(&id, false).expect("archive");
+    app.reload();
+
+    assert_eq!(app.visible_len(), 1, "archived hidden by default");
+    assert_eq!(app.archived_count(), 1);
+
+    press(&mut app, KeyCode::Char('a'));
+    assert_eq!(app.visible_len(), 2, "a shows archived");
+    let last = app.visible_rcas().last().expect("row");
+    assert!(last.archived, "archived sorts below active");
+
+    press(&mut app, KeyCode::Char('a'));
+    assert_eq!(app.visible_len(), 1, "a hides them again");
+}

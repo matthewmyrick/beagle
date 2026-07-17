@@ -25,10 +25,12 @@ pub(super) fn parse_list(
 ) -> Result<Command, String> {
     let mut status: Option<Status> = None;
     let mut severity: Option<Severity> = None;
+    let mut archived = false;
     while let Some(flag) = args.next() {
         match flag.as_str() {
             "--status" => status = Some(take_value(args, "--status")?.parse()?),
             "--severity" => severity = Some(take_value(args, "--severity")?.parse()?),
+            "--archived" => archived = true,
             "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
             other => return Err(format!("unknown flag `{other}` for `list`")),
         }
@@ -37,7 +39,28 @@ pub(super) fn parse_list(
         root,
         status,
         severity,
+        archived,
     })
+}
+
+pub(super) fn parse_archive(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`archive` requires an <id> slug as its first argument")?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+    let mut force = false;
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--force" => force = true,
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `archive`")),
+        }
+    }
+    Ok(Command::Archive { root, id, force })
 }
 
 pub(super) fn parse_status(

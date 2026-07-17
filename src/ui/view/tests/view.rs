@@ -17,6 +17,7 @@ fn sample_summary(severity: Severity) -> crate::model::RcaSummary {
             tags: Vec::new(),
             prs: Vec::new(),
         },
+        archived: false,
     }
 }
 

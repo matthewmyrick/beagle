@@ -69,6 +69,8 @@ beagle new <slug> --title "..." [--severity high] [--system payments-api]...
 beagle status <slug> investigating   # flip status; a running TUI updates live
 beagle log <slug> "checking redis pool"  # append to the live Log tab
 beagle similar <slug>     # past RCAs sharing systems/tags, ranked (R in the TUI)
+beagle archive <slug>     # move a finished RCA to rcas/archive/ (a shows them)
+beagle list --archived    # include archived workspaces in the listing
 beagle pr add <slug> https://github.com/org/repo/pull/123  # attach a fix PR
 beagle pr list <slug>     # attached PRs, with live state when gh is available
 beagle export <slug>      # one markdown file → exports/<slug>.md
@@ -122,7 +124,7 @@ Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab
 `1`–`9` switch tabs · `/` search the incident (all tabs, `n`/`N` between
 hits) · `f` filter the list (i/r/v/f status · c/h/m/l severity · `/` free text,
 stacking + toggling) · `F` follow (tail -f) · `s` collapse/expand the
-sidebar · `T` toolbox ·
+sidebar · `a` show/hide archived · `T` toolbox ·
 `o` open links/PRs · `R` related incidents · `V` sign off final-review · `S` settings ·
 `c` copy tab / `C` copy whole RCA (pbcopy or OSC 52) · `e` export to
 `exports/<slug>.md` · `n/p` cycle diagrams · `h/l` pan diagrams · `r`
@@ -178,6 +180,9 @@ rcas/
     notes.md          # raw evidence, queries, links
     diagrams/
       01-topology.txt # ASCII diagrams, rendered unwrapped; ANSI colors supported
+  archive/            # finished RCAs moved aside by `beagle archive` — hidden
+    <slug>/           # by default in the TUI (`a` shows them, dimmed), still
+                      # exportable and still mined by `similar`
 ```
 
 `rca.toml`:

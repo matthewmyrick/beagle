@@ -54,6 +54,11 @@ pub const MANIFEST_FILE: &str = "rca.toml";
 /// Name of the diagrams directory inside each workspace.
 pub const DIAGRAMS_DIR: &str = "diagrams";
 
+/// Name of the directory under `rcas/` holding archived workspaces —
+/// finished incidents moved out of the sidebar without deleting the
+/// knowledge base.
+pub const ARCHIVE_DIR: &str = "archive";
+
 /// Name of the directory (under the store root, next to `rcas/`) where
 /// exported single-file markdown documents are written.
 pub const EXPORTS_DIR: &str = "exports";
@@ -136,10 +141,32 @@ impl Store {
         &self.root
     }
 
-    /// Absolute path of a workspace directory.
+    /// Where workspace `id` lives while active.
+    pub(crate) fn active_dir(&self, id: &RcaId) -> PathBuf {
+        self.rcas_root.join(id.as_str())
+    }
+
+    /// Where workspace `id` lives once archived.
+    pub(crate) fn archived_dir(&self, id: &RcaId) -> PathBuf {
+        self.rcas_root.join(ARCHIVE_DIR).join(id.as_str())
+    }
+
+    /// Absolute path of a workspace directory. Prefers the active location;
+    /// falls back to `rcas/archive/` when only the archived copy has a
+    /// manifest — so reads, exports, log appends, and similar-ranking work
+    /// on archived workspaces without callers knowing where they live.
     #[must_use]
     pub fn workspace_dir(&self, id: &RcaId) -> PathBuf {
-        self.rcas_root.join(id.as_str())
+        let active = self.active_dir(id);
+        if active.join(MANIFEST_FILE).exists() {
+            return active;
+        }
+        let archived = self.archived_dir(id);
+        if archived.join(MANIFEST_FILE).exists() {
+            archived
+        } else {
+            active
+        }
     }
 
     /// Lists every workspace, sorted for the sidebar (open incidents first,
@@ -155,7 +182,50 @@ impl Store {
     /// Returns [`Error::Io`] only if the `rcas/` directory itself cannot be
     /// read.
     pub fn list(&self) -> Result<Listing> {
-        let entries = fs::read_dir(&self.rcas_root).map_err(|e| Error::io(&self.rcas_root, e))?;
+        Self::list_dir(&self.rcas_root, false)
+    }
+
+    /// Lists the workspaces under `rcas/archive/`, sorted like
+    /// [`Self::list`]. A missing archive directory is an empty listing, not
+    /// an error.
+    ///
+    /// # Errors
+    /// Returns [`Error::Io`] only if the archive directory exists but
+    /// cannot be read.
+    pub fn list_archived(&self) -> Result<Listing> {
+        let archive_root = self.rcas_root.join(ARCHIVE_DIR);
+        if !archive_root.is_dir() {
+            return Ok(Listing::default());
+        }
+        Self::list_dir(&archive_root, true)
+    }
+
+    /// Active and archived workspaces in one listing, re-sorted so archived
+    /// incidents sink below everything active. This is what the TUI loads;
+    /// it hides the archived entries until asked.
+    ///
+    /// # Errors
+    /// As [`Self::list`]; an unreadable archive directory degrades to a
+    /// warning rather than failing the whole listing.
+    pub fn list_all(&self) -> Result<Listing> {
+        let mut listing = self.list()?;
+        match self.list_archived() {
+            Ok(mut archived) => {
+                listing.summaries.append(&mut archived.summaries);
+                listing.broken.append(&mut archived.broken);
+                listing.warnings.append(&mut archived.warnings);
+            }
+            Err(e) => listing
+                .warnings
+                .push(LoadWarning(format!("archive unreadable: {e}"))),
+        }
+        listing.summaries.sort_by_key(RcaSummary::sort_key);
+        listing.broken.sort_by(|a, b| a.dir_name.cmp(&b.dir_name));
+        Ok(listing)
+    }
+
+    fn list_dir(root: &Path, archived: bool) -> Result<Listing> {
+        let entries = fs::read_dir(root).map_err(|e| Error::io(root, e))?;
 
         let mut listing = Listing::default();
         for entry in entries {
@@ -173,8 +243,14 @@ impl Store {
                 continue; // stray files next to workspaces are fine to ignore
             }
             let dir_name = entry.file_name().to_string_lossy().into_owned();
+            if !archived && dir_name == ARCHIVE_DIR {
+                continue; // archived workspaces list via `list_archived`
+            }
             match Self::load_summary(&dir_name, &path) {
-                Ok(summary) => listing.summaries.push(summary),
+                Ok(mut summary) => {
+                    summary.archived = archived;
+                    listing.summaries.push(summary);
+                }
                 Err(e) => listing.broken.push(BrokenWorkspace {
                     dir_name,
                     reason: e.to_string(),
@@ -194,7 +270,11 @@ impl Store {
             path: manifest_path,
             source: Box::new(source),
         })?;
-        Ok(RcaSummary { id, meta })
+        Ok(RcaSummary {
+            id,
+            meta,
+            archived: false,
+        })
     }
 
     /// Reads and parses one workspace's manifest.

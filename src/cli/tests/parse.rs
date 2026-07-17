@@ -245,3 +245,29 @@ fn update_parses_an_optional_target_version() {
     assert!(parse(&["update", "--version", "latest"]).is_err());
     assert!(parse(&["update", "--force"]).is_err());
 }
+
+#[test]
+fn archive_parses_id_force_and_root() {
+    let cmd = parse(&["archive", "old-rca", "--force", "--root", "/r"]).expect("parse");
+    match cmd {
+        Command::Archive { root, id, force } => {
+            assert_eq!(id.as_str(), "old-rca");
+            assert!(force);
+            assert_eq!(root, Some(std::path::PathBuf::from("/r")));
+        }
+        other => panic!("wrong command: {other:?}"),
+    }
+    assert!(parse(&["archive"]).is_err(), "id is required");
+}
+
+#[test]
+fn list_parses_the_archived_flag() {
+    match parse(&["list", "--archived"]).expect("parse") {
+        Command::List { archived, .. } => assert!(archived),
+        other => panic!("wrong command: {other:?}"),
+    }
+    match parse(&["list"]).expect("parse") {
+        Command::List { archived, .. } => assert!(!archived),
+        other => panic!("wrong command: {other:?}"),
+    }
+}

@@ -72,7 +72,13 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         title.push(' ');
         title
     } else {
-        format!(" Incidents ({}) ", app.rcas().len())
+        let archived = app.archived_count();
+        let active = app.rcas().len() - archived;
+        if app.show_archived() && archived > 0 {
+            format!(" Incidents ({active} · {archived} archived) ")
+        } else {
+            format!(" Incidents ({active}) ")
+        }
     };
     let block = pane_block(title, focused);
 
@@ -121,18 +127,25 @@ fn rca_list_item(
     selected: bool,
     progress: Option<(usize, usize)>,
 ) -> Vec<Line<'static>> {
-    let (badge, badge_style) = severity_badge(rca.meta.severity);
-    let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
+    let (badge, mut badge_style) = severity_badge(rca.meta.severity);
+    let (symbol, mut symbol_style) = status_symbol(rca.meta.status, tick);
 
     // The selection background is applied per-span so the badge keeps its
     // own colors; `base` styles everything that has no color identity.
-    let base = if selected {
+    let mut base = if selected {
         Style::default()
             .bg(SELECTED_BG)
             .add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
+    if rca.archived {
+        // Archived rows are uniformly dim — history, not a live incident.
+        // The badge drops its background so nothing on the row pops.
+        base = base.fg(Color::DarkGray);
+        badge_style = base;
+        symbol_style = base;
+    }
     let tinted = |style: Style| {
         if selected {
             style.bg(SELECTED_BG)
@@ -154,6 +167,9 @@ fn rca_list_item(
         Span::styled(format!("  {symbol} "), tinted(symbol_style)),
         Span::styled(rca.meta.status.to_string(), tinted(symbol_style)),
     ];
+    if rca.archived {
+        detail_spans.push(Span::styled(" · archived", tinted(base)));
+    }
     if let Some((checked, total)) = progress {
         // Checklist progress across all sections: green once complete.
         let style = if checked == total {

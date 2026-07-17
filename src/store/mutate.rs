@@ -11,18 +11,27 @@ use crate::error::{Error, Result};
 use crate::model::{RcaId, RcaMeta, SectionKind, Severity, Status};
 
 use super::fsio::{read_optional, write_atomic};
-use super::{Store, DIAGRAMS_DIR, MANIFEST_FILE};
+use super::{Store, ARCHIVE_DIR, DIAGRAMS_DIR, MANIFEST_FILE};
 
 impl Store {
     /// Creates a new workspace: directory, manifest, section skeletons, and
-    /// an empty `diagrams/` directory. Refuses to touch an existing one.
+    /// an empty `diagrams/` directory. Refuses to touch an existing one —
+    /// including an archived one — and refuses the reserved `archive` slug.
     ///
     /// # Errors
     /// [`Error::AlreadyExists`] if the directory is already present;
-    /// [`Error::Io`] / [`Error::SerializeManifest`] on write failures.
+    /// [`Error::InvalidId`] for the reserved slug; [`Error::Io`] /
+    /// [`Error::SerializeManifest`] on write failures.
     pub fn scaffold(&self, id: &RcaId, meta: &RcaMeta) -> Result<PathBuf> {
-        let dir = self.workspace_dir(id);
-        if dir.exists() {
+        if id.as_str() == ARCHIVE_DIR {
+            // `rcas/archive/` is where archived workspaces live; a
+            // workspace by that name would shadow the whole archive.
+            return Err(Error::InvalidId(format!(
+                "{ARCHIVE_DIR} (reserved for archived workspaces)"
+            )));
+        }
+        let dir = self.active_dir(id);
+        if dir.exists() || self.archived_dir(id).exists() {
             return Err(Error::AlreadyExists(id.to_string()));
         }
         fs::create_dir_all(dir.join(DIAGRAMS_DIR)).map_err(|e| Error::io(&dir, e))?;
@@ -103,6 +112,54 @@ impl Store {
             toml::Value::String(status.as_str().to_owned()),
         );
         value.try_into().ok()
+    }
+
+    /// Moves a workspace to `rcas/archive/<id>` — out of the sidebar, never
+    /// out of the knowledge base. Refuses unless the status is `finished`
+    /// (`force` overrides): archiving an unverified incident hides live
+    /// work. The move is a same-filesystem rename, so a watching TUI sees
+    /// one atomic transition.
+    ///
+    /// # Errors
+    /// [`Error::Tool`] when the workspace is missing, already archived, or
+    /// not finished (without `force`); [`Error::AlreadyExists`] when the
+    /// archive already holds this slug; [`Error::Io`] on the move itself.
+    pub fn archive(&self, id: &RcaId, force: bool) -> Result<PathBuf> {
+        let source = self.active_dir(id);
+        if !source.join(MANIFEST_FILE).exists() {
+            let message = if self.archived_dir(id).join(MANIFEST_FILE).exists() {
+                format!("{id} is already archived")
+            } else {
+                format!("no workspace `{id}` under this root")
+            };
+            return Err(Error::Tool {
+                tool: "archive",
+                message,
+            });
+        }
+        if !force {
+            let status = self.read_meta(id)?.status;
+            if status != Status::Finished {
+                return Err(Error::Tool {
+                    tool: "archive",
+                    message: format!(
+                        "{id} is `{status}`, not `finished` — verify and sign off \
+                         first, or pass --force"
+                    ),
+                });
+            }
+        }
+        let dest = self.archived_dir(id);
+        if dest.exists() {
+            return Err(Error::AlreadyExists(format!("{ARCHIVE_DIR}/{id}")));
+        }
+        // `dest.parent()` is always `rcas/archive/`; create_dir_all is a
+        // no-op when it already exists.
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        }
+        fs::rename(&source, &dest).map_err(|e| Error::io(&source, e))?;
+        Ok(dest)
     }
 
     /// Attaches a remediation PR URL to the workspace manifest, stamping
