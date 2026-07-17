@@ -66,6 +66,7 @@ pub(super) fn status_symbol(status: Status, tick: usize) -> (&'static str, Style
             Style::default().fg(Color::LightRed),
         ),
         Status::Review => ("◐", Style::default().fg(Color::Yellow)),
+        Status::Agent => ("⚙", Style::default().fg(Color::Magenta)),
         Status::FinalReview => ("◒", Style::default().fg(Color::LightBlue)),
         Status::Finished => ("✔", Style::default().fg(Color::Green)),
     }

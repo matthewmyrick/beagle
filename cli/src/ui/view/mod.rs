@@ -455,7 +455,7 @@ fn filter_prompt_line(app: &App) -> Line<'static> {
         ));
     } else {
         spans.push(Span::styled(
-            "   i/r/v/f status · c/h/m/l severity · / type · enter keep · esc clear",
+            "   i/r/a/v/f status · c/h/m/l severity · / type · enter keep · esc clear",
             Style::default().fg(Color::DarkGray),
         ));
     }

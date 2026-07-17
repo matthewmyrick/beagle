@@ -3,7 +3,7 @@
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
-export type Status = "investigating" | "review" | "final-review" | "finished";
+export type Status = "investigating" | "review" | "agent" | "final-review" | "finished";
 
 /** One workspace row for the sidebar. */
 export interface Workspace {

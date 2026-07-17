@@ -144,6 +144,10 @@ pub enum Status {
     /// Root cause found; the fix (usually a PR) is out for review.
     #[serde(alias = "identified")]
     Review,
+    /// Review is done — handed off to an automated agent, which polls for
+    /// this state (`beagle list --status agent`) and does the remediation
+    /// work (opens PRs, applies fixes) from its configured prompt.
+    Agent,
     /// The fix has merged — verify it actually worked via the Final
     /// Review checklist, then sign off.
     #[serde(alias = "monitoring")]
@@ -155,9 +159,10 @@ pub enum Status {
 
 impl Status {
     /// Every status, most active first.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Investigating,
         Self::Review,
+        Self::Agent,
         Self::FinalReview,
         Self::Finished,
     ];
@@ -168,6 +173,7 @@ impl Status {
         match self {
             Self::Investigating => "investigating",
             Self::Review => "review",
+            Self::Agent => "agent",
             Self::FinalReview => "final-review",
             Self::Finished => "finished",
         }
@@ -177,7 +183,7 @@ impl Status {
     /// input for compatibility.
     fn legacy_alias(self) -> Option<&'static str> {
         match self {
-            Self::Investigating => None,
+            Self::Investigating | Self::Agent => None,
             Self::Review => Some("identified"),
             Self::FinalReview => Some("monitoring"),
             Self::Finished => Some("resolved"),
@@ -195,7 +201,7 @@ impl FromStr for Status {
             .ok_or_else(|| {
                 format!(
                     "unknown status `{s}` (expected one of: investigating, review, \
-                     final-review, finished)"
+                     agent, final-review, finished)"
                 )
             })
     }

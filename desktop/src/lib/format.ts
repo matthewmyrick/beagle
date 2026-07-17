@@ -16,6 +16,7 @@ const SEVERITY_COLORS: Readonly<Record<Severity, string>> = {
 const STATUS_GLYPHS: Readonly<Record<Status, string>> = {
   investigating: "●",
   review: "◐",
+  agent: "⚙",
   "final-review": "◑",
   finished: "✔",
 };

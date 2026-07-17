@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-17
+
+### Added
+
+- New **`agent`** lifecycle status between `review` and `final-review`: a
+  hand-off state for automated remediation. An external agent polls
+  `beagle list --status agent`, does the work (opens PRs, applies fixes)
+  from its own prompt, and its merged PRs auto-advance the RCA to
+  `final-review` — the same auto-advance that already worked from
+  `review` now fires from `agent` too. Skip it entirely if you don't run
+  an agent. Filter to it in the TUI with `a` in filter mode; it shows a
+  ⚙ glyph. Recognized across the CLI, desktop, and web apps.
+
+### Migration
+
+- Adding a status variant is backward-compatible for reading (old
+  manifests have no `agent` status and load unchanged), but a manifest
+  with `status = "agent"` will show as a *broken workspace* in beagle
+  binaries older than 0.10 — update those installs. This is the same
+  version-skew behavior as any new status name.
+
 ## [0.9.0] - 2026-07-17
 
 ### Added

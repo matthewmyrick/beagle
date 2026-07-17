@@ -142,17 +142,21 @@ impl App {
         });
     }
 
-    /// `review` → `final-review` the moment every attached fix PR has
-    /// merged, per the states the background `gh` poller reports. The
-    /// manifest write is atomic and also wakes the filesystem watcher, so
-    /// other beagle instances see the transition too. Workspaces without
-    /// attached PRs never auto-advance — there is nothing to observe merge.
+    /// `review` or `agent` → `final-review` the moment every attached fix
+    /// PR has merged, per the states the background `gh` poller reports —
+    /// whether the PR was opened during review or by the agent doing the
+    /// remediation. The manifest write is atomic and also wakes the
+    /// filesystem watcher, so other beagle instances see the transition
+    /// too. Workspaces without attached PRs never auto-advance — there is
+    /// nothing to observe merge.
     pub(crate) fn advance_merged_reviews(&mut self) {
+        use crate::model::Status;
         let ready: Vec<(RcaId, String)> = self
             .rcas
             .iter()
             .filter(|rca| {
-                rca.meta.status == crate::model::Status::Review && !rca.meta.prs.is_empty()
+                matches!(rca.meta.status, Status::Review | Status::Agent)
+                    && !rca.meta.prs.is_empty()
             })
             .filter(|rca| {
                 rca.meta
