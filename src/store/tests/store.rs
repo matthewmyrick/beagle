@@ -41,9 +41,20 @@ fn corrupt_manifest_becomes_broken_entry_not_failure() {
     assert_eq!(listing.summaries.len(), 1, "the good workspace still lists");
     let names: Vec<&str> = listing.broken.iter().map(|b| b.dir_name.as_str()).collect();
     assert_eq!(names, ["bad", "husk"], "both failures visible, sorted");
+    // Reasons are compact and path-free: the sidebar row already shows the
+    // directory name and has no room for an absolute path.
     assert!(
-        listing.broken[0].reason.contains("parse"),
-        "reason says why: {}",
+        listing.broken[0].reason.starts_with("rca.toml:"),
+        "corrupt reason leads with the file, not its path: {}",
+        listing.broken[0].reason
+    );
+    assert_eq!(
+        listing.broken[1].reason,
+        "no rca.toml — not a beagle workspace"
+    );
+    assert!(
+        !listing.broken[0].reason.contains('/'),
+        "no absolute path in: {}",
         listing.broken[0].reason
     );
 }
