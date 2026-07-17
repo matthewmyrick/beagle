@@ -1,0 +1,29 @@
+---
+import { formatDate, severityColor, severityLabel } from "../lib/format";
+import type { Incident } from "../lib/rcas";
+import StatusBadge from "./StatusBadge.astro";
+
+interface Props {
+  incident: Incident;
+}
+
+const { incident } = Astro.props;
+const date = incident.publishedAt ?? incident.created;
+---
+
+<li>
+  <a class="incident-card" href={`/incidents/${incident.slug}/`}>
+    <div class="card-top">
+      <span
+        class="severity-chip"
+        style={`background:${severityColor(incident.severity)}`}
+      >
+        {severityLabel(incident.severity)}
+      </span>
+      <StatusBadge status={incident.status} />
+      <span class="card-date">{formatDate(date)}</span>
+    </div>
+    <h2>{incident.title}</h2>
+    <p class="card-lead">{incident.lead}</p>
+  </a>
+</li>

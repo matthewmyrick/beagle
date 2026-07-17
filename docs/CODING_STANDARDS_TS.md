@@ -81,3 +81,22 @@ freer, but the runtime bundle is part of the product.
 `unsafe`, pedantic clippy at `-D warnings`, `unwrap_used`/`expect_used`
 warned. Commands return `Result<_, String>` — errors are data for the
 frontend's banner, never process exits.
+
+## 8. The web app (`web/`, Astro)
+
+The public postmortem site follows the same spirit as the frontends
+above, adapted to Astro + SSG:
+
+- **Read-only and public.** The site never writes; it renders **published**
+  RCAs only (`published = true` in `rca.toml`) and only their client-safe
+  sections (Summary, Timeline, Root Cause, Impact, Resolution, Diagrams).
+  Notes, Log, and Final Review are internal and never leave the machine.
+- **Build-time only.** All `rcas/` reading, TOML parsing, and markdown
+  rendering happen in `src/lib/` during `astro build` — nothing ships to
+  the browser but static HTML/CSS. Keep it that way; this is a content
+  site, not an app.
+- **Pure `lib/`, tested.** `format`, `text`, `render` are pure and unit
+  tested with vitest; the build-time reader (`rcas.ts`) composes them.
+- **Same strictness knobs** (`strictNullChecks`, `noUncheckedIndexedAccess`,
+  `verbatimModuleSyntax`) via `astro/tsconfigs/strict`; `npm run check`
+  (prettier + `astro check` + vitest) is the gate, enforced in CI.

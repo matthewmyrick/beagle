@@ -307,3 +307,24 @@ fn skill_parses_status_install_and_default() {
     assert!(parse(&["skill", "frobnicate"]).is_err());
     assert!(parse(&["skill", "install", "extra"]).is_err());
 }
+
+#[test]
+fn publish_and_unpublish_parse_id_and_root() {
+    match parse(&["publish", "my-rca", "--root", "/r"]).expect("parse") {
+        Command::SetPublished {
+            root,
+            id,
+            published,
+        } => {
+            assert_eq!(id.as_str(), "my-rca");
+            assert!(published);
+            assert_eq!(root, Some(std::path::PathBuf::from("/r")));
+        }
+        other => panic!("wrong command: {other:?}"),
+    }
+    match parse(&["unpublish", "my-rca"]).expect("parse") {
+        Command::SetPublished { published, .. } => assert!(!published),
+        other => panic!("wrong command: {other:?}"),
+    }
+    assert!(parse(&["publish"]).is_err(), "id required");
+}

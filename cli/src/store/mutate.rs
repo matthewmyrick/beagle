@@ -216,6 +216,27 @@ impl Store {
         write_atomic(&self.workspace_dir(id).join(MANIFEST_FILE), &manifest)?;
         Ok(true)
     }
+
+    /// Publishes or unpublishes an incident: sets the `published` flag and,
+    /// when publishing, stamps `published_at` with the current time (clears
+    /// it when unpublishing). Stamps `updated` too. Returns the resulting
+    /// `published` state. Idempotent — re-publishing keeps the original
+    /// `published_at`.
+    ///
+    /// # Errors
+    /// Fails as manifest read/write does.
+    pub fn set_published(&self, id: &RcaId, published: bool) -> Result<bool> {
+        let mut meta = self.read_meta(id)?;
+        if meta.published == published {
+            return Ok(published); // no-op; keep the original published_at
+        }
+        meta.published = published;
+        meta.published_at = published.then(OffsetDateTime::now_utc);
+        meta.updated = Some(OffsetDateTime::now_utc());
+        let manifest = toml::to_string_pretty(&meta)?;
+        write_atomic(&self.workspace_dir(id).join(MANIFEST_FILE), &manifest)?;
+        Ok(published)
+    }
 }
 
 /// Builds a fresh manifest for `scaffold`, stamping `created` with the
@@ -231,6 +252,8 @@ pub fn new_meta(title: String, severity: Severity) -> RcaMeta {
         systems: Vec::new(),
         tags: Vec::new(),
         prs: Vec::new(),
+        published: false,
+        published_at: None,
     }
 }
 

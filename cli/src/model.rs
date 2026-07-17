@@ -241,6 +241,21 @@ pub struct RcaMeta {
     /// available. Omitted from the manifest while empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub prs: Vec<String>,
+    /// Whether this incident is published to the public web app. Opt-in
+    /// per incident (`beagle publish`); the static site only includes
+    /// flagged RCAs, and only their client-safe sections. Defaults to
+    /// `false` and is omitted from the manifest while unset, so existing
+    /// workspaces and internal-only incidents stay private.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub published: bool,
+    /// When the incident was published, if it is. Stamped by
+    /// `beagle publish`; shown as the "published" date on the public page.
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub published_at: Option<OffsetDateTime>,
 }
 
 /// A workspace as listed in the sidebar: identity plus manifest, no section

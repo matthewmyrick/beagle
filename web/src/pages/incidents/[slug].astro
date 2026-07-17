@@ -1,0 +1,81 @@
+---
+import StatusBadge from "../../components/StatusBadge.astro";
+import Base from "../../layouts/Base.astro";
+import { formatDate, isResolved, severityColor, severityLabel } from "../../lib/format";
+import type { Incident } from "../../lib/rcas";
+import { getPublishedIncidents } from "../../lib/rcas";
+
+export function getStaticPaths() {
+  return getPublishedIncidents().map((incident) => ({
+    params: { slug: incident.slug },
+    props: { incident },
+  }));
+}
+
+interface Props {
+  incident: Incident;
+}
+
+const { incident } = Astro.props;
+const date = incident.publishedAt ?? incident.created;
+const dateLabel = isResolved(incident.status) ? "Resolved" : "Reported";
+---
+
+<Base title={incident.title} description={incident.lead}>
+  <article class="wrap">
+    <div class="incident-hero">
+      <a class="back-link" href="/">← All incidents</a>
+      <div class="card-top">
+        <span
+          class="severity-chip"
+          style={`background:${severityColor(incident.severity)}`}
+        >
+          {severityLabel(incident.severity)}
+        </span>
+        <StatusBadge status={incident.status} />
+      </div>
+      <h1>{incident.title}</h1>
+      <div class="incident-meta">
+        <span>{dateLabel} {formatDate(date)}</span>
+      </div>
+      {
+        incident.systems.length > 0 && (
+          <div class="incident-systems">
+            {incident.systems.map((system) => (
+              <span class="system-tag">{system}</span>
+            ))}
+          </div>
+        )
+      }
+    </div>
+
+    {
+      incident.summaryHtml && (
+        <div class="incident-summary prose" set:html={incident.summaryHtml} />
+      )
+    }
+
+    {
+      incident.sections.map((section) => (
+        <section class="section">
+          <h2>{section.title}</h2>
+          <div class="prose" set:html={section.html} />
+        </section>
+      ))
+    }
+
+    {
+      incident.diagrams.length > 0 && (
+        <section class="section">
+          <h2>Diagrams</h2>
+          {incident.diagrams.map((diagram) => (
+            <figure class="diagram">
+              <figcaption>{diagram.name}</figcaption>
+              <pre set:html={diagram.html} />
+            </figure>
+          ))}
+        </section>
+      )
+    }
+  </article>
+</Base>

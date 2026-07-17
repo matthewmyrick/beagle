@@ -1,0 +1,15 @@
+---
+import { isResolved, statusLabel } from "../lib/format";
+
+interface Props {
+  status: string;
+}
+
+const { status } = Astro.props;
+const resolved = isResolved(status);
+---
+
+<span class={`badge ${resolved ? "badge-resolved" : "badge-ongoing"}`}>
+  <span class="badge-dot"></span>
+  {statusLabel(status)}
+</span>
