@@ -30,12 +30,19 @@ use style::{
 
 pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     let [main, status_bar] = vertical(frame.area(), &[Constraint::Min(0), Constraint::Length(1)]);
+    let sidebar_width = if app.sidebar_collapsed() {
+        0
+    } else {
+        SIDEBAR_WIDTH
+    };
     let [sidebar, content] = horizontal(
         main,
-        &[Constraint::Length(SIDEBAR_WIDTH), Constraint::Min(0)],
+        &[Constraint::Length(sidebar_width), Constraint::Min(0)],
     );
 
-    draw_sidebar(frame, app, sidebar);
+    if !app.sidebar_collapsed() {
+        draw_sidebar(frame, app, sidebar);
+    }
     draw_workspace(frame, app, content);
     draw_status_bar(frame, app, status_bar);
 
@@ -435,7 +442,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 "  j/k select · enter open · ←/→ tabs · f filter · / search · T toolbox · R related · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
-                "  j/k scroll · ←/→ tabs · / search · h/l pan · F follow · o links · c copy · b back · ? help · Q quit"
+                "  j/k scroll · ←/→ tabs · / search · h/l pan · F follow · s sidebar · o links · c copy · b back · ? help · Q quit"
             }
         },
         Style::default().fg(Color::DarkGray),

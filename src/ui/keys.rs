@@ -66,6 +66,7 @@ impl App {
                 self.focus = Focus::List;
             }
             KeyCode::Char('b') => self.focus = Focus::List,
+            KeyCode::Char('s') => self.toggle_sidebar(),
             KeyCode::Char('c') => self.copy_current_tab(),
             KeyCode::Char('C') => self.copy_workspace(),
             KeyCode::Char('e') => self.export_current(),
@@ -107,7 +108,26 @@ impl App {
                 Focus::Content => self.handle_content_key(key.code),
             },
         }
+        // Invariant: the sidebar is never collapsed while the list has
+        // focus — `b`, esc, `f`, and every other back-to-list path would
+        // otherwise leave the selection cursor invisible.
+        if self.focus == Focus::List {
+            self.sidebar_collapsed = false;
+        }
         Flow::Continue
+    }
+
+    /// `s`: collapse the sidebar for a full-width content pane, or bring
+    /// it back. Collapsing moves focus to the content — a hidden list
+    /// cannot hold the cursor.
+    fn toggle_sidebar(&mut self) {
+        self.sidebar_collapsed = !self.sidebar_collapsed;
+        if self.sidebar_collapsed {
+            self.focus = Focus::Content;
+            self.status = Some("sidebar hidden — s or b brings it back".to_owned());
+        } else {
+            self.status = Some("sidebar shown".to_owned());
+        }
     }
 
     /// Keystrokes in filter mode. Facets first: single keys toggle status

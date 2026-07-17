@@ -363,3 +363,48 @@ fn opening_an_incident_consumes_the_filter_and_restores_the_list() {
         "selection stays on the incident you opened"
     );
 }
+
+#[test]
+fn s_collapses_the_sidebar_and_focuses_content() {
+    let mut app = app_with(1);
+    assert!(!app.sidebar_collapsed());
+    press(&mut app, KeyCode::Char('s'));
+    assert!(app.sidebar_collapsed());
+    assert_eq!(
+        app.focus(),
+        Focus::Content,
+        "a hidden list cannot hold the cursor"
+    );
+    press(&mut app, KeyCode::Char('s'));
+    assert!(!app.sidebar_collapsed(), "s toggles back");
+    assert_eq!(
+        app.focus(),
+        Focus::Content,
+        "expanding does not steal focus"
+    );
+}
+
+#[test]
+fn returning_focus_to_the_list_expands_the_sidebar() {
+    // Every back-to-list path must bring the sidebar back: b, esc, f.
+    for code in [KeyCode::Char('b'), KeyCode::Esc, KeyCode::Char('f')] {
+        let mut app = app_with(1);
+        press(&mut app, KeyCode::Char('s'));
+        assert!(app.sidebar_collapsed());
+        press(&mut app, code);
+        assert_eq!(app.focus(), Focus::List, "{code:?} should focus the list");
+        assert!(
+            !app.sidebar_collapsed(),
+            "{code:?} should expand the sidebar"
+        );
+    }
+}
+
+#[test]
+fn collapsing_on_an_empty_store_does_not_panic() {
+    let mut app = app_with(0);
+    press(&mut app, KeyCode::Char('s'));
+    assert!(app.sidebar_collapsed());
+    press(&mut app, KeyCode::Esc);
+    assert!(!app.sidebar_collapsed());
+}
