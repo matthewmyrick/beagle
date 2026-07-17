@@ -235,7 +235,7 @@ pub(super) fn draw_toolbox(frame: &mut Frame, app: &mut App, area: Rect) {
 pub(super) fn draw_finder(frame: &mut Frame, app: &App, area: Rect) {
     let Some(finder) = app.finder() else { return };
     let width = area.width.saturating_sub(6).clamp(30, 110);
-    let max_height = area.height.saturating_sub(4).min(30).max(3);
+    let max_height = area.height.saturating_sub(4).clamp(3, 30);
     let height = u16::try_from(finder.matches.len())
         .unwrap_or(u16::MAX)
         .saturating_add(2) // the borders carry the title and the prompt
