@@ -1,12 +1,14 @@
-// Composition root: wires the data hook, theme, filter, and keybindings
-// into the layout. Presentation lives in components/; logic in lib/ and
-// hooks/.
+// Composition root: wires the data hook, theme, filter, finder, and
+// keybindings into the layout. Presentation lives in components/; logic
+// in lib/ and hooks/.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 
+import { ArchiveButton } from "./components/ArchiveButton";
 import { Brand } from "./components/Brand";
 import { DiagramView } from "./components/DiagramView";
+import { FinderOverlay } from "./components/FinderOverlay";
 import { HelpOverlay } from "./components/HelpOverlay";
 import { SectionView } from "./components/SectionView";
 import { Sidebar } from "./components/Sidebar";
@@ -16,6 +18,7 @@ import { useIncidents } from "./hooks/useIncidents";
 import { useKeybindings } from "./hooks/useKeybindings";
 import { useTheme } from "./hooks/useTheme";
 import { filterWorkspaces } from "./lib/filter";
+import type { CorpusLine } from "./lib/finder";
 import { DIAGRAMS_TAB } from "./lib/sections";
 import "./App.css";
 
@@ -25,9 +28,11 @@ export default function App(): JSX.Element {
   const [filter, setFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [helpVisible, setHelpVisible] = useState(false);
+  const [finderVisible, setFinderVisible] = useState(false);
   const filterRef = useRef<HTMLInputElement | null>(null);
 
-  const workspaces = incidents.listing?.workspaces ?? [];
+  const { listing } = incidents;
+  const workspaces = useMemo(() => listing?.workspaces ?? [], [listing]);
   const visible = filterWorkspaces(workspaces, filter, showArchived);
   const hiddenArchived = showArchived ? 0 : workspaces.filter((w) => w.archived).length;
 
@@ -44,6 +49,9 @@ export default function App(): JSX.Element {
     toggleHelp: useCallback(() => {
       setHelpVisible((current) => !current);
     }, []),
+    openFinder: useCallback(() => {
+      setFinderVisible(true);
+    }, []),
   });
   useKeybindings({
     onAction,
@@ -52,6 +60,18 @@ export default function App(): JSX.Element {
       setHelpVisible(false);
     }, []),
   });
+
+  const handleJump = useCallback(
+    (target: CorpusLine) => {
+      setFinderVisible(false);
+      if (workspaces.find((w) => w.id === target.id)?.archived === true) {
+        setShowArchived(true);
+      }
+      incidents.onSelect(target.id);
+      incidents.selectTab(target.file);
+    },
+    [workspaces, incidents],
+  );
 
   const { selected } = incidents;
   return (
@@ -76,6 +96,11 @@ export default function App(): JSX.Element {
                 <h1>{selected.title}</h1>
                 <p className="incident-meta">
                   {selected.status} · {selected.severity} · {selected.systems.join(", ")}
+                  <ArchiveButton
+                    workspace={selected}
+                    onDone={incidents.reload}
+                    onError={incidents.onError}
+                  />
                 </p>
               </>
             ) : null}
@@ -107,6 +132,15 @@ export default function App(): JSX.Element {
           onClose={() => {
             setHelpVisible(false);
           }}
+        />
+      ) : null}
+      {finderVisible ? (
+        <FinderOverlay
+          onJump={handleJump}
+          onClose={() => {
+            setFinderVisible(false);
+          }}
+          onError={incidents.onError}
         />
       ) : null}
     </main>
