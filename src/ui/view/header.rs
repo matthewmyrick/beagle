@@ -57,12 +57,33 @@ pub(super) fn draw_banner(frame: &mut Frame, area: Rect) {
     frame.render_widget(Paragraph::new(lines), banner_rect(area));
 }
 
+/// One tab label's position in the flowed tab bar, relative to its top
+/// left: which wrapped line it landed on, its starting column, and its
+/// width. The mouse handler turns these into clickable screen rects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct TabHit {
+    /// The tab this label selects.
+    pub tab: Tab,
+    /// Zero-based wrapped line inside the tab bar.
+    pub line: u16,
+    /// Starting column, relative to the tab bar's left edge.
+    pub x: u16,
+    /// Label width in columns.
+    pub width: u16,
+}
+
 /// Lays the eight tab labels out left to right, flowing onto additional
 /// lines when the width runs out — never truncating a label. `unread[i]`
 /// marks tab `i` with a dot: its file changed on disk since last viewed.
-pub(super) fn flow_tabs(selected: Tab, width: u16, unread: &[bool]) -> Vec<Line<'static>> {
+/// Also returns each label's hit box for mouse routing.
+pub(super) fn flow_tabs(
+    selected: Tab,
+    width: u16,
+    unread: &[bool],
+) -> (Vec<Line<'static>>, Vec<TabHit>) {
     let width = usize::from(width.max(1));
     let mut lines = Vec::new();
+    let mut hits = Vec::new();
     let mut spans: Vec<Span<'static>> = Vec::new();
     let mut used = 0usize;
 
@@ -92,13 +113,19 @@ pub(super) fn flow_tabs(selected: Tab, width: u16, unread: &[bool]) -> Vec<Line<
             spans.push(Span::styled("·", Style::default().fg(Color::DarkGray)));
             used += 1;
         }
+        hits.push(TabHit {
+            tab: *tab,
+            line: u16::try_from(lines.len()).unwrap_or(u16::MAX),
+            x: u16::try_from(used).unwrap_or(u16::MAX),
+            width: u16::try_from(label_width).unwrap_or(u16::MAX),
+        });
         spans.push(Span::styled(label, style));
         used += label_width;
     }
     if !spans.is_empty() {
         lines.push(Line::from(spans));
     }
-    lines
+    (lines, hits)
 }
 
 /// An investigating agent quieter than this is worth a yellow glance —
