@@ -253,13 +253,29 @@ impl Store {
                 }
                 Err(e) => listing.broken.push(BrokenWorkspace {
                     dir_name,
-                    reason: e.to_string(),
+                    reason: Self::broken_reason(&e),
                 }),
             }
         }
         listing.summaries.sort_by_key(RcaSummary::sort_key);
         listing.broken.sort_by(|a, b| a.dir_name.cmp(&b.dir_name));
         Ok(listing)
+    }
+
+    /// A compact, sidebar-friendly reason for a workspace that failed to
+    /// load. The broken row already shows the directory name, so the
+    /// manifest's absolute path — which is all a narrow sidebar would have
+    /// room for — is dropped in favor of what actually went wrong.
+    fn broken_reason(e: &Error) -> String {
+        match e {
+            Error::Io { source, .. } if source.kind() == std::io::ErrorKind::NotFound => {
+                format!("no {MANIFEST_FILE} — not a beagle workspace")
+            }
+            Error::ParseManifest { source, .. } => {
+                format!("{MANIFEST_FILE}: {}", source.message())
+            }
+            _ => e.to_string(),
+        }
     }
 
     fn load_summary(dir_name: &str, dir: &Path) -> Result<RcaSummary> {
