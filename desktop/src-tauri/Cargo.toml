@@ -1,6 +1,6 @@
 [package]
 name = "beagle-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Beagle desktop app: a native viewer for RCA workspaces"
 authors = ["Matthew Myrick"]
 license = "MIT"
