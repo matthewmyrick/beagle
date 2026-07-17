@@ -17,6 +17,7 @@ export interface ActionContext {
   toggleArchived: () => void;
   toggleTheme: () => void;
   toggleHelp: () => void;
+  openFinder: () => void;
 }
 
 export function useActions(
@@ -31,6 +32,7 @@ export function useActions(
     toggleArchived,
     toggleTheme,
     toggleHelp,
+    openFinder,
   } = context;
 
   return useCallback(
@@ -71,6 +73,9 @@ export function useActions(
         case "toggle-help":
           toggleHelp();
           break;
+        case "open-finder":
+          openFinder();
+          break;
       }
     },
     [
@@ -82,6 +87,7 @@ export function useActions(
       toggleArchived,
       toggleTheme,
       toggleHelp,
+      openFinder,
     ],
   );
 }

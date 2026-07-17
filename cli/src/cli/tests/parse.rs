@@ -271,3 +271,15 @@ fn list_parses_the_archived_flag() {
         other => panic!("wrong command: {other:?}"),
     }
 }
+
+#[test]
+fn unarchive_parses_id_and_root() {
+    match parse(&["unarchive", "old-rca", "--root", "/r"]).expect("parse") {
+        Command::Unarchive { root, id } => {
+            assert_eq!(id.as_str(), "old-rca");
+            assert_eq!(root, Some(std::path::PathBuf::from("/r")));
+        }
+        other => panic!("wrong command: {other:?}"),
+    }
+    assert!(parse(&["unarchive"]).is_err(), "id is required");
+}

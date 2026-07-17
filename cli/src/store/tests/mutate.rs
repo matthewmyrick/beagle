@@ -228,3 +228,26 @@ fn scaffold_refuses_the_archive_slug_and_archived_collisions() {
         .scaffold(&id, &test_meta("Again", Severity::Low))
         .expect_err("archived slug still occupied");
 }
+
+#[test]
+fn unarchive_restores_a_workspace_and_round_trips() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("open store");
+    let id = test_id("back-rca");
+    store
+        .scaffold(&id, &test_meta("Back", Severity::Low))
+        .expect("scaffold");
+    store.archive(&id, true).expect("archive");
+
+    let dest = store.unarchive(&id).expect("unarchive");
+    assert!(dest.ends_with("rcas/back-rca"));
+    let listing = store.list().expect("list");
+    assert_eq!(listing.summaries.len(), 1);
+    assert!(!listing.summaries[0].archived);
+
+    let err = store.unarchive(&id).expect_err("not archived anymore");
+    assert!(err.to_string().contains("not archived"), "got: {err}");
+    let missing = test_id("never-was");
+    let err = store.unarchive(&missing).expect_err("missing");
+    assert!(err.to_string().contains("no workspace"), "got: {err}");
+}

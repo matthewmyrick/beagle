@@ -162,6 +162,35 @@ impl Store {
         Ok(dest)
     }
 
+    /// Moves an archived workspace back to the active list — the inverse
+    /// of [`Self::archive`]. No status requirement: un-archiving is always
+    /// safe, it only makes the workspace visible again.
+    ///
+    /// # Errors
+    /// [`Error::Tool`] when the workspace is missing or not archived;
+    /// [`Error::AlreadyExists`] when an active workspace already holds
+    /// this slug; [`Error::Io`] on the move itself.
+    pub fn unarchive(&self, id: &RcaId) -> Result<PathBuf> {
+        let source = self.archived_dir(id);
+        if !source.join(MANIFEST_FILE).exists() {
+            let message = if self.active_dir(id).join(MANIFEST_FILE).exists() {
+                format!("{id} is not archived")
+            } else {
+                format!("no workspace `{id}` under this root")
+            };
+            return Err(Error::Tool {
+                tool: "unarchive",
+                message,
+            });
+        }
+        let dest = self.active_dir(id);
+        if dest.exists() {
+            return Err(Error::AlreadyExists(id.to_string()));
+        }
+        fs::rename(&source, &dest).map_err(|e| Error::io(&source, e))?;
+        Ok(dest)
+    }
+
     /// Attaches a remediation PR URL to the workspace manifest, stamping
     /// `updated`. Idempotent: re-attaching an existing URL is a no-op and
     /// returns `false`.

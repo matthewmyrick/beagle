@@ -54,3 +54,14 @@ pub struct Listing {
     pub broken: Vec<Broken>,
     pub warnings: Vec<String>,
 }
+
+/// One searchable line for the global finder: where it lives and what it
+/// says. Title entries use the summary file and line 0.
+#[derive(Debug, Clone, Serialize)]
+pub struct CorpusLine {
+    pub id: String,
+    pub title: String,
+    pub file: String,
+    pub line: usize,
+    pub text: String,
+}

@@ -20,7 +20,10 @@ pub fn run() {
             commands::list_workspaces,
             commands::read_section,
             commands::list_diagrams,
-            commands::read_diagram
+            commands::read_diagram,
+            commands::archive_workspace,
+            commands::unarchive_workspace,
+            commands::search_corpus
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -111,3 +111,63 @@ pub fn read_diagram(id: &str, name: &str) -> Result<Option<String>, String> {
         .map_err(|e| e.to_string())?
         .map(|content| beagle::ansi::strip(&content)))
 }
+
+/// Archives a workspace (requires `finished`, like the CLI without
+/// `--force` — the error message explains the sign-off path).
+#[tauri::command]
+pub fn archive_workspace(id: &str) -> Result<String, String> {
+    let store = open_store()?;
+    store
+        .archive(&parse_id(id)?, false)
+        .map(|dest| dest.display().to_string())
+        .map_err(|e| e.to_string())
+}
+
+/// Moves an archived workspace back to the active list.
+#[tauri::command]
+pub fn unarchive_workspace(id: &str) -> Result<String, String> {
+    let store = open_store()?;
+    store
+        .unarchive(&parse_id(id)?)
+        .map(|dest| dest.display().to_string())
+        .map_err(|e| e.to_string())
+}
+
+/// Every non-blank section line of every workspace (archived included)
+/// plus one title entry per workspace — the `\` finder's corpus. Long
+/// lines are capped so a pasted log can't bloat the IPC payload.
+#[tauri::command]
+pub fn search_corpus() -> Result<Vec<dto::CorpusLine>, String> {
+    const MAX_LINE_CHARS: usize = 240;
+    let store = open_store()?;
+    let listing = store.list_all().map_err(|e| e.to_string())?;
+    let mut corpus = Vec::new();
+    for rca in &listing.summaries {
+        corpus.push(dto::CorpusLine {
+            id: rca.id.to_string(),
+            title: rca.meta.title.clone(),
+            file: SectionKind::Summary.file_name().to_owned(),
+            line: 0,
+            text: rca.meta.title.clone(),
+        });
+        for kind in SectionKind::ALL {
+            let Ok(Some(content)) = store.read_section(&rca.id, kind) else {
+                continue;
+            };
+            for (line, raw) in content.lines().enumerate() {
+                let text = raw.trim();
+                if text.is_empty() {
+                    continue;
+                }
+                corpus.push(dto::CorpusLine {
+                    id: rca.id.to_string(),
+                    title: rca.meta.title.clone(),
+                    file: kind.file_name().to_owned(),
+                    line,
+                    text: text.chars().take(MAX_LINE_CHARS).collect(),
+                });
+            }
+        }
+    }
+    Ok(corpus)
+}

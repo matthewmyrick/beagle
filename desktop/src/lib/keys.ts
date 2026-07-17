@@ -11,6 +11,7 @@ export type Action =
   | "focus-filter"
   | "toggle-archived"
   | "toggle-theme"
+  | "open-finder"
   | "toggle-help";
 
 export interface Binding {
@@ -34,6 +35,11 @@ export const BINDINGS: readonly Binding[] = [
   },
   { label: "a", describe: "show / hide archived incidents", action: "toggle-archived" },
   { label: "t", describe: "toggle light / dark theme", action: "toggle-theme" },
+  {
+    label: "\\",
+    describe: "find everywhere: fuzzy across all incidents",
+    action: "open-finder",
+  },
   { label: "?", describe: "this help (any key closes)", action: "toggle-help" },
 ];
 
@@ -59,6 +65,8 @@ export function actionForKey(key: string): { action: Action; tabIndex?: number }
       return { action: "toggle-archived" };
     case "t":
       return { action: "toggle-theme" };
+    case "\\":
+      return { action: "open-finder" };
     case "?":
       return { action: "toggle-help" };
     default: {

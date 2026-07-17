@@ -86,6 +86,12 @@ fn run(command: Command) -> Result<(), Error> {
             archived,
         } => run_list(root, status, severity, archived),
         Command::Archive { root, id, force } => run_archive(root, &id, force),
+        Command::Unarchive { root, id } => {
+            let store = Store::open(&effective_root(root)?)?;
+            let dest = store.unarchive(&id)?;
+            println!("unarchived {id} → {}", dest.display());
+            Ok(())
+        }
         Command::SetStatus { root, id, status } => {
             let store = Store::open(&effective_root(root)?)?;
             store.set_status(&id, status)?;

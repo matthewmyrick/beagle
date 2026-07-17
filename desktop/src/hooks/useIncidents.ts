@@ -19,6 +19,7 @@ interface LoadedSection {
 
 export interface Incidents {
   listing: Listing | null;
+  reload: () => void;
   error: string | null;
   onError: (message: string) => void;
   selectedId: string | null;
@@ -38,7 +39,7 @@ export function useIncidents(): Incidents {
   const [activeFile, setActiveFile] = useState<string>(FIRST_SECTION);
   const [section, setSection] = useState<LoadedSection | null>(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     listWorkspaces()
       .then((result) => {
         setListing(result);
@@ -48,6 +49,10 @@ export function useIncidents(): Incidents {
         setError(String(cause));
       });
   }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   useEffect(() => {
     if (selectedId === null || activeFile === DIAGRAMS_TAB.file) {
@@ -92,6 +97,7 @@ export function useIncidents(): Incidents {
 
   return {
     listing,
+    reload,
     error,
     onError,
     selectedId,
