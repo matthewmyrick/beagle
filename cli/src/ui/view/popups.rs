@@ -228,12 +228,18 @@ pub(super) fn draw_toolbox(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 /// The `\` global finder: prompt on top, ranked results under it, matched
-/// characters highlighted. Centered and large — it's a discovery surface,
-/// not a status line.
+/// characters highlighted. Centered, and sized to its content: a slim
+/// bar while the query is empty, one row per match as results arrive,
+/// capped well short of the full screen — the incident stays visible
+/// behind it.
 pub(super) fn draw_finder(frame: &mut Frame, app: &App, area: Rect) {
     let Some(finder) = app.finder() else { return };
     let width = area.width.saturating_sub(6).clamp(30, 110);
-    let height = area.height.saturating_sub(4).clamp(8, 30);
+    let max_height = area.height.saturating_sub(4).clamp(3, 30);
+    let height = u16::try_from(finder.matches.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(2) // the borders carry the title and the prompt
+        .clamp(3, max_height);
     let rect = center(area, width, height);
     let inner_width = usize::from(width.saturating_sub(2));
 
@@ -273,11 +279,16 @@ pub(super) fn draw_finder(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    let block = Block::default()
-        .title(format!(
-            " find everywhere ({} lines) — type to filter · ↑/↓ move · enter jump · esc ",
+    let title = if finder.query.is_empty() {
+        " find everywhere — type to search · esc closes ".to_owned()
+    } else {
+        format!(
+            " find everywhere ({} matches) — ↑/↓ move · enter jump · esc ",
             finder.matches.len()
-        ))
+        )
+    };
+    let block = Block::default()
+        .title(title)
         .title_alignment(Alignment::Center)
         .title_bottom(Line::from(format!(" \\ {}▌ ", finder.query)).left_aligned())
         .borders(Borders::ALL)

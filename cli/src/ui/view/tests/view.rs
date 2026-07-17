@@ -133,3 +133,62 @@ fn rendered_banner_rows_are_column_aligned() {
         assert_eq!(segment, expected, "banner row {y} misaligned:\n{row}");
     }
 }
+
+/// The finder popup sizes to its matches: a slim bar while the query is
+/// empty, growing a row per hit once typing starts.
+#[test]
+fn finder_popup_grows_with_matches() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    fn popup_height(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> u16 {
+        let buffer = terminal.backend().buffer();
+        let mut top = None;
+        for y in 0..40u16 {
+            let row: String = (0..120u16).map(|x| buffer[(x, y)].symbol()).collect();
+            if top.is_none() && row.contains("find everywhere") {
+                top = Some(y);
+            } else if let Some(t) = top {
+                // First bottom-left rounded corner after the top border
+                // closes the popup.
+                if row.contains('╰') {
+                    return y - t + 1;
+                }
+            }
+        }
+        0
+    }
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = crate::store::Store::open(tmp.path()).expect("store");
+    for i in 0..4 {
+        let id = crate::model::RcaId::new(format!("grow-{i}")).expect("id");
+        store
+            .scaffold(
+                &id,
+                &crate::store::new_meta(format!("Grow case {i}"), Severity::Low),
+            )
+            .expect("scaffold");
+    }
+    let mut app = App::new(store).expect("app");
+    app.handle_key(KeyEvent::new(KeyCode::Char('\\'), KeyModifiers::NONE));
+
+    let backend = ratatui::backend::TestBackend::new(120, 40);
+    let mut terminal = ratatui::Terminal::new(backend).expect("terminal");
+
+    terminal.draw(|frame| draw(frame, &mut app)).expect("draw");
+    let empty_height = popup_height(&terminal);
+    assert!(
+        (2..=4).contains(&empty_height),
+        "empty finder is a slim bar, got {empty_height} rows"
+    );
+
+    for c in "grow".chars() {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    terminal.draw(|frame| draw(frame, &mut app)).expect("draw");
+    let typed_height = popup_height(&terminal);
+    assert!(
+        typed_height > empty_height,
+        "matches grow the popup: {typed_height} vs {empty_height}"
+    );
+}

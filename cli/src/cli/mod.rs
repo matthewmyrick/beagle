@@ -29,6 +29,8 @@ USAGE:
                   [--root <dir>]            rcas/archive/ (kept, but out of
                                             the sidebar; --force skips the
                                             finished-status check)
+    beagle unarchive <id> [--root <dir>]  move an archived RCA back to the
+                                            active list
     beagle status <id> <status>           set a workspace's status; a running
                   [--root <dir>]            TUI picks the change up live
                                             (investigating|review|final-review|finished)
@@ -98,6 +100,13 @@ pub enum Command {
         id: RcaId,
         /// Skip the finished-status check (`--force`).
         force: bool,
+    },
+    /// `beagle unarchive`: move an archived workspace back.
+    Unarchive {
+        /// Explicit `--root`, if given.
+        root: Option<PathBuf>,
+        /// The workspace slug.
+        id: RcaId,
     },
     /// `beagle status`: set a workspace's status.
     SetStatus {
@@ -199,6 +208,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
         }
         Some("list") => subcommands::parse_list(&mut args, root),
         Some("archive") => subcommands::parse_archive(&mut args, root),
+        Some("unarchive") => subcommands::parse_unarchive(&mut args, root),
         Some("status") => subcommands::parse_status(&mut args, root),
         Some("log") => subcommands::parse_log(&mut args, root),
         Some("pr") => subcommands::parse_pr(&mut args, root),

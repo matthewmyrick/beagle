@@ -165,3 +165,25 @@ fn diagrams_list_sorted_and_missing_dir_is_empty() {
     fs::create_dir_all(store.workspace_dir(&no_dir)).expect("mkdir");
     assert!(store.list_diagrams(&no_dir).expect("empty").is_empty());
 }
+
+#[test]
+fn discover_root_walks_up_to_the_nearest_rcas() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = tmp.path();
+    std::fs::create_dir_all(root.join("rcas")).expect("rcas");
+    let nested = root.join("cli").join("src");
+    std::fs::create_dir_all(&nested).expect("nested");
+
+    assert_eq!(crate::store::discover_root(&nested), root);
+    assert_eq!(crate::store::discover_root(root), root);
+
+    let elsewhere = tmp.path().join("no-rcas-here");
+    std::fs::create_dir_all(&elsewhere).expect("dir");
+    // tmp root has rcas/, so even this walks up to it — build an isolated
+    // tree to assert the fallback.
+    let isolated = tempfile::tempdir().expect("tempdir");
+    assert_eq!(
+        crate::store::discover_root(isolated.path()),
+        isolated.path()
+    );
+}

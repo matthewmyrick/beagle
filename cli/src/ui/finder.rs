@@ -200,21 +200,11 @@ impl App {
     }
 }
 
-/// Re-ranks the corpus against the query. An empty query lists the corpus
-/// in natural order (sidebar order, tab order, line order) so the popup is
-/// useful the moment it opens.
+/// Re-ranks the corpus against the query. An empty query matches nothing —
+/// the popup opens quiet and fills as you type.
 fn rescore(finder: &mut Finder) {
     if finder.query.is_empty() {
-        finder.matches = finder
-            .corpus
-            .iter()
-            .enumerate()
-            .take(MAX_MATCHES)
-            .map(|(entry, _)| FinderMatch {
-                entry,
-                positions: Vec::new(),
-            })
-            .collect();
+        finder.matches = Vec::new();
     } else {
         let mut scored: Vec<(i32, FinderMatch)> = finder
             .corpus
