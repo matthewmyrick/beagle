@@ -245,6 +245,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
             "e",
             "export RCA to exports/<id>.md (frontmatter + all tabs)",
         ),
+        ("E", "open this tab's file in your editor"),
         ("T", "toolbox: toolbox.md + systems/ context"),
         ("o", "links: open attached PRs / URLs on this tab"),
         ("R", "related incidents (shared systems/tags); enter jumps"),

@@ -6,11 +6,15 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{App, Focus, Pane, Tab};
 
-/// Whether the key loop should keep running.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// What the key loop should do next. `Edit` carries the file to open —
+/// state transitions stay pure; the event loop owns the terminal and does
+/// the suspend/spawn/restore dance.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Flow {
     Continue,
     Quit,
+    /// Suspend the TUI and open this file in the user's editor.
+    Edit(std::path::PathBuf),
 }
 
 impl App {
@@ -68,6 +72,11 @@ impl App {
             KeyCode::Char('b') => self.focus = Focus::List,
             KeyCode::Char('s') => self.toggle_sidebar(),
             KeyCode::Char('a') => self.toggle_archived(),
+            KeyCode::Char('E') => {
+                if let Some(flow) = self.edit_request() {
+                    return flow;
+                }
+            }
             KeyCode::Char('c') => self.copy_current_tab(),
             KeyCode::Char('C') => self.copy_workspace(),
             KeyCode::Char('e') => self.export_current(),
@@ -116,6 +125,34 @@ impl App {
             self.sidebar_collapsed = false;
         }
         Flow::Continue
+    }
+
+    /// `E`: the file behind the current tab, to open in the user's editor.
+    /// Section tabs edit their markdown file (created by the editor if the
+    /// section doesn't exist yet); the Diagrams tab edits the current
+    /// diagram. `None` (with a status message) when there is nothing to
+    /// edit.
+    fn edit_request(&mut self) -> Option<Flow> {
+        let Some(rca) = self.selected_rca() else {
+            self.status = Some("no incident selected — nothing to edit".to_owned());
+            return None;
+        };
+        let id = rca.id.clone();
+        if let Some(kind) = self.tab.section() {
+            let path = self.store.workspace_dir(&id).join(kind.file_name());
+            return Some(Flow::Edit(path));
+        }
+        // Diagrams tab: edit the diagram currently on screen.
+        match self.store.list_diagrams(&id) {
+            Ok(diagrams) if !diagrams.is_empty() => {
+                let index = self.diagram_index.min(diagrams.len() - 1);
+                Some(Flow::Edit(diagrams[index].path.clone()))
+            }
+            _ => {
+                self.status = Some("no diagram to edit — add one under diagrams/ first".to_owned());
+                None
+            }
+        }
     }
 
     /// `a`: toggle archived incidents into or out of the list, keeping the

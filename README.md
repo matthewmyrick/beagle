@@ -127,8 +127,9 @@ stacking + toggling) · `F` follow (tail -f) · `s` collapse/expand the
 sidebar · `a` show/hide archived · `T` toolbox ·
 `o` open links/PRs · `R` related incidents · `V` sign off final-review · `S` settings ·
 `c` copy tab / `C` copy whole RCA (pbcopy or OSC 52) · `e` export to
-`exports/<slug>.md` · `n/p` cycle diagrams · `h/l` pan diagrams · `r`
-reload · `?` help · `Q` / `ctrl-c` quit. The mouse works too: the wheel
+`exports/<slug>.md` · `E` open this tab's file in your editor (config
+`editor` → `$VISUAL` → `$EDITOR` → vim) · `n/p` cycle diagrams · `h/l`
+pan diagrams · `r` reload · `?` help · `Q` / `ctrl-c` quit. The mouse works too: the wheel
 scrolls whatever is under the cursor, click selects an incident,
 switches tabs, or focuses the content pane — keys stay primary.
 

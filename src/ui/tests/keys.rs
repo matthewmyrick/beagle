@@ -430,3 +430,53 @@ fn a_toggles_archived_incidents_into_the_list() {
     press(&mut app, KeyCode::Char('a'));
     assert_eq!(app.visible_len(), 1, "a hides them again");
 }
+
+#[test]
+fn shift_e_requests_an_edit_of_the_current_tabs_file() {
+    let mut app = app_with(1);
+    match press(&mut app, KeyCode::Char('E')) {
+        Flow::Edit(path) => assert!(
+            path.ends_with("rca-0/summary.md"),
+            "summary tab edits summary.md: {path:?}"
+        ),
+        other => panic!("expected Flow::Edit, got {other:?}"),
+    }
+
+    press(&mut app, KeyCode::Char('9')); // Log tab
+    match press(&mut app, KeyCode::Char('E')) {
+        Flow::Edit(path) => assert!(path.ends_with("rca-0/log.md")),
+        other => panic!("expected Flow::Edit, got {other:?}"),
+    }
+}
+
+#[test]
+fn shift_e_on_an_empty_diagram_tab_or_empty_store_stays_put() {
+    let mut app = app_with(1);
+    press(&mut app, KeyCode::Char('7')); // Diagrams tab, no diagram files
+    assert_eq!(
+        press(&mut app, KeyCode::Char('E')),
+        Flow::Continue,
+        "nothing to edit without diagrams"
+    );
+    assert!(
+        app.status_line().is_some_and(|s| s.contains("diagram")),
+        "status explains why"
+    );
+
+    let mut empty = app_with(0);
+    assert_eq!(press(&mut empty, KeyCode::Char('E')), Flow::Continue);
+}
+
+#[test]
+fn shift_e_edits_the_current_diagram_when_one_exists() {
+    let mut app = app_with(1);
+    let id = crate::model::RcaId::new("rca-0").expect("id");
+    let dir = app.store.workspace_dir(&id).join("diagrams");
+    std::fs::write(dir.join("01-topology.txt"), "box").expect("write");
+    std::fs::write(dir.join("02-fix.txt"), "box2").expect("write");
+    press(&mut app, KeyCode::Char('7'));
+    match press(&mut app, KeyCode::Char('E')) {
+        Flow::Edit(path) => assert!(path.ends_with("diagrams/01-topology.txt")),
+        other => panic!("expected Flow::Edit, got {other:?}"),
+    }
+}
