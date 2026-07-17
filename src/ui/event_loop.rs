@@ -151,8 +151,8 @@ impl App {
             .collect();
         let mut delta = ReloadDelta::default();
         match self.store.list() {
-            Ok((rcas, warnings)) => {
-                for rca in &rcas {
+            Ok(listing) => {
+                for rca in &listing.summaries {
                     match known.get(&rca.id) {
                         None => delta.arrived.push(rca.meta.title.clone()),
                         Some(&old) if old != rca.meta.status => {
@@ -165,8 +165,9 @@ impl App {
                         Some(_) => {}
                     }
                 }
-                self.rcas = rcas;
-                self.warnings = warnings;
+                self.rcas = listing.summaries;
+                self.warnings = listing.warnings;
+                self.broken = listing.broken;
             }
             Err(e) => {
                 self.warnings = vec![LoadWarning(format!("reload failed: {e}"))];

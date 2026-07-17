@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Workspaces that fail to load (invalid status name, corrupt manifest, or
+  a missing `rca.toml`) are no longer silently invisible: the sidebar now
+  shows a red `⚠ broken` row with the directory name and the reason, and
+  `beagle list` prints matching `⚠ broken` lines. The most common cause
+  is version skew — an agent writing status names (`final-review`,
+  `finished`) that an older installed binary does not know (#46).
+- `beagle status <slug> <status>` can now repair a manifest whose *only*
+  problem is an invalid status value — the bad value is exactly what the
+  command overwrites anyway. Other corruption still errors as before.
+
 ### Added
 
 - Agent liveness: `investigating` headers now show how fresh the workspace

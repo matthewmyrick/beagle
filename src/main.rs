@@ -147,7 +147,8 @@ fn run_list(
     severity: Option<Severity>,
 ) -> Result<(), Error> {
     let store = Store::open(&effective_root(root)?)?;
-    let (summaries, warnings) = store.list()?;
+    let listing = store.list()?;
+    let (summaries, warnings) = (listing.summaries, listing.warnings);
     for rca in summaries
         .iter()
         .filter(|rca| status.map_or(true, |s| rca.meta.status == s))
@@ -157,6 +158,9 @@ fn run_list(
             "{:<10} {:<14} {:<30} {}",
             rca.meta.severity, rca.meta.status, rca.id, rca.meta.title,
         );
+    }
+    for broken in &listing.broken {
+        println!("⚠ broken     {:<30} {}", broken.dir_name, broken.reason);
     }
     for warning in &warnings {
         eprintln!("warning: {}", warning.0);
@@ -185,7 +189,7 @@ fn run_pr_list(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
 /// `beagle similar`: related workspaces, highest score first.
 fn run_similar(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
     let store = Store::open(&effective_root(root)?)?;
-    let (summaries, _) = store.list()?;
+    let summaries = store.list()?.summaries;
     let target = summaries
         .iter()
         .find(|rca| rca.id == *id)

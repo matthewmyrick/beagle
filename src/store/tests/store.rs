@@ -23,7 +23,7 @@ fn missing_section_is_none_not_error() {
 }
 
 #[test]
-fn corrupt_manifest_becomes_warning_not_failure() {
+fn corrupt_manifest_becomes_broken_entry_not_failure() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let store = Store::open(tmp.path()).expect("open store");
     store
@@ -34,10 +34,59 @@ fn corrupt_manifest_becomes_warning_not_failure() {
     fs::create_dir_all(&bad_dir).expect("mkdir");
     fs::write(bad_dir.join(MANIFEST_FILE), "title = unclosed").expect("write corrupt");
 
-    let (summaries, warnings) = store.list().expect("list");
-    assert_eq!(summaries.len(), 1, "the good workspace still lists");
-    assert_eq!(warnings.len(), 1, "the bad one is reported");
-    assert!(warnings[0].0.contains("bad"));
+    // A workspace with no manifest at all is broken too, not invisible.
+    fs::create_dir_all(store.workspace_dir(&test_id("husk"))).expect("mkdir");
+
+    let listing = store.list().expect("list");
+    assert_eq!(listing.summaries.len(), 1, "the good workspace still lists");
+    let names: Vec<&str> = listing.broken.iter().map(|b| b.dir_name.as_str()).collect();
+    assert_eq!(names, ["bad", "husk"], "both failures visible, sorted");
+    assert!(
+        listing.broken[0].reason.contains("parse"),
+        "reason says why: {}",
+        listing.broken[0].reason
+    );
+}
+
+#[test]
+fn unknown_status_lists_as_broken_and_beagle_status_repairs_it() {
+    use crate::model::Status;
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("open store");
+    let id = test_id("relapse");
+    store
+        .scaffold(&id, &test_meta("Relapse", Severity::High))
+        .expect("scaffold");
+
+    // Simulate a manifest written with a status this build doesn't know
+    // (the version-skew case from #46).
+    let manifest = store.workspace_dir(&id).join(MANIFEST_FILE);
+    let raw = fs::read_to_string(&manifest).expect("read");
+    fs::write(
+        &manifest,
+        raw.replace("status = \"investigating\"", "status = \"someday-maybe\""),
+    )
+    .expect("write");
+
+    let listing = store.list().expect("list");
+    assert!(listing.summaries.is_empty());
+    assert_eq!(listing.broken.len(), 1, "visible as broken, not dropped");
+
+    // `beagle status` can now repair exactly this: the bad value is what
+    // it is overwriting anyway.
+    let meta = store
+        .set_status(&id, Status::Review)
+        .expect("repair via set_status");
+    assert_eq!(meta.status, Status::Review);
+    assert_eq!(meta.title, "Relapse", "everything else preserved");
+    let listing = store.list().expect("list");
+    assert_eq!(listing.summaries.len(), 1, "workspace is back");
+    assert!(listing.broken.is_empty());
+
+    // Corruption beyond the status is still not repairable.
+    fs::write(&manifest, "title = unclosed").expect("corrupt");
+    assert!(store.set_status(&id, Status::Review).is_err());
 }
 
 #[test]

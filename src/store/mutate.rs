@@ -72,12 +72,37 @@ impl Store {
     /// [`Error::Io`] / [`Error::ParseManifest`] if the manifest cannot be
     /// read, [`Error::SerializeManifest`] / [`Error::Io`] on write failures.
     pub fn set_status(&self, id: &RcaId, status: Status) -> Result<RcaMeta> {
-        let mut meta = self.read_meta(id)?;
+        let mut meta = match self.read_meta(id) {
+            Ok(meta) => meta,
+            // The manifest may be unreadable *because* the status is
+            // invalid — the exact thing this command should be able to
+            // repair. Retry with the bad status overwritten before giving
+            // up (otherwise `beagle status` can never fix what broke it).
+            Err(original) => match self.repair_status(id, status) {
+                Some(meta) => meta,
+                None => return Err(original),
+            },
+        };
         meta.status = status;
         meta.updated = Some(OffsetDateTime::now_utc());
         let manifest = toml::to_string_pretty(&meta)?;
         write_atomic(&self.workspace_dir(id).join(MANIFEST_FILE), &manifest)?;
         Ok(meta)
+    }
+
+    /// Attempts to parse the manifest with `status` substituted for
+    /// whatever (possibly invalid) value is on disk. `Some` only when the
+    /// rest of the manifest is valid — a bad status is repairable, other
+    /// corruption is not.
+    fn repair_status(&self, id: &RcaId, status: Status) -> Option<RcaMeta> {
+        let path = self.workspace_dir(id).join(MANIFEST_FILE);
+        let raw = read_optional(&path).ok()??;
+        let mut value: toml::Value = toml::from_str(&raw).ok()?;
+        value.as_table_mut()?.insert(
+            "status".to_owned(),
+            toml::Value::String(status.as_str().to_owned()),
+        );
+        value.try_into().ok()
     }
 
     /// Attaches a remediation PR URL to the workspace manifest, stamping
