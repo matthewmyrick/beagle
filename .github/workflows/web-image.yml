@@ -1,0 +1,38 @@
+name: web-image
+
+# Pushing a tag like web-v0.1.0 builds the static-site Docker image and
+# publishes it to GitHub Container Registry — the web analog of the CLI
+# (v*) and desktop (desktop-v*) release flows. Content is baked in from
+# the repo's published RCAs at build time.
+on:
+  push:
+    tags: ["web-v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Derive version from the tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#web-v}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/beagle-web:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/beagle-web:latest

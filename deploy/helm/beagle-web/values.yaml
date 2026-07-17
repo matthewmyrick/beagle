@@ -1,0 +1,49 @@
+# The beagle-web image. Content (published RCAs) is baked in at image
+# build time, so point this at an image built from your store.
+image:
+  repository: ghcr.io/matthewmyrick/beagle-web
+  # Defaults to the chart appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# The nginx container serves on this port.
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  host: postmortems.example.com
+  # Set to a TLS secret name to terminate HTTPS at the ingress.
+  tlsSecret: ""
+  annotations: {}
+
+# Optional GitHub-SSO gateway (oauth2-proxy). When enabled, the ingress
+# routes to the proxy, which authenticates and forwards to the site.
+auth:
+  enabled: false
+  image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+  github:
+    clientId: ""
+    # Restrict to a GitHub org and/or team (blank = any authenticated user).
+    org: ""
+    team: ""
+  # The OAuth callback URL registered on your GitHub OAuth app:
+  #   https://<ingress.host>/oauth2/callback
+  redirectUrl: ""
+  cookieSecure: true
+  # Secrets. Either set these (the chart creates a Secret) or point
+  # existingSecret at a Secret with keys: client-secret, cookie-secret.
+  clientSecret: ""
+  # 32-byte base64: `openssl rand -base64 32`
+  cookieSecret: ""
+  existingSecret: ""
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

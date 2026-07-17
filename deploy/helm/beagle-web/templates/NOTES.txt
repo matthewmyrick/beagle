@@ -1,0 +1,24 @@
+beagle-web is deployed.
+
+{{- if .Values.ingress.enabled }}
+Site:  http{{ if .Values.ingress.tlsSecret }}s{{ end }}://{{ .Values.ingress.host }}/
+{{- else }}
+No ingress is enabled. Reach the service with a port-forward:
+
+  kubectl port-forward svc/{{ include "beagle-web.fullname" . }} 8080:{{ .Values.service.port }}
+  open http://localhost:8080/
+{{- end }}
+
+{{- if .Values.auth.enabled }}
+
+GitHub SSO is ON. Requests are gated by oauth2-proxy; make sure your
+GitHub OAuth app's callback URL is:
+  {{ .Values.auth.redirectUrl }}
+{{- if .Values.auth.github.org }}
+Access is restricted to org "{{ .Values.auth.github.org }}"{{ if .Values.auth.github.team }}, team "{{ .Values.auth.github.team }}"{{ end }}.
+{{- end }}
+{{- else }}
+
+The site is PUBLIC (no auth). Enable GitHub SSO with --set auth.enabled=true
+(see values.yaml).
+{{- end }}

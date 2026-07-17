@@ -1,0 +1,44 @@
+# Run the public postmortem site, optionally behind GitHub SSO.
+#
+#   docker compose up --build                 → public site on :8080
+#   docker compose --profile auth up --build  → gated by GitHub OAuth
+#                                               (fill .env first; use :4180)
+#
+# With auth on, reach the site through the proxy on :4180 and do NOT expose
+# the web service's :8080 to the internet — it is the un-gated backend.
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    image: beagle-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+
+  # Optional GitHub-SSO gateway (oauth2-proxy). Enable with `--profile auth`.
+  # Bring your own GitHub OAuth app; configure it in .env (see .env.example).
+  auth:
+    profiles: ["auth"]
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "4180:4180"
+    environment:
+      OAUTH2_PROXY_PROVIDER: github
+      OAUTH2_PROXY_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      OAUTH2_PROXY_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      OAUTH2_PROXY_COOKIE_SECRET: ${COOKIE_SECRET}
+      # Restrict access to a GitHub org and/or team (leave blank to allow
+      # any authenticated GitHub user).
+      OAUTH2_PROXY_GITHUB_ORG: ${GITHUB_ORG:-}
+      OAUTH2_PROXY_GITHUB_TEAM: ${GITHUB_TEAM:-}
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_UPSTREAMS: "http://web:8080"
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_REDIRECT_URL: ${OAUTH2_REDIRECT_URL}
+      # Set to "true" behind HTTPS (recommended in production).
+      OAUTH2_PROXY_COOKIE_SECURE: ${COOKIE_SECURE:-false}

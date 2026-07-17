@@ -1,0 +1,6 @@
+        BEFORE (during the incident)                 AFTER (resolved)
+
+  client ─▶ checkout-api ─▶ [pool: too small] [1;31mBUG[0m    client ─▶ checkout-api ─▶ [pool: right-sized] [1;32mOK[0m
+                 │              [31mwaiting…[0m                            │              free connection
+                 ▼                                                  ▼
+             [1;31mtimeout (8% of attempts)[0m                          [32morder placed[0m

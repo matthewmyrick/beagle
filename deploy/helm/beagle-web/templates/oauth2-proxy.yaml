@@ -1,0 +1,73 @@
+{{- if .Values.auth.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "beagle-web.fullname" . }}-auth
+  labels:
+    {{- include "beagle-web.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "beagle-web.authSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beagle-web.authSelectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: {{ .Values.auth.image }}
+          args:
+            - --provider=github
+            - --http-address=0.0.0.0:4180
+            - --reverse-proxy=true
+            - --email-domain=*
+            - --upstream=http://{{ include "beagle-web.fullname" . }}:{{ .Values.service.port }}
+            - --client-id={{ required "auth.github.clientId is required when auth is enabled" .Values.auth.github.clientId }}
+            - --redirect-url={{ required "auth.redirectUrl is required when auth is enabled" .Values.auth.redirectUrl }}
+            - --cookie-secure={{ .Values.auth.cookieSecure }}
+            {{- if .Values.auth.github.org }}
+            - --github-org={{ .Values.auth.github.org }}
+            {{- end }}
+            {{- if .Values.auth.github.team }}
+            - --github-team={{ .Values.auth.github.team }}
+            {{- end }}
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "beagle-web.authSecretName" . }}
+                  key: client-secret
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "beagle-web.authSecretName" . }}
+                  key: cookie-secret
+          ports:
+            - name: http
+              containerPort: 4180
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "beagle-web.fullname" . }}-auth
+  labels:
+    {{- include "beagle-web.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "beagle-web.authSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 4180
+      targetPort: http
+{{- end }}

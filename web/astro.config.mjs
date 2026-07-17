@@ -8,5 +8,6 @@ import { defineConfig } from "astro/config";
 export default defineConfig({
   output: "static",
   // Set to your deployed origin for correct absolute URLs / sitemaps.
-  site: process.env.BEAGLE_SITE_URL ?? "https://example.com",
+  // `||` (not `??`) so an empty env value falls back too.
+  site: process.env.BEAGLE_SITE_URL || "https://example.com",
 });

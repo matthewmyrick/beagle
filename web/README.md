@@ -42,9 +42,11 @@ npm run check        # prettier + astro check (types) + vitest
 
 ## Deploy
 
-`npm run build` emits `dist/`. Deploy it to Vercel, Netlify, GitHub
-Pages, S3 — any static host. Set `BEAGLE_SITE_URL` to your origin for
-correct absolute URLs.
+`npm run build` emits `dist/` — deploy it to any static host (Vercel,
+Netlify, Pages, S3). Or run it as a container, or on Kubernetes with the
+Helm chart, and gate it behind GitHub SSO. See **[DEPLOY.md](DEPLOY.md)**
+for all three plus the auth gateway. Set `BEAGLE_SITE_URL` to your origin
+for correct absolute URLs.
 
 ## Layout
 
