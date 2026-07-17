@@ -245,8 +245,10 @@ fn run_similar(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
 }
 
 /// Resolves the workspace root: explicit `--root` → config file `root` →
-/// current directory. An invalid config surfaces here rather than being
-/// silently ignored — otherwise beagle would quietly open the wrong root.
+/// nearest ancestor of the working directory that already contains
+/// `rcas/` → the working directory. An invalid config surfaces here
+/// rather than being silently ignored — otherwise beagle would quietly
+/// open the wrong root.
 fn effective_root(explicit: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Some(root) = explicit {
         return Ok(root);
@@ -256,7 +258,8 @@ fn effective_root(explicit: Option<PathBuf>) -> Result<PathBuf, Error> {
             return Ok(root);
         }
     }
-    env::current_dir().map_err(|e| Error::io(".", e))
+    let cwd = env::current_dir().map_err(|e| Error::io(".", e))?;
+    Ok(beagle::store::discover_root(&cwd))
 }
 
 /// `beagle config`: create the file from the template if absent, open it in

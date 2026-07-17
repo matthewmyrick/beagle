@@ -108,6 +108,20 @@ pub struct DiagramEntry {
     pub path: PathBuf,
 }
 
+/// The nearest directory at or above `start` that already contains an
+/// `rcas/` directory, or `start` itself when none does. This is the
+/// git-style discovery both frontends use: `beagle` run anywhere inside
+/// an oncall checkout (or `cargo run` from `cli/`) finds the repo's
+/// workspaces instead of silently scaffolding an empty `rcas/` in the
+/// working directory. An explicit `--root` or config `root` wins over it.
+#[must_use]
+pub fn discover_root(start: &Path) -> PathBuf {
+    start
+        .ancestors()
+        .find(|dir| dir.join(RCAS_DIR).is_dir())
+        .map_or_else(|| start.to_path_buf(), Path::to_path_buf)
+}
+
 /// Handle to an on-disk collection of RCA workspaces.
 #[derive(Debug)]
 pub struct Store {

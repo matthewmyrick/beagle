@@ -26,11 +26,7 @@ fn effective_root() -> Result<PathBuf, String> {
     }
     let cwd =
         std::env::current_dir().map_err(|e| format!("cannot resolve a workspace root: {e}"))?;
-    let nearest = cwd
-        .ancestors()
-        .find(|dir| dir.join(beagle::store::RCAS_DIR).is_dir())
-        .map(std::path::Path::to_path_buf);
-    Ok(nearest.unwrap_or(cwd))
+    Ok(beagle::store::discover_root(&cwd))
 }
 
 fn open_store() -> Result<Store, String> {
