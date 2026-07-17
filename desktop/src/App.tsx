@@ -5,10 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import type { JSX } from "react";
 
 import { listWorkspaces, readSection } from "./api";
+import { Brand } from "./components/Brand";
 import { DiagramView } from "./components/DiagramView";
 import { Sidebar } from "./components/Sidebar";
 import { SectionView } from "./components/SectionView";
 import { TabBar } from "./components/TabBar";
+import { useTheme } from "./hooks/useTheme";
 import { DIAGRAMS_TAB, SECTIONS } from "./lib/sections";
 import type { Listing, Workspace } from "./types";
 import "./App.css";
@@ -23,6 +25,7 @@ interface LoadedSection {
 }
 
 export default function App(): JSX.Element {
+  const { theme, toggleTheme } = useTheme();
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -90,14 +93,21 @@ export default function App(): JSX.Element {
       />
       <section className="content">
         {error !== null ? <div className="error-banner">{error}</div> : null}
+        <div className="content-top">
+          <header className="incident-header">
+            {selected !== null ? (
+              <>
+                <h1>{selected.title}</h1>
+                <p className="incident-meta">
+                  {selected.status} · {selected.severity} · {selected.systems.join(", ")}
+                </p>
+              </>
+            ) : null}
+          </header>
+          <Brand theme={theme} onToggleTheme={toggleTheme} />
+        </div>
         {selected !== null ? (
           <>
-            <header className="incident-header">
-              <h1>{selected.title}</h1>
-              <p className="incident-meta">
-                {selected.status} · {selected.severity} · {selected.systems.join(", ")}
-              </p>
-            </header>
             <TabBar activeFile={activeFile} onSelect={setActiveFile} />
             {activeFile === DIAGRAMS_TAB.file ? (
               <DiagramView id={selected.id} onError={handleError} />

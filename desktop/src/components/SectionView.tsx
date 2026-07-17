@@ -1,8 +1,9 @@
-// The content pane for one section. First slice: raw markdown in a
-// scrollable pre — a real markdown renderer (shared with the web app) is
-// the next slice; absent sections show a hint, mirroring the TUI.
+// The content pane for one section: rendered markdown (the TUI's subset),
+// fading in on change. Absent sections show a hint, mirroring the TUI.
 
 import type { JSX } from "react";
+
+import { Markdown } from "./Markdown";
 
 interface SectionViewProps {
   content: string | null;
@@ -21,5 +22,9 @@ export function SectionView({ content, loading, file }: SectionViewProps): JSX.E
       </div>
     );
   }
-  return <pre className="section-content">{content}</pre>;
+  return (
+    <div className="section-content fade-in">
+      <Markdown source={content} />
+    </div>
+  );
 }

@@ -1,12 +1,35 @@
+/* Theme variables. Dark is the default; [data-theme="light"] overrides.
+   The amber accent is beagle's signature (the TUI banner color). */
 :root {
   color-scheme: dark;
   --bg: #14161f;
   --bg-raised: #1b1e2b;
   --bg-selected: #282c3c;
+  --bg-code: #10121a;
   --fg: #d8dce8;
   --fg-dim: #8890a4;
   --accent: #e8b44a;
+  --accent-soft: rgba(232, 180, 74, 0.14);
   --border: #2a2e40;
+  --error-bg: #4a1f24;
+  --error-fg: #ffb3b3;
+  --done: #6fbf73;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #faf9f6;
+  --bg-raised: #f0eee8;
+  --bg-selected: #e5e1d6;
+  --bg-code: #f1efe9;
+  --fg: #2b2c33;
+  --fg-dim: #6d7076;
+  --accent: #b07d1e;
+  --accent-soft: rgba(176, 125, 30, 0.12);
+  --border: #ddd8cc;
+  --error-bg: #fbe3e3;
+  --error-fg: #a03030;
+  --done: #2f7d34;
 }
 
 * {
@@ -22,6 +45,9 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
 .app {
@@ -30,10 +56,13 @@ body {
   height: 100vh;
 }
 
+/* ---------- sidebar ---------- */
+
 .sidebar {
   border-right: 1px solid var(--border);
   background: var(--bg-raised);
   overflow-y: auto;
+  transition: background-color 0.25s ease;
 }
 
 .sidebar-heading {
@@ -65,10 +94,15 @@ body {
   text-align: left;
   cursor: pointer;
   font: inherit;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .sidebar-row:hover {
   background: var(--bg-selected);
+  transform: translateX(2px);
 }
 
 .sidebar-row.selected {
@@ -98,14 +132,36 @@ body {
   color: var(--fg-dim);
 }
 
+.status-glyph.pulse {
+  display: inline-block;
+  animation: pulse 1.6s ease-in-out infinite;
+  color: var(--accent);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ---------- content column ---------- */
+
 .content {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.incident-header {
-  padding: 16px 20px 0;
+.content-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px 0;
 }
 
 .incident-header h1 {
@@ -118,6 +174,59 @@ body {
   font-size: 0.85rem;
   margin: 4px 0 0;
 }
+
+/* ---------- brand corner ---------- */
+
+.brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.banner-art {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.55rem;
+  line-height: 1.15;
+  color: var(--accent);
+  text-shadow: 0 0 12px var(--accent-soft);
+  user-select: none;
+  animation: banner-in 0.6s ease both;
+}
+
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.theme-toggle {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.theme-toggle:hover {
+  transform: rotate(20deg) scale(1.08);
+  background: var(--bg-selected);
+}
+
+/* ---------- tabs ---------- */
 
 .tab-bar {
   display: flex;
@@ -136,6 +245,16 @@ body {
   cursor: pointer;
   font: inherit;
   font-size: 0.85rem;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.tab:hover {
+  color: var(--fg);
+  background: var(--accent-soft);
+  border-radius: 4px 4px 0 0;
 }
 
 .tab.active {
@@ -144,15 +263,110 @@ body {
   font-weight: 600;
 }
 
+/* ---------- section content & markdown ---------- */
+
 .section-content {
   flex: 1;
   overflow: auto;
-  margin: 0;
-  padding: 16px 20px;
+  padding: 8px 24px 24px;
+  max-width: 78ch;
+}
+
+.fade-in {
+  animation: fade-up 0.25s ease both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.markdown {
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.md-h1 {
+  font-size: 1.25rem;
+  margin: 18px 0 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.md-h2 {
+  font-size: 1.05rem;
+  margin: 16px 0 4px;
+  color: var(--accent);
+}
+
+.md-h3 {
+  font-size: 0.95rem;
+  margin: 12px 0 2px;
+}
+
+.md-p {
+  margin: 8px 0;
+}
+
+.md-rule {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 14px 0;
+}
+
+.md-quote {
+  margin: 8px 0;
+  padding: 2px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 6px 6px 0;
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+.md-code {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  overflow-x: auto;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.85rem;
-  line-height: 1.55;
-  white-space: pre-wrap;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.markdown code {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85em;
+}
+
+.md-bullet {
+  display: flex;
+  gap: 8px;
+  margin: 3px 0;
+}
+
+.md-bullet .md-marker {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.md-bullet.done .md-marker {
+  color: var(--done);
+}
+
+.md-bullet.done > span:last-child {
+  color: var(--done);
 }
 
 .section-hint {
@@ -161,11 +375,13 @@ body {
 }
 
 .error-banner {
-  background: #4a1f24;
-  color: #ffb3b3;
+  background: var(--error-bg);
+  color: var(--error-fg);
   padding: 8px 20px;
   font-size: 0.85rem;
 }
+
+/* ---------- diagrams ---------- */
 
 .diagram-view {
   display: flex;
@@ -190,6 +406,11 @@ body {
   cursor: pointer;
   font: inherit;
   font-size: 0.8rem;
+  transition: background-color 0.15s ease;
+}
+
+.diagram-nav button:hover:not(:disabled) {
+  background: var(--bg-selected);
 }
 
 .diagram-nav button:disabled {
@@ -211,4 +432,29 @@ body {
   font-size: 0.8rem;
   line-height: 1.4;
   white-space: pre;
+}
+
+/* ---------- scrollbars & motion preferences ---------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

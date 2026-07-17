@@ -61,7 +61,14 @@ function SidebarRow({ workspace, selected, onSelect }: SidebarRowProps): JSX.Ele
         </span>
         <span className="row-title">{workspace.title}</span>
         <span className="row-detail">
-          {statusGlyph(workspace.status)} {workspace.status}
+          <span
+            className={
+              workspace.status === "investigating" ? "status-glyph pulse" : "status-glyph"
+            }
+          >
+            {statusGlyph(workspace.status)}
+          </span>{" "}
+          {workspace.status}
           {workspace.archived ? " · archived" : ""} · {formatCreated(workspace.created)}
         </span>
       </button>

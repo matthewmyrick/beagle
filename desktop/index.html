@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri + React + Typescript</title>
+    <title>Beagle</title>
+    <script>
+      // Apply the stored theme before first paint so light-mode users
+      // don't get a dark flash (and vice versa).
+      try {
+        var stored = localStorage.getItem("beagle-theme");
+        var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme =
+          stored === "light" || stored === "dark" ? stored : dark ? "dark" : "light";
+      } catch (e) {}
+    </script>
   </head>
 
   <body>
