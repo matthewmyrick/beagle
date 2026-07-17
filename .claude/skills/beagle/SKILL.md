@@ -120,11 +120,14 @@ Then the sections:
 
 Edit `rca.toml` as the investigation progresses:
 
-- `status`: `investigating` → `review` (fix PR open) → `final-review`
-  (beagle flips this automatically when every attached PR merges) →
-  `finished` (the user signs off with `V` after working your Final Review
-  checklist). Old names (identified/monitoring/resolved) still parse.
-  The easy way: `beagle status <slug> <status>` stamps `updated` for you.
+- `status`: `investigating` → `review` (fix reviewed) → `agent`
+  (optional — an automated agent polls `beagle list --status agent` and
+  does remediation from a prompt) → `final-review` (beagle flips here
+  automatically when every attached PR merges, from `review` or `agent`)
+  → `finished` (the user signs off with `V` after working your Final
+  Review checklist). Skip `agent` if you don't run one. Old names
+  (identified/monitoring/resolved) still parse. The easy way:
+  `beagle status <slug> <status>` stamps `updated` for you.
 - `updated`: bump to now (RFC 3339, **quoted string**, e.g. `"2026-07-05T14:32:00Z"`).
 - `tags`: **always set these** — 3–6 kebab-case topics (e.g. `webhooks`,
   `config`, `data-loss`, `redis`). They matter downstream: `beagle export`

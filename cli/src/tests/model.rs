@@ -154,3 +154,13 @@ fn sort_key_puts_active_severe_recent_first() {
         vec![active_crit_new, active_crit_old, active_high, resolved]
     );
 }
+
+#[test]
+fn agent_status_sits_between_review_and_final_review() {
+    use crate::model::Status;
+    assert!(Status::Review < Status::Agent);
+    assert!(Status::Agent < Status::FinalReview);
+    assert_eq!(Status::ALL[2], Status::Agent);
+    assert_eq!(Status::Agent.as_str(), "agent");
+    assert_eq!("agent".parse::<Status>().expect("parse"), Status::Agent);
+}

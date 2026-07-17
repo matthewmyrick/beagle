@@ -148,7 +148,7 @@ with `beagle skill status`.
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
 `1`–`9` switch tabs · `/` search the incident (all tabs, `n`/`N` between
 hits) · `\` find everywhere (fuzzy across every incident, tab, and line —
-enter jumps straight there) · `f` filter the list (i/r/v/f status ·
+enter jumps straight there) · `f` filter the list (i/r/a/v/f status ·
 c/h/m/l severity · `/` free text,
 stacking + toggling) · `F` follow (tail -f) · `s` collapse/expand the
 sidebar · `a` show/hide archived · `T` toolbox ·
@@ -166,10 +166,17 @@ Remediation lands as pull requests, and a merged PR isn't a verified fix.
 The lifecycle follows the fix all the way:
 
 ```text
-investigating ──▶ review ──▶ final-review ──▶ finished
-   (digging)   (fix PR open)  (PR merged —      (verified,
-                               verify it!)       signed off)
+investigating ──▶ review ──▶ agent ──▶ final-review ──▶ finished
+   (digging)   (fix reviewed) (an agent  (PR merged —      (verified,
+                               polls +    verify it!)       signed off)
+                               remediates)
 ```
+
+`agent` is an optional hand-off: an automated agent polls
+`beagle list --status agent`, does the remediation work (opens PRs,
+applies fixes) from its configured prompt, and its merged PRs
+auto-advance the RCA to `final-review`. Skip it entirely and go
+straight `review → final-review` if you don't run an agent.
 
 `beagle pr add <slug> <url>` attaches a PR to the manifest; the workspace
 header shows `fixes: ○ #123 open · ✓ #124 merged`, refreshed by a background
@@ -220,7 +227,7 @@ rcas/
 ```toml
 title = "Payments API p99 latency 40x regression"
 severity = "high"          # critical | high | medium | low | info
-status = "review"          # investigating | review | final-review | finished
+status = "review"          # investigating | review | agent | final-review | finished
 created = "2026-07-05T14:32:00Z"   # RFC 3339, quoted
 systems = ["payments-api", "redis-sessions"]
 tags = ["latency"]

@@ -224,6 +224,7 @@ impl App {
             KeyCode::Char('/') => self.filter_input = super::FilterInput::Typing,
             KeyCode::Char('i') => self.toggle_status_facet(Status::Investigating),
             KeyCode::Char('r') => self.toggle_status_facet(Status::Review),
+            KeyCode::Char('a') => self.toggle_status_facet(Status::Agent),
             KeyCode::Char('v') => self.toggle_status_facet(Status::FinalReview),
             KeyCode::Char('f') => self.toggle_status_facet(Status::Finished),
             KeyCode::Char('c') => self.toggle_severity_facet(Severity::Critical),
