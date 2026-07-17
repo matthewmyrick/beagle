@@ -14,7 +14,8 @@ fn scaffold_then_list_round_trips() {
     let meta = test_meta("Payments p99 latency", Severity::High);
 
     store.scaffold(&id, &meta).expect("scaffold");
-    let (summaries, warnings) = store.list().expect("list");
+    let listing = store.list().expect("list");
+    let (summaries, warnings) = (listing.summaries, listing.warnings);
 
     assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
     assert_eq!(summaries.len(), 1);

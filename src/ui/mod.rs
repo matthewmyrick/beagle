@@ -43,6 +43,9 @@ pub struct App {
     store: Store,
     rcas: Vec<RcaSummary>,
     warnings: Vec<LoadWarning>,
+    /// Workspace directories that exist but could not load — rendered at
+    /// the bottom of the sidebar so they never silently disappear.
+    broken: Vec<crate::store::BrokenWorkspace>,
     /// Fuzzy filter over the incident list; empty means "show everything".
     filter: String,
     /// Status facets toggled in filter mode (`i`/`r`/`v`/`f`); empty means
@@ -135,12 +138,13 @@ impl App {
     /// # Errors
     /// Fails only if the `rcas/` directory itself is unreadable.
     pub fn new(store: Store) -> Result<Self> {
-        let (rcas, warnings) = store.list()?;
-        let visible = (0..rcas.len()).collect();
+        let listing = store.list()?;
+        let visible = (0..listing.summaries.len()).collect();
         let mut app = Self {
             store,
-            rcas,
-            warnings,
+            rcas: listing.summaries,
+            warnings: listing.warnings,
+            broken: listing.broken,
             filter: String::new(),
             facet_statuses: HashSet::new(),
             facet_severities: HashSet::new(),
@@ -209,6 +213,11 @@ impl App {
         self.selected = keep
             .and_then(|id| self.visible.iter().position(|&i| self.rcas[i].id == id))
             .unwrap_or(0);
+    }
+
+    /// Workspace directories that exist on disk but could not load.
+    pub(crate) fn broken(&self) -> &[crate::store::BrokenWorkspace] {
+        &self.broken
     }
 
     /// The newest section-file modification across workspace `id`, straight
