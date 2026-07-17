@@ -227,6 +227,75 @@ pub(super) fn draw_toolbox(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_widget(paragraph.block(block).scroll((scroll, 0)), popup);
 }
 
+/// The `\` global finder: prompt on top, ranked results under it, matched
+/// characters highlighted. Centered and large — it's a discovery surface,
+/// not a status line.
+pub(super) fn draw_finder(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(finder) = app.finder() else { return };
+    let width = area.width.saturating_sub(6).clamp(30, 110);
+    let height = area.height.saturating_sub(4).clamp(8, 30);
+    let rect = center(area, width, height);
+    let inner_width = usize::from(width.saturating_sub(2));
+
+    let highlight = Style::default()
+        .fg(Color::Rgb(214, 160, 30))
+        .add_modifier(Modifier::BOLD);
+    let items: Vec<ListItem<'_>> = finder
+        .matches
+        .iter()
+        .enumerate()
+        .filter_map(|(index, m)| {
+            let entry = finder.entry(index)?;
+            // Context first, dimmed; the line text carries the highlights.
+            let context = format!(" {} · {} · ", truncate(&entry.title, 24), entry.tab.title());
+            let room = inner_width.saturating_sub(context.chars().count() + 1);
+            let mut spans = vec![Span::styled(context, Style::default().fg(Color::DarkGray))];
+            let mut segment = String::new();
+            let mut segment_matched = None;
+            for (offset, c) in entry.text.chars().take(room).enumerate() {
+                let matched = m.positions.contains(&offset);
+                if segment_matched.is_some_and(|was| was != matched) && !segment.is_empty() {
+                    let style = if matched { Style::default() } else { highlight };
+                    spans.push(Span::styled(std::mem::take(&mut segment), style));
+                }
+                segment_matched = Some(matched);
+                segment.push(c);
+            }
+            if !segment.is_empty() {
+                let style = if segment_matched == Some(true) {
+                    highlight
+                } else {
+                    Style::default()
+                };
+                spans.push(Span::styled(segment, style));
+            }
+            Some(ListItem::new(Line::from(spans)))
+        })
+        .collect();
+
+    let block = Block::default()
+        .title(format!(
+            " find everywhere ({} lines) — type to filter · ↑/↓ move · enter jump · esc ",
+            finder.matches.len()
+        ))
+        .title_alignment(Alignment::Center)
+        .title_bottom(Line::from(format!(" \\ {}▌ ", finder.query)).left_aligned())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(40, 44, 60))
+            .add_modifier(Modifier::BOLD),
+    );
+    let mut state = ListState::default();
+    if !finder.matches.is_empty() {
+        state.select(Some(finder.selected));
+    }
+    frame.render_widget(Clear, rect);
+    frame.render_stateful_widget(list, rect, &mut state);
+}
+
 pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
     let rows = [
         ("j / k, ↓ / ↑", "select incident or scroll content"),
@@ -240,6 +309,10 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("a", "show / hide archived incidents (dimmed)"),
         ("/", "search the incident: every tab, live highlight"),
         ("n / N", "next / previous search match"),
+        (
+            "\\",
+            "find everywhere: fuzzy across all incidents; enter jumps",
+        ),
         ("c / C", "copy this tab / whole RCA to clipboard"),
         (
             "e",

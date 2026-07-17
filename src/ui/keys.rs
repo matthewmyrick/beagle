@@ -23,6 +23,10 @@ impl App {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             return Flow::Quit;
         }
+        if self.finder.is_some() {
+            self.handle_finder_key(key.code, key.modifiers.contains(KeyModifiers::CONTROL));
+            return Flow::Continue;
+        }
         if self.filter_input != super::FilterInput::Off {
             self.handle_search_key(key.code);
             return Flow::Continue;
@@ -65,6 +69,7 @@ impl App {
             // `f` filters the incident list; `F` follows (tail -f). Each
             // also moves the focus to where the action is.
             KeyCode::Char('/') => self.start_content_search(),
+            KeyCode::Char('\\') => self.open_finder(),
             KeyCode::Char('f') => {
                 self.filter_input = super::FilterInput::Facets;
                 self.focus = Focus::List;

@@ -344,8 +344,9 @@ impl App {
 
 /// Rows the first `line_index` lines occupy after wrapping at `width`.
 /// Before the first draw the width is unknown (0) — treat lines as
-/// unwrapped, which the next draw's clamp corrects.
-fn wrapped_rows_before(text: &Text<'_>, line_index: usize, width: u16) -> u16 {
+/// unwrapped, which the next draw's clamp corrects. Shared with the `\`
+/// global finder, whose jumps use the same rendering.
+pub(super) fn wrapped_rows_before(text: &Text<'_>, line_index: usize, width: u16) -> u16 {
     if width == 0 {
         return u16::try_from(line_index).unwrap_or(u16::MAX);
     }

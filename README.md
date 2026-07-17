@@ -122,7 +122,9 @@ prebuilt binaries, update via `cargo install` instead.
 
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
 `1`–`9` switch tabs · `/` search the incident (all tabs, `n`/`N` between
-hits) · `f` filter the list (i/r/v/f status · c/h/m/l severity · `/` free text,
+hits) · `\` find everywhere (fuzzy across every incident, tab, and line —
+enter jumps straight there) · `f` filter the list (i/r/v/f status ·
+c/h/m/l severity · `/` free text,
 stacking + toggling) · `F` follow (tail -f) · `s` collapse/expand the
 sidebar · `a` show/hide archived · `T` toolbox ·
 `o` open links/PRs · `R` related incidents · `V` sign off final-review · `S` settings ·

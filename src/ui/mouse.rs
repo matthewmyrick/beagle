@@ -41,6 +41,10 @@ impl App {
         } else {
             KeyCode::Down
         };
+        if self.finder.is_some() {
+            self.handle_finder_key(arrow, false);
+            return;
+        }
         if self.toolbox.is_some() {
             self.handle_toolbox_key(arrow);
             return;
@@ -85,7 +89,8 @@ impl App {
             self.show_help = false;
             return;
         }
-        if self.toolbox.is_some()
+        if self.finder.is_some()
+            || self.toolbox.is_some()
             || self.links.is_some()
             || self.related.is_some()
             || self.settings.is_some()
