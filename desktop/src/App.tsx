@@ -1,98 +1,74 @@
-// Composition root: sidebar + header + tabs + section content. State
-// lives here; components below it are presentational.
+// Composition root: wires the data hook, theme, filter, and keybindings
+// into the layout. Presentation lives in components/; logic in lib/ and
+// hooks/.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { JSX } from "react";
 
-import { listWorkspaces, readSection } from "./api";
 import { Brand } from "./components/Brand";
 import { DiagramView } from "./components/DiagramView";
-import { Sidebar } from "./components/Sidebar";
+import { HelpOverlay } from "./components/HelpOverlay";
 import { SectionView } from "./components/SectionView";
+import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
+import { useActions } from "./hooks/useActions";
+import { useIncidents } from "./hooks/useIncidents";
+import { useKeybindings } from "./hooks/useKeybindings";
 import { useTheme } from "./hooks/useTheme";
-import { DIAGRAMS_TAB, SECTIONS } from "./lib/sections";
-import type { Listing, Workspace } from "./types";
+import { filterWorkspaces } from "./lib/filter";
+import { DIAGRAMS_TAB } from "./lib/sections";
 import "./App.css";
-
-const FIRST_SECTION = SECTIONS[0]?.file ?? "summary.md";
-
-/** The last section fetch that completed, keyed by what it was for. */
-interface LoadedSection {
-  id: string;
-  file: string;
-  body: string | null;
-}
 
 export default function App(): JSX.Element {
   const { theme, toggleTheme } = useTheme();
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [activeFile, setActiveFile] = useState<string>(FIRST_SECTION);
-  const [section, setSection] = useState<LoadedSection | null>(null);
+  const incidents = useIncidents();
+  const [filter, setFilter] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
+  const filterRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    listWorkspaces()
-      .then((result) => {
-        setListing(result);
-        setSelectedId((current) => current ?? result.workspaces[0]?.id ?? null);
-      })
-      .catch((cause: unknown) => {
-        setError(String(cause));
-      });
-  }, []);
+  const workspaces = incidents.listing?.workspaces ?? [];
+  const visible = filterWorkspaces(workspaces, filter, showArchived);
+  const hiddenArchived = showArchived ? 0 : workspaces.filter((w) => w.archived).length;
 
-  useEffect(() => {
-    if (selectedId === null || activeFile === DIAGRAMS_TAB.file) {
-      return undefined;
-    }
-    let stale = false;
-    readSection(selectedId, activeFile)
-      .then((body) => {
-        if (!stale) {
-          setSection({ id: selectedId, file: activeFile, body });
-        }
-      })
-      .catch((cause: unknown) => {
-        if (!stale) {
-          setError(String(cause));
-        }
-      });
-    return () => {
-      stale = true;
-    };
-  }, [selectedId, activeFile]);
+  const onAction = useActions({
+    visible,
+    selectedId: incidents.selectedId,
+    onSelect: incidents.onSelect,
+    setActiveFile: incidents.setActiveFile,
+    filterRef,
+    toggleArchived: useCallback(() => {
+      setShowArchived((current) => !current);
+    }, []),
+    toggleTheme,
+    toggleHelp: useCallback(() => {
+      setHelpVisible((current) => !current);
+    }, []),
+  });
+  useKeybindings({
+    onAction,
+    helpVisible,
+    onCloseHelp: useCallback(() => {
+      setHelpVisible(false);
+    }, []),
+  });
 
-  const handleSelect = useCallback((id: string) => {
-    setSelectedId(id);
-    setActiveFile(FIRST_SECTION);
-  }, []);
-
-  const handleError = useCallback((message: string) => {
-    setError(message);
-  }, []);
-
-  // Loading is derived, not stored: the pane is loading whenever the last
-  // completed fetch isn't for what's on screen.
-  const current =
-    section !== null && section.id === selectedId && section.file === activeFile
-      ? section
-      : null;
-  const loading = selectedId !== null && current === null;
-
-  const selected: Workspace | null =
-    listing?.workspaces.find((w) => w.id === selectedId) ?? null;
-
+  const { selected } = incidents;
   return (
     <main className="app">
       <Sidebar
-        workspaces={listing?.workspaces ?? []}
-        selectedId={selectedId}
-        onSelect={handleSelect}
+        workspaces={visible}
+        selectedId={incidents.selectedId}
+        onSelect={incidents.onSelect}
+        filter={filter}
+        onFilterChange={setFilter}
+        filterRef={filterRef}
+        hiddenArchived={hiddenArchived}
       />
       <section className="content">
-        {error !== null ? <div className="error-banner">{error}</div> : null}
+        {incidents.error !== null ? (
+          <div className="error-banner">{incidents.error}</div>
+        ) : null}
         <div className="content-top">
           <header className="incident-header">
             {selected !== null ? (
@@ -108,24 +84,31 @@ export default function App(): JSX.Element {
         </div>
         {selected !== null ? (
           <>
-            <TabBar activeFile={activeFile} onSelect={setActiveFile} />
-            {activeFile === DIAGRAMS_TAB.file ? (
-              <DiagramView id={selected.id} onError={handleError} />
+            <TabBar activeFile={incidents.activeFile} onSelect={incidents.selectTab} />
+            {incidents.activeFile === DIAGRAMS_TAB.file ? (
+              <DiagramView id={selected.id} onError={incidents.onError} />
             ) : (
               <SectionView
-                content={current?.body ?? null}
-                loading={loading}
-                file={activeFile}
+                content={incidents.content}
+                loading={incidents.loading}
+                file={incidents.activeFile}
               />
             )}
           </>
         ) : (
           <div className="section-hint">
-            No RCA workspaces under {listing?.root ?? "the current directory"} — create
-            one with `beagle new`.
+            No RCA workspaces under {incidents.listing?.root ?? "the current directory"} —
+            create one with `beagle new`.
           </div>
         )}
       </section>
+      {helpVisible ? (
+        <HelpOverlay
+          onClose={() => {
+            setHelpVisible(false);
+          }}
+        />
+      ) : null}
     </main>
   );
 }

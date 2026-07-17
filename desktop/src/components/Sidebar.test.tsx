@@ -2,8 +2,17 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createRef } from "react";
+
 import type { Workspace } from "../types";
 import { Sidebar } from "./Sidebar";
+
+const filterProps = {
+  filter: "",
+  onFilterChange: (): undefined => undefined,
+  filterRef: createRef<HTMLInputElement>(),
+  hiddenArchived: 0,
+};
 
 function workspace(overrides: Partial<Workspace>): Workspace {
   return {
@@ -33,6 +42,7 @@ describe("Sidebar", () => {
         ]}
         selectedId="a"
         onSelect={onSelect}
+        {...filterProps}
       />,
     );
     expect(screen.getByText("First")).toBeDefined();
@@ -46,6 +56,7 @@ describe("Sidebar", () => {
         workspaces={[workspace({ id: "old", archived: true })]}
         selectedId={null}
         onSelect={() => undefined}
+        {...filterProps}
       />,
     );
     expect(screen.getByText(/archived/)).toBeDefined();

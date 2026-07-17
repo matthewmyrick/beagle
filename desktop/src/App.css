@@ -458,3 +458,97 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- filter & help overlay ---------- */
+
+.filter-input {
+  display: block;
+  width: calc(100% - 20px);
+  margin: 6px 10px 8px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.8rem;
+  transition: border-color 0.15s ease;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.sidebar-footnote {
+  color: var(--fg-dim);
+  font-size: 0.72rem;
+  padding: 8px 14px;
+  margin: 0;
+}
+
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.help-sheet {
+  background: var(--bg-raised);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 18px 26px;
+  min-width: 380px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.help-sheet h2 {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.help-sheet dl {
+  margin: 0;
+}
+
+.help-row {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  margin: 5px 0;
+}
+
+.help-row dt {
+  min-width: 80px;
+}
+
+.help-row dd {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+}
+
+kbd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.help-hint {
+  margin: 12px 0 0;
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+  text-align: center;
+}

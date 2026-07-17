@@ -32,3 +32,11 @@ export const TABS: readonly Section[] = [
   DIAGRAMS_TAB,
   ...SECTIONS.slice(6),
 ];
+
+/** The tab after/before `file` in TABS, wrapping at both ends. */
+export function cycleTab(file: string, direction: 1 | -1): string {
+  const index = TABS.findIndex((tab) => tab.file === file);
+  const from = index === -1 ? 0 : index;
+  const next = (from + direction + TABS.length) % TABS.length;
+  return TABS[next]?.file ?? file;
+}

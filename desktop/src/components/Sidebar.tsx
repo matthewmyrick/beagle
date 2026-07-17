@@ -3,6 +3,8 @@
 
 import type { JSX } from "react";
 
+import type { RefObject } from "react";
+
 import { formatCreated, severityColor, statusGlyph } from "../lib/format";
 import type { Workspace } from "../types";
 
@@ -10,12 +12,43 @@ interface SidebarProps {
   workspaces: Workspace[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  filter: string;
+  onFilterChange: (value: string) => void;
+  filterRef: RefObject<HTMLInputElement | null>;
+  hiddenArchived: number;
 }
 
-export function Sidebar({ workspaces, selectedId, onSelect }: SidebarProps): JSX.Element {
+export function Sidebar({
+  workspaces,
+  selectedId,
+  onSelect,
+  filter,
+  onFilterChange,
+  filterRef,
+  hiddenArchived,
+}: SidebarProps): JSX.Element {
   return (
     <nav className="sidebar" aria-label="Incidents">
       <h2 className="sidebar-heading">Incidents ({workspaces.length})</h2>
+      <input
+        ref={filterRef}
+        className="filter-input"
+        type="search"
+        placeholder="filter…  ( / )"
+        value={filter}
+        onChange={(event) => {
+          onFilterChange(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            onFilterChange("");
+            event.currentTarget.blur();
+          }
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+        }}
+      />
       <ul className="sidebar-list">
         {workspaces.map((workspace) => (
           <SidebarRow
@@ -26,6 +59,11 @@ export function Sidebar({ workspaces, selectedId, onSelect }: SidebarProps): JSX
           />
         ))}
       </ul>
+      {hiddenArchived > 0 ? (
+        <p className="sidebar-footnote">
+          {hiddenArchived} archived hidden — a shows them
+        </p>
+      ) : null}
     </nav>
   );
 }
