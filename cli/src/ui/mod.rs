@@ -113,6 +113,8 @@ pub struct App {
     settings: Option<SettingsOverlay>,
     /// The `D` delete confirmation popup; `Some` while it awaits y/n.
     confirm_delete: Option<overlays::ConfirmDelete>,
+    /// The `t` status picker; `Some` while open.
+    status_picker: Option<overlays::StatusPicker>,
     /// Rendered toolbox overlay content; `Some` while the overlay is open.
     toolbox: Option<Text<'static>>,
     /// Vertical scroll of the toolbox overlay.
@@ -210,6 +212,7 @@ impl App {
             finder: None,
             settings: None,
             confirm_delete: None,
+            status_picker: None,
             toolbox: None,
             toolbox_scroll: 0,
             toolbox_viewport: (0, 0),

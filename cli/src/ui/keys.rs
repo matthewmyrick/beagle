@@ -35,6 +35,7 @@ impl App {
             KeyCode::Char('o') => self.open_links(),
             KeyCode::Char('R') => self.open_related(),
             KeyCode::Char('V') => self.verify_final_review(),
+            KeyCode::Char('t') => self.open_status_picker(),
             KeyCode::Char('S') => self.open_settings(),
             // `/` always searches keywords across the selected incident;
             // `f` filters the incident list; `F` follows (tail -f). Each
@@ -113,6 +114,8 @@ impl App {
     fn route_modal_key(&mut self, key: KeyEvent) -> bool {
         if self.confirm_delete.is_some() {
             self.handle_confirm_delete_key(key.code);
+        } else if self.status_picker.is_some() {
+            self.handle_status_picker_key(key.code);
         } else if self.finder.is_some() {
             self.handle_finder_key(key.code, key.modifiers.contains(KeyModifiers::CONTROL));
         } else if self.filter_input != super::FilterInput::Off {
