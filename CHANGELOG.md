@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-07-20
+
 ### Added
 
 - `skip-final-review` tag: a workspace carrying it in `rca.toml`'s
