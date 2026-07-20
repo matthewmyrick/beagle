@@ -6,6 +6,74 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `#` opens a floating tags editor on the selected incident: current
+  tags as rows (with a callout on `skip-final-review` explaining its
+  effect), `a` adds — typed inline, trimmed, deduped, whitespace
+  rejected — `d` deletes, and every edit writes straight to the
+  manifest via the new `Store::set_tags` (atomic, stamps `updated`).
+  Esc peels typing → closed (#91).
+
+## [0.17.0] - 2026-07-20
+
+### Added
+
+- `skip-final-review` tag: a workspace carrying it in `rca.toml`'s
+  `tags` advances straight to **`finished`** when every attached fix PR
+  merges — no verification pass, no `V` sign-off. An ordinary tag, so no
+  manifest-format change and older binaries read it fine; the /beagle
+  skill tells agents to set it only when the user asks (#88).
+
+## [0.16.0] - 2026-07-20
+
+### Changed
+
+- `beagle init` now sets up the whole store, not just the templates: run
+  bare in a terminal with no governing `.beagle`, it asks where the
+  store root should live (enter accepts the current directory), writes
+  the `.beagle` pinning it — empty when the cwd itself is the root, so
+  `beagle` run anywhere under it finds the store from then on — then
+  scaffolds `toolbox.md` + `systems/` there as before. With `--root`,
+  when piped (agents, scripts), or when a `.beagle` already governs the
+  directory, behavior is exactly as before: no prompt, nothing written
+  but the templates. Never overwrites an existing `.beagle` (#85).
+
+## [0.15.0] - 2026-07-20
+
+### Added
+
+- `.beagle` project files: drop a `.beagle` (same TOML as the config
+  file) in a directory and beagle finds it git-style, walking up from
+  wherever it runs — no more `--root` for every command. Fields it sets
+  win; anything unset falls back to the global config. A relative `root`
+  resolves against the `.beagle`'s directory, and an **empty** `.beagle`
+  pins its own directory as the root, exactly like `.git` marks a repo.
+  Precedence: `--root` flag → nearest `.beagle` → global config →
+  existing `rcas/` discovery; `$BEAGLE_CONFIG` skips project discovery
+  entirely (#82).
+
+## [0.14.0] - 2026-07-20
+
+### Added
+
+- `t` opens a floating status picker on the selected incident: the five
+  lifecycle stages with their glyphs and a one-line hint each, current
+  stage marked. `j`/`k` move, enter applies (atomic manifest write —
+  other beagle instances see it live), esc cancels; re-picking the
+  current stage closes without a write (#79).
+
+## [0.13.0] - 2026-07-20
+
+### Added
+
+- `D` (shift-d) on the incident list deletes the selected RCA — behind a
+  red floating confirmation naming the incident (title + slug). Only an
+  explicit `y` deletes (enter is deliberately ignored so a queued
+  keypress can never confirm); `n`/esc cancel. Works on archived
+  incidents too, and the popup pins the workspace by id at open time so
+  a reload underneath can never redirect the delete (#76).
+
 ## [0.12.0] - 2026-07-17
 
 ### Added

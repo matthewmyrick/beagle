@@ -480,3 +480,194 @@ fn shift_e_edits_the_current_diagram_when_one_exists() {
         other => panic!("expected Flow::Edit, got {other:?}"),
     }
 }
+
+#[test]
+fn shift_d_confirms_before_deleting_and_only_y_deletes() {
+    let mut app = app_with(2);
+    let doomed = app.selected_rca().expect("selected").id.clone();
+    let dir = app.store.workspace_dir(&doomed);
+
+    // D opens the confirmation; the list is untouched until an answer.
+    press(&mut app, KeyCode::Char('D'));
+    assert!(app.confirm_delete.is_some(), "popup open");
+    assert_eq!(app.rcas.len(), 2);
+
+    // Enter must NOT confirm — a queued enter from navigation would
+    // otherwise delete without the user ever seeing the popup.
+    press(&mut app, KeyCode::Enter);
+    assert!(app.confirm_delete.is_some(), "enter is ignored");
+    assert!(dir.exists());
+
+    // n cancels, everything intact.
+    press(&mut app, KeyCode::Char('n'));
+    assert!(app.confirm_delete.is_none());
+    assert!(dir.exists());
+    assert_eq!(app.rcas.len(), 2);
+
+    // D then y deletes and reloads.
+    press(&mut app, KeyCode::Char('D'));
+    press(&mut app, KeyCode::Char('y'));
+    assert!(app.confirm_delete.is_none());
+    assert!(!dir.exists(), "workspace directory removed");
+    assert_eq!(app.rcas.len(), 1);
+    assert!(
+        app.status_line().is_some_and(|s| s.contains("deleted")),
+        "status announces the delete"
+    );
+}
+
+#[test]
+fn shift_d_is_list_only_and_esc_cancels() {
+    let mut app = app_with(1);
+
+    // Content focus: D is not a delete trigger while reading.
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Char('D'));
+    assert!(app.confirm_delete.is_none(), "no popup from content focus");
+
+    // Back on the list, esc closes the popup without deleting.
+    press(&mut app, KeyCode::Esc);
+    press(&mut app, KeyCode::Char('D'));
+    assert!(app.confirm_delete.is_some());
+    press(&mut app, KeyCode::Esc);
+    assert!(app.confirm_delete.is_none());
+    assert_eq!(app.rcas.len(), 1);
+
+    // Nothing selected: D says so instead of opening an empty popup.
+    let mut empty = app_with(0);
+    press(&mut empty, KeyCode::Char('D'));
+    assert!(empty.confirm_delete.is_none());
+    assert!(empty
+        .status_line()
+        .is_some_and(|s| s.contains("nothing to delete")));
+}
+
+#[test]
+fn t_opens_the_status_picker_and_enter_applies_the_stage() {
+    use crate::model::Status;
+
+    let mut app = app_with(1);
+    assert_eq!(
+        app.selected_rca().expect("selected").meta.status,
+        Status::Investigating
+    );
+
+    press(&mut app, KeyCode::Char('t'));
+    let picker = app.status_picker.as_ref().expect("picker open");
+    assert_eq!(picker.current, Status::Investigating);
+    assert_eq!(picker.selected, 0, "current stage highlighted");
+
+    // Move to `review` and apply; the manifest write reloads the list.
+    press(&mut app, KeyCode::Char('j'));
+    press(&mut app, KeyCode::Enter);
+    assert!(app.status_picker.is_none());
+    assert_eq!(
+        app.selected_rca().expect("selected").meta.status,
+        Status::Review
+    );
+    assert!(
+        app.status_line().is_some_and(|s| s.contains("review")),
+        "status announces the change"
+    );
+}
+
+#[test]
+fn status_picker_esc_cancels_and_repicking_current_writes_nothing() {
+    use crate::model::Status;
+
+    let mut app = app_with(1);
+    let before = app
+        .store
+        .read_meta(&app.selected_rca().expect("selected").id.clone())
+        .expect("meta");
+
+    // Esc: no change.
+    press(&mut app, KeyCode::Char('t'));
+    press(&mut app, KeyCode::Char('j'));
+    press(&mut app, KeyCode::Esc);
+    assert!(app.status_picker.is_none());
+    assert_eq!(
+        app.selected_rca().expect("selected").meta.status,
+        Status::Investigating
+    );
+
+    // Enter on the current stage: closes without stamping `updated`.
+    press(&mut app, KeyCode::Char('t'));
+    press(&mut app, KeyCode::Enter);
+    assert!(app.status_picker.is_none());
+    let after = app
+        .store
+        .read_meta(&app.selected_rca().expect("selected").id.clone())
+        .expect("meta");
+    assert_eq!(before.updated, after.updated, "no spurious write");
+
+    // Nothing selected: t says so.
+    let mut empty = app_with(0);
+    press(&mut empty, KeyCode::Char('t'));
+    assert!(empty.status_picker.is_none());
+    assert!(empty
+        .status_line()
+        .is_some_and(|s| s.contains("nothing to set")));
+}
+
+#[test]
+fn hash_opens_the_tags_editor_and_edits_write_through() {
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    press(&mut app, KeyCode::Char('#'));
+    assert!(app.tags_editor.is_some(), "editor open");
+
+    // Type a new tag: `a` enters typing mode, chars build it, enter lands
+    // it on disk immediately.
+    press(&mut app, KeyCode::Char('a'));
+    for c in "skip-final-review".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(
+        app.store.read_meta(&id).expect("meta").tags,
+        vec!["skip-final-review".to_owned()],
+        "written to the manifest"
+    );
+    let editor = app.tags_editor.as_ref().expect("still open");
+    assert_eq!(editor.tags, vec!["skip-final-review".to_owned()]);
+    assert!(editor.typing.is_none(), "back in navigation mode");
+
+    // `d` on the tag deletes it from disk too.
+    press(&mut app, KeyCode::Char('k'));
+    press(&mut app, KeyCode::Char('d'));
+    assert!(app.store.read_meta(&id).expect("meta").tags.is_empty());
+
+    // Esc closes; nothing selected on an empty store just reports.
+    press(&mut app, KeyCode::Esc);
+    assert!(app.tags_editor.is_none());
+    let mut empty = app_with(0);
+    press(&mut empty, KeyCode::Char('#'));
+    assert!(empty.tags_editor.is_none());
+}
+
+#[test]
+fn tags_editor_rejects_whitespace_and_esc_peels_typing_first() {
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    press(&mut app, KeyCode::Char('#'));
+    press(&mut app, KeyCode::Char('a'));
+    for c in "two words".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+    assert!(
+        app.store.read_meta(&id).expect("meta").tags.is_empty(),
+        "whitespace tag never lands"
+    );
+    assert!(app.status_line().is_some_and(|s| s.contains("kebab-case")));
+
+    // Esc from typing returns to navigation, second esc closes.
+    press(&mut app, KeyCode::Char('a'));
+    press(&mut app, KeyCode::Esc);
+    assert!(app.tags_editor.as_ref().expect("open").typing.is_none());
+    press(&mut app, KeyCode::Esc);
+    assert!(app.tags_editor.is_none());
+}

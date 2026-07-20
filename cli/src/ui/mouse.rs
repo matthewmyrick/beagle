@@ -41,6 +41,17 @@ impl App {
         } else {
             KeyCode::Down
         };
+        if self.confirm_delete.is_some() {
+            return; // y/n only — the wheel must not touch the list beneath
+        }
+        if self.status_picker.is_some() {
+            self.handle_status_picker_key(arrow);
+            return;
+        }
+        if self.tags_editor.is_some() {
+            self.handle_tags_editor_key(arrow);
+            return;
+        }
         if self.finder.is_some() {
             self.handle_finder_key(arrow, false);
             return;
@@ -94,6 +105,9 @@ impl App {
             || self.links.is_some()
             || self.related.is_some()
             || self.settings.is_some()
+            || self.confirm_delete.is_some()
+            || self.status_picker.is_some()
+            || self.tags_editor.is_some()
         {
             return;
         }

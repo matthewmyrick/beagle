@@ -23,36 +23,7 @@ impl App {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             return Flow::Quit;
         }
-        if self.finder.is_some() {
-            self.handle_finder_key(key.code, key.modifiers.contains(KeyModifiers::CONTROL));
-            return Flow::Continue;
-        }
-        if self.filter_input != super::FilterInput::Off {
-            self.handle_search_key(key.code);
-            return Flow::Continue;
-        }
-        if self.content_search.as_ref().is_some_and(|s| s.typing) {
-            self.handle_content_search_key(key.code);
-            return Flow::Continue;
-        }
-        if self.links.is_some() {
-            self.handle_links_key(key.code);
-            return Flow::Continue;
-        }
-        if self.related.is_some() {
-            self.handle_related_key(key.code);
-            return Flow::Continue;
-        }
-        if self.settings.is_some() {
-            self.handle_settings_key(key.code);
-            return Flow::Continue;
-        }
-        if self.toolbox.is_some() {
-            self.handle_toolbox_key(key.code);
-            return Flow::Continue;
-        }
-        if self.show_help {
-            self.show_help = false;
+        if self.route_modal_key(key) {
             return Flow::Continue;
         }
         match key.code {
@@ -64,6 +35,8 @@ impl App {
             KeyCode::Char('o') => self.open_links(),
             KeyCode::Char('R') => self.open_related(),
             KeyCode::Char('V') => self.verify_final_review(),
+            KeyCode::Char('t') => self.open_status_picker(),
+            KeyCode::Char('#') => self.open_tags_editor(),
             KeyCode::Char('S') => self.open_settings(),
             // `/` always searches keywords across the selected incident;
             // `f` filters the incident list; `F` follows (tail -f). Each
@@ -74,6 +47,10 @@ impl App {
                 self.filter_input = super::FilterInput::Facets;
                 self.focus = Focus::List;
             }
+            // Shift-D, list focus only: deleting is a list-management
+            // action, and the guard keeps a stray D while reading content
+            // from opening a destructive prompt.
+            KeyCode::Char('D') if self.focus == Focus::List => self.open_confirm_delete(),
             KeyCode::Char('b') => self.focus = Focus::List,
             KeyCode::Char('s') => self.toggle_sidebar(),
             KeyCode::Char('a') => self.toggle_archived(),
@@ -130,6 +107,38 @@ impl App {
             self.sidebar_collapsed = false;
         }
         Flow::Continue
+    }
+
+    /// Routes the key to whichever modal owns it, returning whether one
+    /// did. The delete confirmation is checked first: while it is open,
+    /// nothing else may interpret a key — least of all `y`.
+    fn route_modal_key(&mut self, key: KeyEvent) -> bool {
+        if self.confirm_delete.is_some() {
+            self.handle_confirm_delete_key(key.code);
+        } else if self.status_picker.is_some() {
+            self.handle_status_picker_key(key.code);
+        } else if self.tags_editor.is_some() {
+            self.handle_tags_editor_key(key.code);
+        } else if self.finder.is_some() {
+            self.handle_finder_key(key.code, key.modifiers.contains(KeyModifiers::CONTROL));
+        } else if self.filter_input != super::FilterInput::Off {
+            self.handle_search_key(key.code);
+        } else if self.content_search.as_ref().is_some_and(|s| s.typing) {
+            self.handle_content_search_key(key.code);
+        } else if self.links.is_some() {
+            self.handle_links_key(key.code);
+        } else if self.related.is_some() {
+            self.handle_related_key(key.code);
+        } else if self.settings.is_some() {
+            self.handle_settings_key(key.code);
+        } else if self.toolbox.is_some() {
+            self.handle_toolbox_key(key.code);
+        } else if self.show_help {
+            self.show_help = false;
+        } else {
+            return false;
+        }
+        true
     }
 
     /// `E`: the file behind the current tab, to open in the user's editor.
