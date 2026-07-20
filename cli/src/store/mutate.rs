@@ -217,6 +217,28 @@ impl Store {
         Ok(true)
     }
 
+    /// Replaces the workspace's tag list wholesale, stamping `updated`.
+    /// Tags are trimmed and deduplicated (first occurrence wins); empty
+    /// and whitespace-only entries are dropped.
+    ///
+    /// # Errors
+    /// Fails as manifest read/write does.
+    pub fn set_tags(&self, id: &RcaId, tags: Vec<String>) -> Result<RcaMeta> {
+        let mut meta = self.read_meta(id)?;
+        let mut cleaned: Vec<String> = Vec::new();
+        for tag in tags {
+            let tag = tag.trim();
+            if !tag.is_empty() && !cleaned.iter().any(|existing| existing == tag) {
+                cleaned.push(tag.to_owned());
+            }
+        }
+        meta.tags = cleaned;
+        meta.updated = Some(OffsetDateTime::now_utc());
+        let manifest = toml::to_string_pretty(&meta)?;
+        write_atomic(&self.workspace_dir(id).join(MANIFEST_FILE), &manifest)?;
+        Ok(meta)
+    }
+
     /// Deletes a workspace directory — active or archived — permanently,
     /// with everything in it. The manifest must parse first: delete
     /// refuses to guess about a directory it cannot identify as a

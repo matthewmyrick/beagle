@@ -371,6 +371,73 @@ pub(super) fn draw_status_picker(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, rect, &mut state);
 }
 
+/// The `#` tags editor: current tags as rows, a trailing `+ add tag` row,
+/// and an inline input while typing. Adds/deletes write straight to the
+/// manifest, so what you see is what's on disk.
+pub(super) fn draw_tags_editor(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(editor) = app.tags_editor() else {
+        return;
+    };
+    let width = area.width.saturating_sub(6).clamp(36, 64);
+    let inner = usize::from(width.saturating_sub(6));
+
+    let mut items: Vec<ListItem<'_>> = editor
+        .tags
+        .iter()
+        .map(|tag| {
+            let special = tag == crate::model::SKIP_FINAL_REVIEW_TAG;
+            let mut spans = vec![Span::raw(format!(" {}", truncate(tag, inner)))];
+            if special {
+                spans.push(Span::styled(
+                    "  (merged PRs → finished)",
+                    Style::default().fg(Color::Yellow),
+                ));
+            }
+            ListItem::new(Line::from(spans))
+        })
+        .collect();
+    items.push(ListItem::new(Line::styled(
+        match &editor.typing {
+            Some(buffer) => format!(" + {buffer}▌"),
+            None => " + add tag".to_owned(),
+        },
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let height = u16::try_from(items.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(2)
+        .min(area.height.saturating_sub(2));
+    let rect = center(area, width, height);
+
+    let block = Block::default()
+        .title(format!(
+            " tags — {} ",
+            truncate(&editor.title, usize::from(width).saturating_sub(10))
+        ))
+        .title_alignment(Alignment::Center)
+        .title_bottom(
+            Line::from(if editor.typing.is_some() {
+                " type tag · enter add · esc back "
+            } else {
+                " a add · d delete · j/k move · esc close "
+            })
+            .centered(),
+        )
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(40, 44, 60))
+            .add_modifier(Modifier::BOLD),
+    );
+    let mut state = ListState::default();
+    state.select(Some(editor.selected));
+    frame.render_widget(Clear, rect);
+    frame.render_stateful_widget(list, rect, &mut state);
+}
+
 /// The `D` delete confirmation: names the incident (title + slug) and
 /// waits for an explicit `y` or `n`. Red border — this one is destructive.
 pub(super) fn draw_confirm_delete(frame: &mut Frame, app: &App, area: Rect) {
@@ -444,6 +511,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("R", "related incidents (shared systems/tags); enter jumps"),
         ("V", "sign off final-review as verified \u{2192} finished"),
         ("t", "set status: pick the RCA's lifecycle stage"),
+        ("#", "edit tags: add / remove, incl. skip-final-review"),
         ("D", "delete the selected incident (y/n confirm popup)"),
         ("S", "settings: view + edit the config file"),
         ("n / p", "next / previous diagram"),
