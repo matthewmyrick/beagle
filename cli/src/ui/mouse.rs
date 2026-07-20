@@ -41,6 +41,9 @@ impl App {
         } else {
             KeyCode::Down
         };
+        if self.confirm_delete.is_some() {
+            return; // y/n only — the wheel must not touch the list beneath
+        }
         if self.finder.is_some() {
             self.handle_finder_key(arrow, false);
             return;
@@ -94,6 +97,7 @@ impl App {
             || self.links.is_some()
             || self.related.is_some()
             || self.settings.is_some()
+            || self.confirm_delete.is_some()
         {
             return;
         }

@@ -217,6 +217,27 @@ impl Store {
         Ok(true)
     }
 
+    /// Deletes a workspace directory — active or archived — permanently,
+    /// with everything in it. The manifest must parse first: delete
+    /// refuses to guess about a directory it cannot identify as a
+    /// workspace (remove broken ones by hand).
+    ///
+    /// # Errors
+    /// [`Error::Tool`] for the reserved `archive` id; otherwise fails as
+    /// manifest read does, or [`Error::Io`] if the removal itself fails.
+    pub fn delete(&self, id: &RcaId) -> Result<PathBuf> {
+        if id.as_str() == ARCHIVE_DIR {
+            return Err(Error::Tool {
+                tool: "delete",
+                message: format!("`{ARCHIVE_DIR}` is the archive directory, not a workspace"),
+            });
+        }
+        let _ = self.read_meta(id)?; // proves this is a loadable workspace
+        let dir = self.workspace_dir(id);
+        fs::remove_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+        Ok(dir)
+    }
+
     /// Publishes or unpublishes an incident: sets the `published` flag and,
     /// when publishing, stamps `published_at` with the current time (clears
     /// it when unpublishing). Stamps `updated` too. Returns the resulting

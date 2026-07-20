@@ -307,6 +307,51 @@ pub(super) fn draw_finder(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, rect, &mut state);
 }
 
+/// The `D` delete confirmation: names the incident (title + slug) and
+/// waits for an explicit `y` or `n`. Red border — this one is destructive.
+pub(super) fn draw_confirm_delete(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(confirm) = app.confirm_delete() else {
+        return;
+    };
+    let width = area.width.saturating_sub(6).clamp(30, 72);
+    let inner = usize::from(width.saturating_sub(4));
+
+    let lines = vec![
+        Line::from(""),
+        Line::styled(
+            truncate(&confirm.title, inner),
+            Style::default().add_modifier(Modifier::BOLD),
+        )
+        .centered(),
+        Line::styled(
+            truncate(&confirm.id.to_string(), inner),
+            Style::default().fg(Color::DarkGray),
+        )
+        .centered(),
+        Line::from(""),
+        Line::styled(
+            "permanently deletes the workspace directory and all its files",
+            Style::default().fg(Color::Red),
+        )
+        .centered(),
+    ];
+    let height = u16::try_from(lines.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(2)
+        .min(area.height.saturating_sub(2));
+    let rect = center(area, width, height);
+
+    let block = Block::default()
+        .title(" delete this incident? ")
+        .title_alignment(Alignment::Center)
+        .title_bottom(Line::from(" y delete · n / esc cancel ").centered())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Red));
+    frame.render_widget(Clear, rect);
+    frame.render_widget(Paragraph::new(lines).block(block), rect);
+}
+
 pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
     let rows = [
         ("j / k, ↓ / ↑", "select incident or scroll content"),
@@ -334,6 +379,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("o", "links: open attached PRs / URLs on this tab"),
         ("R", "related incidents (shared systems/tags); enter jumps"),
         ("V", "sign off final-review as verified \u{2192} finished"),
+        ("D", "delete the selected incident (y/n confirm popup)"),
         ("S", "settings: view + edit the config file"),
         ("n / p", "next / previous diagram"),
         ("h / l, ← / →", "pan diagrams horizontally"),

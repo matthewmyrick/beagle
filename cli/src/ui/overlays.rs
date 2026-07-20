@@ -35,6 +35,17 @@ pub(crate) struct RelatedItem {
     pub shared: String,
 }
 
+/// State of the `D` delete confirmation popup: the workspace it will
+/// delete if confirmed. Pinned by id at open time, so a selection change
+/// underneath (e.g. a reload) can never redirect the delete.
+#[derive(Debug)]
+pub(crate) struct ConfirmDelete {
+    /// The workspace to delete on `y`.
+    pub id: RcaId,
+    /// Its title, shown so the user confirms the right incident.
+    pub title: String,
+}
+
 /// State of the `R` related-incidents popup.
 #[derive(Debug)]
 pub(crate) struct RelatedPopup {
@@ -109,6 +120,51 @@ impl App {
     /// The link popup, when open.
     pub(crate) fn links(&self) -> Option<&LinksPopup> {
         self.links.as_ref()
+    }
+
+    /// Opens the `D` delete confirmation for the selected incident. The
+    /// delete itself only happens on an explicit `y` — see
+    /// [`Self::handle_confirm_delete_key`].
+    pub(crate) fn open_confirm_delete(&mut self) {
+        let Some(rca) = self.selected_rca() else {
+            self.status = Some("no incident selected — nothing to delete".to_owned());
+            return;
+        };
+        self.confirm_delete = Some(ConfirmDelete {
+            id: rca.id.clone(),
+            title: rca.meta.title.clone(),
+        });
+    }
+
+    /// Keystrokes while the delete confirmation is open. Only an explicit
+    /// `y` deletes; `n`, esc, or `q` cancel. Enter deliberately does
+    /// nothing — a queued enter from normal navigation must never confirm
+    /// a destructive action.
+    pub(crate) fn handle_confirm_delete_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Char('y' | 'Y') => {
+                let Some(confirm) = self.confirm_delete.take() else {
+                    return;
+                };
+                match self.store.delete(&confirm.id) {
+                    Ok(_) => {
+                        let _ = self.reload();
+                        self.status = Some(format!("deleted {}", confirm.id));
+                    }
+                    Err(e) => self.status = Some(format!("delete failed: {e}")),
+                }
+            }
+            KeyCode::Esc | KeyCode::Char('n' | 'N' | 'q') => {
+                self.confirm_delete = None;
+                self.status = Some("delete cancelled".to_owned());
+            }
+            _ => {}
+        }
+    }
+
+    /// The delete confirmation, when open.
+    pub(crate) fn confirm_delete(&self) -> Option<&ConfirmDelete> {
+        self.confirm_delete.as_ref()
     }
 
     /// Builds and opens the `R` popup: past workspaces sharing systems or
