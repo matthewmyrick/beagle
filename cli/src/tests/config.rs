@@ -112,3 +112,90 @@ fn notify_events_all_enables_every_event() {
     assert_eq!(NotifyEvents::default(), NotifyEvents::default());
     assert!(!NotifyEvents::default().finished);
 }
+
+#[test]
+fn find_project_file_walks_up_and_prefers_the_nearest() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let outer = tmp.path();
+    let inner = outer.join("services").join("payments");
+    std::fs::create_dir_all(&inner).expect("mkdir");
+
+    assert_eq!(find_project_file(&inner), None, "no .beagle anywhere yet");
+
+    std::fs::write(outer.join(PROJECT_FILE), "").expect("write outer");
+    assert_eq!(
+        find_project_file(&inner),
+        Some(outer.join(PROJECT_FILE)),
+        "found walking up"
+    );
+
+    // A nearer one shadows the ancestor, like nested git repos.
+    std::fs::write(inner.join(PROJECT_FILE), "").expect("write inner");
+    assert_eq!(find_project_file(&inner), Some(inner.join(PROJECT_FILE)));
+
+    // A .beagle *directory* is not a project file.
+    let elsewhere = outer.join("elsewhere");
+    std::fs::create_dir_all(elsewhere.join(PROJECT_FILE)).expect("mkdir");
+    assert_eq!(
+        find_project_file(&elsewhere),
+        Some(outer.join(PROJECT_FILE))
+    );
+}
+
+#[test]
+fn project_file_pins_the_root_like_git() {
+    let dir = Path::new("/work/oncall");
+    let file = dir.join(PROJECT_FILE);
+
+    // Empty .beagle: its own directory is the root.
+    let config = resolve_project(&file, Config::default(), None);
+    assert_eq!(config.root.as_deref(), Some(dir));
+
+    // Relative root resolves against the .beagle's directory.
+    let project = parse("root = \"stores/prod\"").expect("parse");
+    let config = resolve_project(&file, project, None);
+    assert_eq!(
+        config.root.as_deref(),
+        Some(dir.join("stores/prod").as_path())
+    );
+
+    // Absolute root is taken as-is.
+    let project = parse("root = \"/srv/rcas\"").expect("parse");
+    let config = resolve_project(&file, project, None);
+    assert_eq!(config.root.as_deref(), Some(Path::new("/srv/rcas")));
+}
+
+#[test]
+fn project_fields_win_and_unset_fields_fall_back_to_global() {
+    let file = Path::new("/work/oncall").join(PROJECT_FILE);
+    let project = parse("editor = \"hx\"").expect("parse");
+    let global = parse("root = \"/ignored\"\neditor = \"vim\"\nnotify = true").expect("parse");
+
+    let config = resolve_project(&file, project, Some(global));
+    assert_eq!(config.editor.as_deref(), Some("hx"), "project wins");
+    assert_eq!(config.notify, Some(true), "unset falls back to global");
+    assert_eq!(
+        config.root.as_deref(),
+        Some(Path::new("/work/oncall")),
+        "the .beagle pins the root — the global root never leaks through"
+    );
+}
+
+#[test]
+fn load_effective_reads_a_real_dot_beagle() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let nested = tmp.path().join("deep").join("er");
+    std::fs::create_dir_all(&nested).expect("mkdir");
+    std::fs::write(tmp.path().join(PROJECT_FILE), "").expect("write");
+
+    let config = load_effective(&nested)
+        .expect("load")
+        .expect("project config found");
+    // Only the root is asserted — other fields may merge from whatever
+    // global config exists on the machine running the tests.
+    assert_eq!(config.root.as_deref(), Some(tmp.path()));
+
+    // An invalid .beagle is an error, not silently the default config.
+    std::fs::write(tmp.path().join(PROJECT_FILE), "root = 42").expect("write");
+    assert!(load_effective(&nested).is_err());
+}

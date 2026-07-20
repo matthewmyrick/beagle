@@ -54,7 +54,7 @@ fn run(command: Command) -> Result<(), Error> {
             Ok(())
         }
         Command::Tui { root } => {
-            let config = config::load_default().ok().flatten();
+            let config = effective_config().ok().flatten();
             let notify = config.as_ref().and_then(|c| c.notify).unwrap_or(false);
             // Absent `[notify_events]` means every event fires.
             let events = config
@@ -226,7 +226,7 @@ fn run_set_published(root: Option<PathBuf>, id: &RcaId, published: bool) -> Resu
 /// the environment, and its output streams to the terminal. Book-ended in
 /// the workspace log so the live view shows the hand-off.
 fn run_handoff(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
-    let handoff = config::load_default()?
+    let handoff = effective_config()?
         .and_then(|c| c.handoff)
         .filter(|h| !h.command.is_empty())
         .ok_or_else(|| Error::Tool {
@@ -365,22 +365,31 @@ fn run_similar(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
     Ok(())
 }
 
-/// Resolves the workspace root: explicit `--root` → config file `root` →
-/// nearest ancestor of the working directory that already contains
-/// `rcas/` → the working directory. An invalid config surfaces here
-/// rather than being silently ignored — otherwise beagle would quietly
-/// open the wrong root.
+/// Resolves the workspace root: explicit `--root` → the effective config's
+/// `root` (a `.beagle` found walking up from the working directory, else
+/// the global config) → nearest ancestor of the working directory that
+/// already contains `rcas/` → the working directory. An invalid config
+/// surfaces here rather than being silently ignored — otherwise beagle
+/// would quietly open the wrong root.
 fn effective_root(explicit: Option<PathBuf>) -> Result<PathBuf, Error> {
     if let Some(root) = explicit {
         return Ok(root);
     }
-    if let Some(config) = config::load_default()? {
+    if let Some(config) = effective_config()? {
         if let Some(root) = config.root {
             return Ok(root);
         }
     }
     let cwd = env::current_dir().map_err(|e| Error::io(".", e))?;
     Ok(beagle::store::discover_root(&cwd))
+}
+
+/// The config governing this invocation: the nearest `.beagle` walking up
+/// from the working directory (git-style), falling back to the global
+/// config file — see [`config::load_effective`].
+fn effective_config() -> Result<Option<config::Config>, Error> {
+    let cwd = env::current_dir().map_err(|e| Error::io(".", e))?;
+    config::load_effective(&cwd)
 }
 
 /// `beagle config`: create the file from the template if absent, open it in

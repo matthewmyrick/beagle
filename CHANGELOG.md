@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `.beagle` project files: drop a `.beagle` (same TOML as the config
+  file) in a directory and beagle finds it git-style, walking up from
+  wherever it runs — no more `--root` for every command. Fields it sets
+  win; anything unset falls back to the global config. A relative `root`
+  resolves against the `.beagle`'s directory, and an **empty** `.beagle`
+  pins its own directory as the root, exactly like `.git` marks a repo.
+  Precedence: `--root` flag → nearest `.beagle` → global config →
+  existing `rcas/` discovery; `$BEAGLE_CONFIG` skips project discovery
+  entirely (#82).
+
 ## [0.14.0] - 2026-07-20
 
 ### Added
