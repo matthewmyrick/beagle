@@ -4,6 +4,17 @@ The desktop app versions and releases independently of the CLI, on
 `desktop-v*` tags. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] - 2026-07-20
+
+### Added
+
+- Diagrams render their ANSI SGR colors as styled HTML — red/green/
+  yellow annotations (`◀── BUG`) now show in color instead of being
+  stripped, with exact character alignment preserved (#75).
+- Rebased on cli 0.18.0: the bundled crate brings the `agent` lifecycle
+  status, `skip-final-review` tag handling, `.beagle` project-file
+  discovery, and the publish flags along for the ride.
+
 ## [0.1.1] - 2026-07-17
 
 ### Fixed
