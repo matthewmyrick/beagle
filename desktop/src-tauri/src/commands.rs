@@ -88,8 +88,8 @@ pub fn list_diagrams(id: &str) -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// One diagram's text with ANSI colors stripped — the webview gets plain
-/// alignment-safe text; colored rendering is a follow-up. `None` when the
+/// One diagram's raw text, ANSI intact — the frontend converts the SGR
+/// color codes to styled spans (see `src/lib/ansi.ts`). `None` when the
 /// file vanished since listing.
 #[tauri::command]
 pub fn read_diagram(id: &str, name: &str) -> Result<Option<String>, String> {
@@ -103,10 +103,7 @@ pub fn read_diagram(id: &str, name: &str) -> Result<Option<String>, String> {
     else {
         return Ok(None);
     };
-    Ok(store
-        .read_diagram(&entry)
-        .map_err(|e| e.to_string())?
-        .map(|content| beagle::ansi::strip(&content)))
+    store.read_diagram(&entry).map_err(|e| e.to_string())
 }
 
 /// Archives a workspace (requires `finished`, like the CLI without
