@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-20
+
 ### Added
 
 - `D` (shift-d) on the incident list deletes the selected RCA — behind a
