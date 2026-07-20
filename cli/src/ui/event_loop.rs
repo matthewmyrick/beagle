@@ -145,13 +145,15 @@ impl App {
     /// `review` or `agent` → `final-review` the moment every attached fix
     /// PR has merged, per the states the background `gh` poller reports —
     /// whether the PR was opened during review or by the agent doing the
-    /// remediation. The manifest write is atomic and also wakes the
-    /// filesystem watcher, so other beagle instances see the transition
-    /// too. Workspaces without attached PRs never auto-advance — there is
-    /// nothing to observe merge.
+    /// remediation. Workspaces tagged `skip-final-review` advance straight
+    /// to `finished` instead: no checklist, no sign-off. The manifest
+    /// write is atomic and also wakes the filesystem watcher, so other
+    /// beagle instances see the transition too. Workspaces without
+    /// attached PRs never auto-advance — there is nothing to observe
+    /// merge.
     pub(crate) fn advance_merged_reviews(&mut self) {
         use crate::model::Status;
-        let ready: Vec<(RcaId, String)> = self
+        let ready: Vec<(RcaId, String, Status)> = self
             .rcas
             .iter()
             .filter(|rca| {
@@ -164,19 +166,31 @@ impl App {
                     .iter()
                     .all(|url| self.pr_states.get(url) == Some(&crate::prs::PrState::Merged))
             })
-            .map(|rca| (rca.id.clone(), rca.meta.title.clone()))
+            .map(|rca| {
+                let target = if rca.meta.skips_final_review() {
+                    Status::Finished
+                } else {
+                    Status::FinalReview
+                };
+                (rca.id.clone(), rca.meta.title.clone(), target)
+            })
             .collect();
         if ready.is_empty() {
             return;
         }
-        for (id, title) in &ready {
-            match self.store.set_status(id, crate::model::Status::FinalReview) {
+        for (id, title, target) in &ready {
+            match self.store.set_status(id, *target) {
                 Ok(_) => {
-                    self.status = Some(format!("→ final-review: {title} (all fix PRs merged)"));
+                    self.status = Some(match target {
+                        Status::Finished => format!(
+                            "→ finished: {title} (all fix PRs merged; final review skipped)"
+                        ),
+                        _ => format!("→ final-review: {title} (all fix PRs merged)"),
+                    });
                 }
-                Err(e) => self.warnings.push(LoadWarning(format!(
-                    "auto final-review failed for {id}: {e}"
-                ))),
+                Err(e) => self
+                    .warnings
+                    .push(LoadWarning(format!("auto {target} failed for {id}: {e}"))),
             }
         }
         let _ = self.reload();

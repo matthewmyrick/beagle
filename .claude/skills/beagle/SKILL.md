@@ -135,6 +135,10 @@ Edit `rca.toml` as the investigation progresses:
   emits them as YAML frontmatter `tags`, which Obsidian and similar tools
   index directly, and `similar` ranks on them. Tag the failure class and
   the technologies involved, not the incident specifics.
+  One tag is special: `skip-final-review` sends the RCA straight to
+  `finished` when its PRs merge — no verification pass. Only add it when
+  the user says the incident needs no final review (trivial fixes,
+  drills); a real outage always deserves the checklist.
 - Unknown fields are rejected — don't invent new ones.
 - **When remediation lands as a PR**, attach it:
   `beagle pr add <slug> <url>`. Both apps then track its merge status live

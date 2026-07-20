@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `skip-final-review` tag: a workspace carrying it in `rca.toml`'s
+  `tags` advances straight to **`finished`** when every attached fix PR
+  merges — no verification pass, no `V` sign-off. An ordinary tag, so no
+  manifest-format change and older binaries read it fine; the /beagle
+  skill tells agents to set it only when the user asks (#88).
+
 ## [0.16.0] - 2026-07-20
 
 ### Changed

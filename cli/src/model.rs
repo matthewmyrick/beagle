@@ -264,6 +264,21 @@ pub struct RcaMeta {
     pub published_at: Option<OffsetDateTime>,
 }
 
+/// Tag that opts a workspace out of the verification pass: when every
+/// attached fix PR has merged, it advances straight to `finished` instead
+/// of parking in `final-review` for the `V` sign-off. An ordinary entry in
+/// `tags`, so no manifest-format change and older binaries read it fine.
+pub const SKIP_FINAL_REVIEW_TAG: &str = "skip-final-review";
+
+impl RcaMeta {
+    /// Whether the [`SKIP_FINAL_REVIEW_TAG`] is set — merged fix PRs then
+    /// advance this workspace straight to `finished`.
+    #[must_use]
+    pub fn skips_final_review(&self) -> bool {
+        self.tags.iter().any(|tag| tag == SKIP_FINAL_REVIEW_TAG)
+    }
+}
+
 /// A workspace as listed in the sidebar: identity plus manifest, no section
 /// content (that is loaded lazily by the store when a tab is opened).
 #[derive(Debug, Clone, PartialEq)]
