@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-20
+
 ### Added
 
 - `t` opens a floating status picker on the selected incident: the five
