@@ -199,3 +199,38 @@ fn load_effective_reads_a_real_dot_beagle() {
     std::fs::write(tmp.path().join(PROJECT_FILE), "root = 42").expect("write");
     assert!(load_effective(&nested).is_err());
 }
+
+#[test]
+fn write_project_file_pins_roots_and_never_overwrites() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+
+    // No root: an empty file — the directory itself is the root.
+    let path = write_project_file(tmp.path(), None).expect("write empty");
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), "");
+    let config = load_effective(tmp.path())
+        .expect("load")
+        .expect("project config");
+    assert_eq!(config.root.as_deref(), Some(tmp.path()));
+
+    // Existing file: refused, contents untouched.
+    assert!(matches!(
+        write_project_file(tmp.path(), Some(Path::new("/elsewhere"))),
+        Err(Error::AlreadyExists(_))
+    ));
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), "");
+
+    // Explicit root: a single valid assignment, relative kept verbatim.
+    let other = tmp.path().join("project");
+    std::fs::create_dir_all(&other).expect("mkdir");
+    let path = write_project_file(&other, Some(Path::new("ops/rcas"))).expect("write");
+    let written = std::fs::read_to_string(&path).expect("read");
+    assert_eq!(written, "root = \"ops/rcas\"\n");
+    let config = load_effective(&other)
+        .expect("load")
+        .expect("project config");
+    assert_eq!(
+        config.root.as_deref(),
+        Some(other.join("ops/rcas").as_path()),
+        "relative root resolves against the .beagle's directory"
+    );
+}
