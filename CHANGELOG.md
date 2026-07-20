@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-20
+
 ### Changed
 
 - `beagle init` now sets up the whole store, not just the templates: run
