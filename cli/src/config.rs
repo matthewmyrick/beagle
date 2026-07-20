@@ -247,6 +247,28 @@ pub fn load_effective(start: &Path) -> Result<Option<Config>> {
     )))
 }
 
+/// Writes a `.beagle` in `dir`: an empty file when `root` is `None` (the
+/// directory itself becomes the store root), else a single `root = "..."`
+/// assignment. A relative root is written verbatim — it resolves against
+/// the `.beagle`'s directory by [`load_effective`]'s rules. Refuses to
+/// overwrite an existing file.
+///
+/// # Errors
+/// [`Error::AlreadyExists`] if a `.beagle` is already there,
+/// [`Error::Io`] on write failures.
+pub fn write_project_file(dir: &Path, root: Option<&Path>) -> Result<PathBuf> {
+    let path = dir.join(PROJECT_FILE);
+    if path.exists() {
+        return Err(Error::AlreadyExists(path.display().to_string()));
+    }
+    let contents = match root {
+        None => String::new(),
+        Some(root) => format!("root = {}\n", toml::Value::from(root.display().to_string())),
+    };
+    fs::write(&path, &contents).map_err(|e| Error::io(&path, e))?;
+    Ok(path)
+}
+
 /// The pure core of [`load_effective`]: pins the root from the project
 /// file's location and fills unset fields from the global config.
 fn resolve_project(project_path: &Path, mut project: Config, global: Option<Config>) -> Config {

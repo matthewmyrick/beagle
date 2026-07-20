@@ -49,8 +49,11 @@ USAGE:
                                             (shared systems and tags, ranked)
     beagle export <id> [--out <file>]     export one RCA as a single markdown
                   [--root <dir>]            document (default: exports/<id>.md)
-    beagle init [--root <dir>]            scaffold toolbox.md + systems/ agent
-                                            context templates at the root
+    beagle init [--root <dir>]            set up a store: interactively asks
+                                            for the root and writes a .beagle
+                                            pinning it (skipped with --root or
+                                            when piped), then scaffolds
+                                            toolbox.md + systems/ templates
     beagle config                         edit the config file and validate it
     beagle skill [status|install]         show or install the /beagle skill
                                             for Claude Code and Codex
@@ -190,7 +193,8 @@ pub enum Command {
         /// Explicit output path (`--out`).
         out: Option<PathBuf>,
     },
-    /// `beagle init`: scaffold toolbox.md + systems/.
+    /// `beagle init`: set up a store — interactively writes a `.beagle`
+    /// pinning the root, then scaffolds toolbox.md + systems/.
     Init {
         /// Explicit `--root`, if given.
         root: Option<PathBuf>,

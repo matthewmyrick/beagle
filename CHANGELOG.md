@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `beagle init` now sets up the whole store, not just the templates: run
+  bare in a terminal with no governing `.beagle`, it asks where the
+  store root should live (enter accepts the current directory), writes
+  the `.beagle` pinning it — empty when the cwd itself is the root, so
+  `beagle` run anywhere under it finds the store from then on — then
+  scaffolds `toolbox.md` + `systems/` there as before. With `--root`,
+  when piped (agents, scripts), or when a `.beagle` already governs the
+  directory, behavior is exactly as before: no prompt, nothing written
+  but the templates. Never overwrites an existing `.beagle` (#85).
+
 ## [0.15.0] - 2026-07-20
 
 ### Added

@@ -11,7 +11,7 @@ mod cli;
 use std::env;
 use std::fs;
 use std::io::IsTerminal as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use beagle::model::{RcaId, Severity, Status};
@@ -177,7 +177,11 @@ fn run_list(
 
 /// `beagle init`: scaffold toolbox.md + systems/ agent context templates.
 fn run_init(root: Option<PathBuf>) -> Result<(), Error> {
-    let store = Store::open(&effective_root(root)?)?;
+    let store_root = match root {
+        Some(explicit) => explicit,
+        None => init_project_root()?,
+    };
+    let store = Store::open(&store_root)?;
     let created = store.init_context()?;
     if created.is_empty() {
         println!("toolbox.md and systems/ already present; nothing created");
@@ -190,6 +194,58 @@ fn run_init(root: Option<PathBuf>) -> Result<(), Error> {
         );
     }
     Ok(())
+}
+
+/// The root for a bare `beagle init`. An existing `.beagle` up-tree wins
+/// (init stays idempotent — no prompt). Interactively, asks where the
+/// store root should live (default: the working directory) and writes a
+/// `.beagle` in the cwd pinning it, so `beagle` run anywhere under here
+/// finds the store from then on. Non-interactive (piped, agents) keeps
+/// the plain resolution — scripts never block on a prompt.
+fn init_project_root() -> Result<PathBuf, Error> {
+    let cwd = env::current_dir().map_err(|e| Error::io(".", e))?;
+    if let Some(existing) = config::find_project_file(&cwd) {
+        println!("using {}", existing.display());
+        return effective_root(None);
+    }
+    if !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {
+        return effective_root(None);
+    }
+
+    print!("beagle store root? [{}] ", cwd.display());
+    std::io::Write::flush(&mut std::io::stdout()).map_err(|e| Error::io(".", e))?;
+    let mut answer = String::new();
+    std::io::stdin()
+        .read_line(&mut answer)
+        .map_err(|e| Error::io(".", e))?;
+    let answer = answer.trim();
+
+    let typed = expand_tilde(Path::new(answer));
+    let resolved = if typed.is_relative() {
+        cwd.join(&typed)
+    } else {
+        typed.clone()
+    };
+    let root = if answer.is_empty() || resolved == cwd {
+        let path = config::write_project_file(&cwd, None)?;
+        println!(
+            "created {} — this directory is the beagle store root",
+            path.display()
+        );
+        cwd
+    } else {
+        // The typed form goes in the file (relative stays relative — it
+        // resolves against the `.beagle`'s directory), the resolved form
+        // opens the store now.
+        let path = config::write_project_file(&cwd, Some(&typed))?;
+        println!(
+            "created {} — beagle here now uses {}",
+            path.display(),
+            resolved.display()
+        );
+        resolved
+    };
+    Ok(root)
 }
 
 /// `beagle archive`: move a finished workspace to `rcas/archive/`.
