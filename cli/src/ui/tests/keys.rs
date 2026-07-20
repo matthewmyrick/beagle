@@ -541,3 +541,71 @@ fn shift_d_is_list_only_and_esc_cancels() {
         .status_line()
         .is_some_and(|s| s.contains("nothing to delete")));
 }
+
+#[test]
+fn t_opens_the_status_picker_and_enter_applies_the_stage() {
+    use crate::model::Status;
+
+    let mut app = app_with(1);
+    assert_eq!(
+        app.selected_rca().expect("selected").meta.status,
+        Status::Investigating
+    );
+
+    press(&mut app, KeyCode::Char('t'));
+    let picker = app.status_picker.as_ref().expect("picker open");
+    assert_eq!(picker.current, Status::Investigating);
+    assert_eq!(picker.selected, 0, "current stage highlighted");
+
+    // Move to `review` and apply; the manifest write reloads the list.
+    press(&mut app, KeyCode::Char('j'));
+    press(&mut app, KeyCode::Enter);
+    assert!(app.status_picker.is_none());
+    assert_eq!(
+        app.selected_rca().expect("selected").meta.status,
+        Status::Review
+    );
+    assert!(
+        app.status_line().is_some_and(|s| s.contains("review")),
+        "status announces the change"
+    );
+}
+
+#[test]
+fn status_picker_esc_cancels_and_repicking_current_writes_nothing() {
+    use crate::model::Status;
+
+    let mut app = app_with(1);
+    let before = app
+        .store
+        .read_meta(&app.selected_rca().expect("selected").id.clone())
+        .expect("meta");
+
+    // Esc: no change.
+    press(&mut app, KeyCode::Char('t'));
+    press(&mut app, KeyCode::Char('j'));
+    press(&mut app, KeyCode::Esc);
+    assert!(app.status_picker.is_none());
+    assert_eq!(
+        app.selected_rca().expect("selected").meta.status,
+        Status::Investigating
+    );
+
+    // Enter on the current stage: closes without stamping `updated`.
+    press(&mut app, KeyCode::Char('t'));
+    press(&mut app, KeyCode::Enter);
+    assert!(app.status_picker.is_none());
+    let after = app
+        .store
+        .read_meta(&app.selected_rca().expect("selected").id.clone())
+        .expect("meta");
+    assert_eq!(before.updated, after.updated, "no spurious write");
+
+    // Nothing selected: t says so.
+    let mut empty = app_with(0);
+    press(&mut empty, KeyCode::Char('t'));
+    assert!(empty.status_picker.is_none());
+    assert!(empty
+        .status_line()
+        .is_some_and(|s| s.contains("nothing to set")));
+}

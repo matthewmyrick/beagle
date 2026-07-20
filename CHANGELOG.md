@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `t` opens a floating status picker on the selected incident: the five
+  lifecycle stages with their glyphs and a one-line hint each, current
+  stage marked. `j`/`k` move, enter applies (atomic manifest write —
+  other beagle instances see it live), esc cancels; re-picking the
+  current stage closes without a write (#79).
+
 ## [0.13.0] - 2026-07-20
 
 ### Added

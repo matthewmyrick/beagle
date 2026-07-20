@@ -46,6 +46,20 @@ pub(crate) struct ConfirmDelete {
     pub title: String,
 }
 
+/// State of the `t` status picker: the workspace whose status it will
+/// change on enter. Pinned by id at open time, like [`ConfirmDelete`].
+#[derive(Debug)]
+pub(crate) struct StatusPicker {
+    /// The workspace whose status changes on enter.
+    pub id: RcaId,
+    /// Its title, for the popup header.
+    pub title: String,
+    /// Its status when the picker opened — marked, and a no-op if re-picked.
+    pub current: Status,
+    /// Index into [`Status::ALL`] of the highlighted stage.
+    pub selected: usize,
+}
+
 /// State of the `R` related-incidents popup.
 #[derive(Debug)]
 pub(crate) struct RelatedPopup {
@@ -120,6 +134,63 @@ impl App {
     /// The link popup, when open.
     pub(crate) fn links(&self) -> Option<&LinksPopup> {
         self.links.as_ref()
+    }
+
+    /// Opens the `t` status picker for the selected incident, with the
+    /// current stage highlighted.
+    pub(crate) fn open_status_picker(&mut self) {
+        let Some(rca) = self.selected_rca() else {
+            self.status = Some("no incident selected — nothing to set".to_owned());
+            return;
+        };
+        let current = rca.meta.status;
+        self.status_picker = Some(StatusPicker {
+            id: rca.id.clone(),
+            title: rca.meta.title.clone(),
+            current,
+            selected: Status::ALL.iter().position(|&s| s == current).unwrap_or(0),
+        });
+    }
+
+    /// Keystrokes while the status picker is open: move, apply, or close.
+    /// Re-picking the current stage closes without a write — no spurious
+    /// `updated` stamp.
+    pub(crate) fn handle_status_picker_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Esc | KeyCode::Char('q' | 't') => self.status_picker = None,
+            KeyCode::Char('j') | KeyCode::Down => {
+                if let Some(picker) = self.status_picker.as_mut() {
+                    picker.selected = (picker.selected + 1).min(Status::ALL.len() - 1);
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if let Some(picker) = self.status_picker.as_mut() {
+                    picker.selected = picker.selected.saturating_sub(1);
+                }
+            }
+            KeyCode::Enter => {
+                let Some(picker) = self.status_picker.take() else {
+                    return;
+                };
+                let status = Status::ALL[picker.selected.min(Status::ALL.len() - 1)];
+                if status == picker.current {
+                    return; // already there — close quietly
+                }
+                match self.store.set_status(&picker.id, status) {
+                    Ok(_) => {
+                        let _ = self.reload();
+                        self.status = Some(format!("{} → {status}", picker.id));
+                    }
+                    Err(e) => self.status = Some(format!("status change failed: {e}")),
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The status picker, when open.
+    pub(crate) fn status_picker(&self) -> Option<&StatusPicker> {
+        self.status_picker.as_ref()
     }
 
     /// Opens the `D` delete confirmation for the selected incident. The
