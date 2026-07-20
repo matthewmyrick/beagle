@@ -214,3 +214,39 @@ fn checklist_progress_aggregates_sections_and_tracks_reloads() {
     app.reload();
     assert_eq!(app.checklist_progress(&id), Some((2, 3)));
 }
+
+#[test]
+fn skip_final_review_tag_advances_straight_to_finished() {
+    use crate::model::Status;
+    use crate::prs::PrState;
+
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    // Tag the workspace and put it in review with one attached PR.
+    let mut meta = app.store.read_meta(&id).expect("meta");
+    meta.tags.push("skip-final-review".to_owned());
+    meta.status = Status::Review;
+    let manifest = toml::to_string_pretty(&meta).expect("toml");
+    std::fs::write(app.store.workspace_dir(&id).join("rca.toml"), manifest).expect("write");
+    app.store
+        .add_pr(&id, "https://github.com/o/r/pull/1")
+        .expect("pr");
+    app.reload();
+
+    // PR merges: finished directly — final-review is skipped.
+    app.pr_states
+        .insert("https://github.com/o/r/pull/1".to_owned(), PrState::Merged);
+    app.advance_merged_reviews();
+    assert_eq!(
+        app.store.read_meta(&id).expect("read").status,
+        Status::Finished,
+        "tagged workspaces never park in final-review"
+    );
+    assert!(
+        app.status_line()
+            .expect("announced")
+            .contains("final review skipped"),
+        "the announcement says why"
+    );
+}

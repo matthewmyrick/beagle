@@ -53,7 +53,9 @@ Manifest (`rca.toml`) fields: `title`, `severity`
 (`critical|high|medium|low|info`), `status`, `created` (RFC 3339, **quoted**
 string), optional `updated`, `systems`, `tags`, `prs` (remediation PR URLs —
 attach with `beagle pr add <slug> <url>`). Unknown fields are rejected —
-don't invent new ones.
+don't invent new ones. One tag is special: `skip-final-review` advances
+the RCA straight to `finished` when every attached PR merges, skipping
+the verification pass — only when the user asks for it.
 
 ## Markdown that renders well
 
