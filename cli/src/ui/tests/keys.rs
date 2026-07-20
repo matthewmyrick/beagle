@@ -609,3 +609,65 @@ fn status_picker_esc_cancels_and_repicking_current_writes_nothing() {
         .status_line()
         .is_some_and(|s| s.contains("nothing to set")));
 }
+
+#[test]
+fn hash_opens_the_tags_editor_and_edits_write_through() {
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    press(&mut app, KeyCode::Char('#'));
+    assert!(app.tags_editor.is_some(), "editor open");
+
+    // Type a new tag: `a` enters typing mode, chars build it, enter lands
+    // it on disk immediately.
+    press(&mut app, KeyCode::Char('a'));
+    for c in "skip-final-review".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(
+        app.store.read_meta(&id).expect("meta").tags,
+        vec!["skip-final-review".to_owned()],
+        "written to the manifest"
+    );
+    let editor = app.tags_editor.as_ref().expect("still open");
+    assert_eq!(editor.tags, vec!["skip-final-review".to_owned()]);
+    assert!(editor.typing.is_none(), "back in navigation mode");
+
+    // `d` on the tag deletes it from disk too.
+    press(&mut app, KeyCode::Char('k'));
+    press(&mut app, KeyCode::Char('d'));
+    assert!(app.store.read_meta(&id).expect("meta").tags.is_empty());
+
+    // Esc closes; nothing selected on an empty store just reports.
+    press(&mut app, KeyCode::Esc);
+    assert!(app.tags_editor.is_none());
+    let mut empty = app_with(0);
+    press(&mut empty, KeyCode::Char('#'));
+    assert!(empty.tags_editor.is_none());
+}
+
+#[test]
+fn tags_editor_rejects_whitespace_and_esc_peels_typing_first() {
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    press(&mut app, KeyCode::Char('#'));
+    press(&mut app, KeyCode::Char('a'));
+    for c in "two words".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+    assert!(
+        app.store.read_meta(&id).expect("meta").tags.is_empty(),
+        "whitespace tag never lands"
+    );
+    assert!(app.status_line().is_some_and(|s| s.contains("kebab-case")));
+
+    // Esc from typing returns to navigation, second esc closes.
+    press(&mut app, KeyCode::Char('a'));
+    press(&mut app, KeyCode::Esc);
+    assert!(app.tags_editor.as_ref().expect("open").typing.is_none());
+    press(&mut app, KeyCode::Esc);
+    assert!(app.tags_editor.is_none());
+}

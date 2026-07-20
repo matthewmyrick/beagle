@@ -317,3 +317,32 @@ fn delete_removes_active_and_archived_workspaces_permanently() {
         Err(Error::Tool { tool: "delete", .. })
     ));
 }
+
+#[test]
+fn set_tags_trims_dedupes_and_drops_empties() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("open store");
+    let id = test_id("taggy");
+    store
+        .scaffold(&id, &test_meta("Taggy", Severity::Low))
+        .expect("scaffold");
+
+    let meta = store
+        .set_tags(
+            &id,
+            vec![
+                " redis ".to_owned(),
+                "redis".to_owned(),
+                String::new(),
+                "  ".to_owned(),
+                "config".to_owned(),
+            ],
+        )
+        .expect("set");
+    assert_eq!(meta.tags, ["redis", "config"]);
+    assert_eq!(
+        store.read_meta(&id).expect("read").tags,
+        ["redis", "config"]
+    );
+    assert!(meta.updated.is_some(), "updated stamped");
+}

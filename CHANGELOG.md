@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `#` opens a floating tags editor on the selected incident: current
+  tags as rows (with a callout on `skip-final-review` explaining its
+  effect), `a` adds — typed inline, trimmed, deduped, whitespace
+  rejected — `d` deletes, and every edit writes straight to the
+  manifest via the new `Store::set_tags` (atomic, stamps `updated`).
+  Esc peels typing → closed (#91).
+
 ## [0.17.0] - 2026-07-20
 
 ### Added

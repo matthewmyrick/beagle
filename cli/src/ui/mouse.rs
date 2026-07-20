@@ -48,6 +48,10 @@ impl App {
             self.handle_status_picker_key(arrow);
             return;
         }
+        if self.tags_editor.is_some() {
+            self.handle_tags_editor_key(arrow);
+            return;
+        }
         if self.finder.is_some() {
             self.handle_finder_key(arrow, false);
             return;
@@ -103,6 +107,7 @@ impl App {
             || self.settings.is_some()
             || self.confirm_delete.is_some()
             || self.status_picker.is_some()
+            || self.tags_editor.is_some()
         {
             return;
         }
