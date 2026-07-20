@@ -283,3 +283,37 @@ fn publish_sets_the_flag_and_stamps_a_date_idempotently() {
     assert!(!meta.published);
     assert!(meta.published_at.is_none());
 }
+
+#[test]
+fn delete_removes_active_and_archived_workspaces_permanently() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("open store");
+
+    let active = test_id("mistake");
+    store
+        .scaffold(&active, &test_meta("Mistake", Severity::Low))
+        .expect("scaffold");
+    let dir = store.delete(&active).expect("delete active");
+    assert!(!dir.exists(), "directory gone: {dir:?}");
+    assert!(store.list_all().expect("list").summaries.is_empty());
+
+    // Archived workspaces delete from rcas/archive/ transparently.
+    let archived = test_id("old-news");
+    store
+        .scaffold(&archived, &test_meta("Old news", Severity::Low))
+        .expect("scaffold");
+    store
+        .set_status(&archived, Status::Finished)
+        .expect("finish");
+    store.archive(&archived, false).expect("archive");
+    let dir = store.delete(&archived).expect("delete archived");
+    assert!(dir.ends_with("archive/old-news") && !dir.exists());
+
+    // No workspace, no delete — and the reserved archive dir is refused
+    // even if an `archive` id were constructed.
+    assert!(store.delete(&test_id("ghost")).is_err());
+    assert!(matches!(
+        store.delete(&test_id("archive")),
+        Err(Error::Tool { tool: "delete", .. })
+    ));
+}

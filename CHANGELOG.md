@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `D` (shift-d) on the incident list deletes the selected RCA — behind a
+  red floating confirmation naming the incident (title + slug). Only an
+  explicit `y` deletes (enter is deliberately ignored so a queued
+  keypress can never confirm); `n`/esc cancel. Works on archived
+  incidents too, and the popup pins the workspace by id at open time so
+  a reload underneath can never redirect the delete (#76).
+
 ## [0.12.0] - 2026-07-17
 
 ### Added
