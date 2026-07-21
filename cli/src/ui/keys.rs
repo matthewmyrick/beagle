@@ -37,6 +37,7 @@ impl App {
             KeyCode::Char('V') => self.verify_final_review(),
             KeyCode::Char('t') => self.open_status_picker(),
             KeyCode::Char('#') => self.open_tags_editor(),
+            KeyCode::Char('!') => self.open_errors(),
             KeyCode::Char('S') => self.open_settings(),
             // `/` always searches keywords across the selected incident;
             // `f` filters the incident list; `F` follows (tail -f). Each
@@ -119,6 +120,8 @@ impl App {
             self.handle_status_picker_key(key.code);
         } else if self.tags_editor.is_some() {
             self.handle_tags_editor_key(key.code);
+        } else if self.show_errors {
+            self.handle_errors_key(key.code);
         } else if self.finder.is_some() {
             self.handle_finder_key(key.code, key.modifiers.contains(KeyModifiers::CONTROL));
         } else if self.filter_input != super::FilterInput::Off {

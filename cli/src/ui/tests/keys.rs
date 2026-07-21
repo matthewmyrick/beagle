@@ -671,3 +671,33 @@ fn tags_editor_rejects_whitespace_and_esc_peels_typing_first() {
     press(&mut app, KeyCode::Esc);
     assert!(app.tags_editor.is_none());
 }
+
+#[test]
+fn bang_opens_the_errors_overlay_only_when_there_are_problems() {
+    let mut app = app_with(1);
+
+    // Clean store: `!` reports, opens nothing.
+    press(&mut app, KeyCode::Char('!'));
+    assert!(!app.errors_visible());
+    assert!(app
+        .status_line()
+        .is_some_and(|s| s.contains("no load errors")));
+
+    // Plant a manifest-less directory under rcas/ — a broken workspace.
+    std::fs::create_dir_all(app.store.root().join("rcas").join("husk")).expect("mkdir");
+    app.reload();
+    assert_eq!(app.broken().len(), 1, "surfaced as broken");
+
+    // `!` now opens the overlay; j scrolls; esc closes.
+    press(&mut app, KeyCode::Char('!'));
+    assert!(app.errors_visible());
+    press(&mut app, KeyCode::Esc);
+    assert!(!app.errors_visible());
+
+    // While it's open every other key is intercepted (no quit leak).
+    press(&mut app, KeyCode::Char('!'));
+    assert_eq!(press(&mut app, KeyCode::Char('j')), Flow::Continue);
+    assert!(app.errors_visible());
+    press(&mut app, KeyCode::Char('!'));
+    assert!(!app.errors_visible());
+}

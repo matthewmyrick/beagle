@@ -24,8 +24,8 @@ use super::{App, Focus, Pane, Tab};
 
 use header::{banner_fits, draw_banner, flow_tabs, header_paragraph, BANNER_COLS};
 use popups::{
-    draw_confirm_delete, draw_finder, draw_help, draw_links, draw_related, draw_settings,
-    draw_status_picker, draw_tags_editor, draw_toolbox,
+    draw_confirm_delete, draw_errors, draw_finder, draw_help, draw_links, draw_related,
+    draw_settings, draw_status_picker, draw_tags_editor, draw_toolbox,
 };
 use style::{
     horizontal, inset, pane_block, severity_badge, status_symbol, truncate, vertical, SIDEBAR_WIDTH,
@@ -56,6 +56,9 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
 
     if app.toolbox().is_some() {
         draw_toolbox(frame, app, frame.area());
+    }
+    if app.errors_visible() {
+        draw_errors(frame, app, frame.area());
     }
     draw_links(frame, app, frame.area());
     draw_related(frame, app, frame.area());
@@ -110,9 +113,16 @@ fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         .collect();
     // Broken workspaces render at the bottom, unselectable but never
     // hidden: a directory that exists on disk must not silently vanish
-    // from the incident list.
-    for broken in app.broken() {
-        items.push(ListItem::new(broken_list_item(broken)));
+    // from the incident list. One compact line each — the full reason
+    // lives in the `!` errors overlay, not crammed into this narrow pane.
+    if !app.broken().is_empty() {
+        for broken in app.broken() {
+            items.push(ListItem::new(broken_list_item(broken)));
+        }
+        items.push(ListItem::new(Line::from(Span::styled(
+            "   ! or click to view",
+            Style::default().fg(Color::DarkGray),
+        ))));
     }
     // Selection styling is baked into the items (rca_list_item): a
     // highlight_style here would be patched over every span in the row and
@@ -210,30 +220,24 @@ fn rca_list_item(
     vec![title, pad_line(detail_spans, base)]
 }
 
-/// The two sidebar lines for a workspace that failed to load: an
-/// unmissable marker plus the reason, so "why did my incident disappear"
-/// answers itself in-app.
-fn broken_list_item(broken: &crate::store::BrokenWorkspace) -> Vec<Line<'static>> {
+/// One compact sidebar line for a workspace that failed to load: an
+/// unmissable marker and the directory name, never hidden. The reason is
+/// too long for this pane — it lives in the `!` errors overlay.
+fn broken_list_item(broken: &crate::store::BrokenWorkspace) -> Line<'static> {
     let width = usize::from(SIDEBAR_WIDTH).saturating_sub(2);
-    vec![
-        Line::from(vec![
-            Span::styled(
-                " ⚠ ",
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Red)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!(" {}", truncate(&broken.dir_name, width.saturating_sub(5))),
-                Style::default().fg(Color::LightRed),
-            ),
-        ]),
-        Line::from(Span::styled(
-            format!("   {}", truncate(&broken.reason, width.saturating_sub(3))),
-            Style::default().fg(Color::Red),
-        )),
-    ]
+    Line::from(vec![
+        Span::styled(
+            " ⚠ ",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Red)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(" {}", truncate(&broken.dir_name, width.saturating_sub(5))),
+            Style::default().fg(Color::LightRed),
+        ),
+    ])
 }
 
 /// Pads a sidebar line with a filler span so a selection background covers
@@ -556,13 +560,10 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::LightYellow),
         ));
     }
-    if !app.warnings().is_empty() {
+    let problems = app.broken().len() + app.warnings().len();
+    if problems > 0 {
         spans.push(Span::styled(
-            format!(
-                "  ·  {} warning(s), first: {}",
-                app.warnings().len(),
-                app.warnings()[0].0
-            ),
+            format!("  ·  ⚠ {problems} problem(s) — ! for details"),
             Style::default().fg(Color::Yellow),
         ));
     }
