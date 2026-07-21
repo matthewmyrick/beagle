@@ -3,7 +3,10 @@
 This repo is the `beagle` TUI: it renders RCA (root-cause analysis)
 workspaces that **you** write while debugging a system. There is a dedicated
 skill for this workflow — `/beagle` (`.claude/skills/beagle/SKILL.md`); invoke
-it whenever you are debugging an incident or writing one up. The user keeps the
+it whenever you are debugging an incident or writing one up. A companion
+skill — `/beagle-review` (`.claude/skills/beagle-review/SKILL.md`) — loads an
+existing RCA by id (via `beagle context <id>`) so you can answer clarifying
+questions about it read-only, without editing the workspace. The user keeps the
 TUI open; it live-reloads as you write files. Your job when debugging:
 investigate, then explain **what broke, why it happened, and how to fix it**
 through these files.

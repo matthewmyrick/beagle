@@ -75,3 +75,53 @@ fn context_templates_are_valid_markdown_seeds() {
     assert!(TOOLBOX_TEMPLATE.starts_with("# Toolbox"));
     assert!(SYSTEM_TEMPLATE.starts_with("# example-service"));
 }
+
+#[test]
+fn review_context_bundles_writeup_toolbox_and_relevant_systems() {
+    use crate::model::Severity;
+    use crate::store::testutil::{test_id, test_meta};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("open store");
+    let id = test_id("payments-latency");
+    // test_meta lists the `payments-api` system.
+    store
+        .scaffold(&id, &test_meta("Payments p99 latency", Severity::High))
+        .expect("scaffold");
+
+    // Toolbox + two system docs, only one of which this RCA touches.
+    fs::write(
+        tmp.path().join(TOOLBOX_FILE),
+        "# Toolbox\n\nGrafana at /d/payments\n",
+    )
+    .expect("toolbox");
+    let systems = tmp.path().join(SYSTEMS_DIR);
+    fs::create_dir_all(&systems).expect("mkdir");
+    fs::write(
+        systems.join("payments-api.md"),
+        "# payments-api\n\nRust axum service\n",
+    )
+    .expect("sys1");
+    fs::write(
+        systems.join("unrelated.md"),
+        "# unrelated\n\nshould not appear\n",
+    )
+    .expect("sys2");
+
+    let bundle = store.review_context(&id).expect("context");
+    assert!(
+        bundle.contains("title: \"Payments p99 latency\""),
+        "has the writeup frontmatter"
+    );
+    assert!(bundle.contains("# Toolbox"), "includes the toolbox");
+    assert!(bundle.contains("Grafana at /d/payments"));
+    assert!(
+        bundle.contains("<!-- systems/payments-api.md -->"),
+        "includes the touched system"
+    );
+    assert!(bundle.contains("Rust axum service"));
+    assert!(
+        !bundle.contains("should not appear"),
+        "omits unrelated systems"
+    );
+}

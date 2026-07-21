@@ -18,7 +18,7 @@ use beagle::model::{RcaId, Severity, Status};
 use beagle::store::{new_meta, Store};
 use beagle::{config, ui, update, Error};
 
-use beagle::skill::{self, Agent, SkillStatus};
+use beagle::skill::{self, Agent, Skill, SkillStatus};
 
 use cli::{Command, SkillAction, USAGE};
 
@@ -82,6 +82,7 @@ fn run(command: Command) -> Result<(), Error> {
             println!("{}", path.display());
             Ok(())
         }
+        Command::Context { root, id } => run_context(root, &id),
         Command::List {
             root,
             status,
@@ -393,6 +394,15 @@ fn run_pr_list(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
 /// `beagle similar`: related workspaces, highest score first. Archived
 /// incidents stay in the candidate set — the archive *is* the knowledge
 /// base this command exists to mine.
+/// `beagle context <id>`: print the review bundle (writeup + toolbox +
+/// relevant systems) to stdout, for a reviewer or the `/beagle-review`
+/// skill to capture.
+fn run_context(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    print!("{}", store.review_context(id)?);
+    Ok(())
+}
+
 fn run_similar(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
     let store = Store::open(&effective_root(root)?)?;
     let summaries = store.list_all()?.summaries;
@@ -574,25 +584,32 @@ fn run_skill(action: SkillAction) -> Result<(), Error> {
     match action {
         SkillAction::Status => {
             for agent in Agent::ALL {
-                let note = if agent.is_present(&home) {
-                    match skill::status(agent, &home) {
-                        SkillStatus::Current => "up to date",
-                        SkillStatus::Outdated => "outdated — `beagle skill install` refreshes it",
-                        SkillStatus::Missing => "not installed — `beagle skill install` adds it",
-                    }
-                } else {
-                    "agent not detected here"
-                };
-                println!(
-                    "{:<12} {note}\n             {}",
-                    agent.name(),
-                    agent.skill_path(&home).display()
-                );
+                for skill in Skill::ALL {
+                    let note = if agent.is_present(&home) {
+                        match skill::status(skill, agent, &home) {
+                            SkillStatus::Current => "up to date",
+                            SkillStatus::Outdated => {
+                                "outdated — `beagle skill install` refreshes it"
+                            }
+                            SkillStatus::Missing => {
+                                "not installed — `beagle skill install` adds it"
+                            }
+                        }
+                    } else {
+                        "agent not detected here"
+                    };
+                    println!(
+                        "{:<12} /{:<14} {note}\n             {}",
+                        agent.name(),
+                        skill.slug(),
+                        agent.skill_path(skill, &home).display()
+                    );
+                }
             }
         }
         SkillAction::Install => {
             // Explicit intent: install for detected agents, or for all when
-            // none are detected (so a fresh setup still gets the skill).
+            // none are detected (so a fresh setup still gets the skills).
             let detected: Vec<Agent> = Agent::ALL
                 .into_iter()
                 .filter(|a| a.is_present(&home))
@@ -603,38 +620,43 @@ fn run_skill(action: SkillAction) -> Result<(), Error> {
                 detected
             };
             for agent in targets {
-                let path = skill::install(agent, &home)?;
-                println!("✓ {} → {}", agent.name(), path.display());
+                for skill in Skill::ALL {
+                    let path = skill::install(skill, agent, &home)?;
+                    println!("✓ {} /{} → {}", agent.name(), skill.slug(), path.display());
+                }
             }
         }
     }
     Ok(())
 }
 
-/// After an install, offer to install or refresh the `/beagle` skill for
-/// every detected agent whose copy is missing or stale. Interactive only —
-/// piped output just prints a hint — and best-effort: a decline or a write
-/// failure never fails the update.
+/// After an install, offer to install or refresh the beagle skills for
+/// every detected agent whose copy of any skill is missing or stale.
+/// Interactive only — piped output just prints a hint — and best-effort: a
+/// decline or a write failure never fails the update.
 fn offer_skill_install() {
     let Ok(home) = skill::home() else { return };
-    let pending: Vec<Agent> = Agent::ALL
+    // (skill, agent) pairs that are detected but not current.
+    let pending: Vec<(Skill, Agent)> = Agent::ALL
         .into_iter()
         .filter(|a| a.is_present(&home))
-        .filter(|a| skill::status(*a, &home) != SkillStatus::Current)
+        .flat_map(|agent| Skill::ALL.into_iter().map(move |skill| (skill, agent)))
+        .filter(|(skill, agent)| skill::status(*skill, *agent, &home) != SkillStatus::Current)
         .collect();
     if pending.is_empty() {
         return;
     }
-    let names: Vec<&str> = pending.iter().map(|a| a.name()).collect();
+    let mut names: Vec<&str> = pending.iter().map(|(_, a)| a.name()).collect();
+    names.dedup();
     let list = names.join(" and ");
 
     if !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {
-        println!("\nthe bundled /beagle skill is newer than what's installed for {list}.");
-        println!("run `beagle skill install` to update it.");
+        println!("\nbundled beagle skills are newer than what's installed for {list}.");
+        println!("run `beagle skill install` to update them.");
         return;
     }
 
-    print!("\ninstall/update the /beagle skill for {list}? [y/N] ");
+    print!("\ninstall/update the beagle skills for {list}? [y/N] ");
     if std::io::Write::flush(&mut std::io::stdout()).is_err() {
         return;
     }
@@ -646,10 +668,14 @@ fn offer_skill_install() {
         println!("skipped — run `beagle skill install` anytime.");
         return;
     }
-    for agent in pending {
-        match skill::install(agent, &home) {
-            Ok(path) => println!("✓ {} → {}", agent.name(), path.display()),
-            Err(e) => eprintln!("could not install for {}: {e}", agent.name()),
+    for (skill, agent) in pending {
+        match skill::install(skill, agent, &home) {
+            Ok(path) => println!("✓ {} /{} → {}", agent.name(), skill.slug(), path.display()),
+            Err(e) => eprintln!(
+                "could not install /{} for {}: {e}",
+                skill.slug(),
+                agent.name()
+            ),
         }
     }
 }

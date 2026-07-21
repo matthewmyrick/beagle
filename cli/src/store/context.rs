@@ -2,10 +2,12 @@
 //! to work with) and `systems/*.md` (per-system knowledge). Scaffolded by
 //! `beagle init` and shown in the TUI via `T`.
 
+use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 
 use crate::error::{Error, Result};
+use crate::model::RcaId;
 
 use super::fsio::{read_optional, write_atomic};
 use super::{Store, SYSTEMS_DIR, TOOLBOX_FILE};
@@ -21,6 +23,42 @@ pub struct SystemDoc {
 }
 
 impl Store {
+    /// A single self-contained review bundle for workspace `id`: the full
+    /// RCA writeup (as [`Store::export_markdown`](Store::export_markdown)),
+    /// then the toolbox (`toolbox.md`) and the `systems/*.md` docs for the
+    /// systems this RCA touches (all of them when it lists none). This is
+    /// exactly what a reviewer — human or agent — needs to reason about the
+    /// incident, in one document.
+    ///
+    /// # Errors
+    /// Fails only if the manifest cannot be read; a missing toolbox or
+    /// systems directory is simply omitted.
+    pub fn review_context(&self, id: &RcaId) -> Result<String> {
+        let mut doc = self.export_markdown(id)?;
+        let wanted = self.read_meta(id)?.systems;
+
+        // A horizontal rule separates the writeup from the reference
+        // material; toolbox.md and systems/*.md carry their own headings,
+        // so injecting more would just duplicate them.
+        if let Some(toolbox) = self.read_toolbox()? {
+            doc.push_str("\n\n---\n\n");
+            doc.push_str(toolbox.trim_end());
+            doc.push('\n');
+        }
+
+        for sys in self.list_system_docs()? {
+            if !wanted.is_empty() && !wanted.contains(&sys.name) {
+                continue;
+            }
+            if let Some(content) = self.read_system_doc(&sys)? {
+                let _ = write!(doc, "\n\n<!-- systems/{}.md -->\n\n", sys.name);
+                doc.push_str(content.trim_end());
+                doc.push('\n');
+            }
+        }
+        Ok(doc)
+    }
+
     /// Reads the root `toolbox.md` — the investigation context agents read
     /// before starting. `Ok(None)` when it does not exist.
     ///

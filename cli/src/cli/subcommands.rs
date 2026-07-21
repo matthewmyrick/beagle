@@ -122,6 +122,25 @@ pub(super) fn parse_similar(
     Ok(Command::Similar { root, id })
 }
 
+/// `context <id>`: the review bundle for one workspace.
+pub(super) fn parse_context(
+    args: &mut impl Iterator<Item = String>,
+    mut root: Option<PathBuf>,
+) -> Result<Command, String> {
+    let id_raw = args
+        .next()
+        .filter(|a| !a.starts_with('-'))
+        .ok_or("`context` requires an <id> slug as its first argument")?;
+    let id = RcaId::new(id_raw).map_err(|e| e.to_string())?;
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
+            other => return Err(format!("unknown flag `{other}` for `context`")),
+        }
+    }
+    Ok(Command::Context { root, id })
+}
+
 /// `log <id> <message...>`: everything that isn't a flag becomes the
 /// message, so multi-word messages work without quoting.
 pub(super) fn parse_log(

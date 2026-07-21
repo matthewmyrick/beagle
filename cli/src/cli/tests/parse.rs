@@ -171,6 +171,19 @@ fn similar_parses_id_and_root() {
 }
 
 #[test]
+fn context_parses_id_and_root() {
+    match parse(&["context", "my-rca", "--root", "/x"]) {
+        Ok(Command::Context { root, id }) => {
+            assert_eq!(root, Some(PathBuf::from("/x")));
+            assert_eq!(id.as_str(), "my-rca");
+        }
+        other => panic!("unexpected parse: {other:?}"),
+    }
+    assert!(parse(&["context"]).is_err(), "missing id");
+    assert!(parse(&["context", "my-rca", "--frob"]).is_err());
+}
+
+#[test]
 fn pr_parses_add_and_list() {
     match parse(&[
         "pr",

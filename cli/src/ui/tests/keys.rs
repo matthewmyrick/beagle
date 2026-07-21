@@ -711,3 +711,23 @@ fn bang_opens_the_errors_overlay_only_when_there_are_problems() {
     press(&mut app, KeyCode::Char('!'));
     assert!(!app.errors_visible());
 }
+
+#[test]
+fn y_yanks_the_selected_incident_id() {
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.to_string();
+    press(&mut app, KeyCode::Char('y'));
+    assert!(
+        app.status_line()
+            .is_some_and(|s| s.contains("copied id") && s.contains(&id)),
+        "status confirms the id copy: {:?}",
+        app.status_line()
+    );
+
+    // Nothing selected: reports instead of copying.
+    let mut empty = app_with(0);
+    press(&mut empty, KeyCode::Char('y'));
+    assert!(empty
+        .status_line()
+        .is_some_and(|s| s.contains("no incident selected")));
+}

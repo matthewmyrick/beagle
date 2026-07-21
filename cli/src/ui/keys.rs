@@ -62,6 +62,7 @@ impl App {
             }
             KeyCode::Char('c') => self.copy_current_tab(),
             KeyCode::Char('C') => self.copy_workspace(),
+            KeyCode::Char('y') => self.copy_id(),
             KeyCode::Char('e') => self.export_current(),
             KeyCode::Char('r') => {
                 let _ = self.reload();

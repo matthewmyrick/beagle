@@ -1,23 +1,56 @@
-//! The bundled `/beagle` skill and installing it for coding agents.
+//! The bundled beagle skills and installing them for coding agents.
 //!
-//! The skill markdown is embedded into the binary at compile time from the
-//! repo's canonical `.claude/skills/beagle/SKILL.md`, so a release carries
-//! a snapshot of the skill and `beagle update` can offer to install or
-//! refresh it wherever an agent looks for it — Claude Code
-//! (`~/.claude/skills/beagle/SKILL.md`) and Codex
-//! (`~/.codex/prompts/beagle.md`). Everything here is pure given a home
+//! Each skill's markdown is embedded into the binary at compile time from
+//! the repo's canonical `.claude/skills/<slug>/SKILL.md`, so a release
+//! carries a snapshot and `beagle update` can offer to install or refresh
+//! them wherever an agent looks — Claude Code
+//! (`~/.claude/skills/<slug>/SKILL.md`) and Codex
+//! (`~/.codex/prompts/<slug>.md`). Everything here is pure given a home
 //! directory, so it tests against a temp dir without touching the real one.
 
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
 
-/// The `/beagle` skill markdown, embedded from the repo's single source of
-/// truth. Rebuilding the binary re-snapshots it; that is how a newer
-/// release ships a newer skill.
+/// A bundled beagle skill.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Skill {
+    /// `/beagle` — author and maintain RCA workspaces.
+    Beagle,
+    /// `/beagle-review` — load an RCA by id and answer questions about it.
+    Review,
+}
+
+impl Skill {
+    /// Every bundled skill, in display order.
+    pub const ALL: [Self; 2] = [Self::Beagle, Self::Review];
+
+    /// The skill slug — its directory name and the `/name` agents invoke.
+    #[must_use]
+    pub fn slug(self) -> &'static str {
+        match self {
+            Self::Beagle => "beagle",
+            Self::Review => "beagle-review",
+        }
+    }
+
+    /// The skill markdown, embedded from the repo's single source of truth.
+    /// Rebuilding the binary re-snapshots it; that is how a newer release
+    /// ships newer skills.
+    #[must_use]
+    pub fn markdown(self) -> &'static str {
+        match self {
+            Self::Beagle => include_str!("../../.claude/skills/beagle/SKILL.md"),
+            Self::Review => include_str!("../../.claude/skills/beagle-review/SKILL.md"),
+        }
+    }
+}
+
+/// The `/beagle` skill markdown. Retained for callers that want the primary
+/// skill directly; equivalent to `Skill::Beagle.markdown()`.
 pub const SKILL_MD: &str = include_str!("../../.claude/skills/beagle/SKILL.md");
 
-/// A coding agent beagle can install its skill for.
+/// A coding agent beagle can install its skills for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Agent {
     /// Anthropic's Claude Code — skills live under `~/.claude/skills/`.
@@ -49,16 +82,19 @@ impl Agent {
         }
     }
 
-    /// Where this agent reads the beagle skill / prompt from.
+    /// Where this agent reads `skill` from.
     #[must_use]
-    pub fn skill_path(self, home: &Path) -> PathBuf {
+    pub fn skill_path(self, skill: Skill, home: &Path) -> PathBuf {
         match self {
             Self::Claude => home
                 .join(".claude")
                 .join("skills")
-                .join("beagle")
+                .join(skill.slug())
                 .join("SKILL.md"),
-            Self::Codex => home.join(".codex").join("prompts").join("beagle.md"),
+            Self::Codex => home
+                .join(".codex")
+                .join("prompts")
+                .join(format!("{}.md", skill.slug())),
         }
     }
 
@@ -66,10 +102,10 @@ impl Agent {
     /// frontmatter (it drives skill discovery); a Codex prompt is injected
     /// verbatim, so it gets the body only.
     #[must_use]
-    pub fn content(self) -> &'static str {
+    pub fn content(self, skill: Skill) -> &'static str {
         match self {
-            Self::Claude => SKILL_MD,
-            Self::Codex => body_without_frontmatter(SKILL_MD),
+            Self::Claude => skill.markdown(),
+            Self::Codex => body_without_frontmatter(skill.markdown()),
         }
     }
 
@@ -91,26 +127,27 @@ pub enum SkillStatus {
     Current,
 }
 
-/// Compares the on-disk skill for `agent` against the bundled content.
+/// Compares the on-disk copy of `skill` for `agent` against the bundled
+/// content.
 #[must_use]
-pub fn status(agent: Agent, home: &Path) -> SkillStatus {
-    match std::fs::read_to_string(agent.skill_path(home)) {
-        Ok(existing) if existing == agent.content() => SkillStatus::Current,
+pub fn status(skill: Skill, agent: Agent, home: &Path) -> SkillStatus {
+    match std::fs::read_to_string(agent.skill_path(skill, home)) {
+        Ok(existing) if existing == agent.content(skill) => SkillStatus::Current,
         Ok(_) => SkillStatus::Outdated,
         Err(_) => SkillStatus::Missing,
     }
 }
 
-/// Writes the bundled skill for `agent`, creating parent directories.
+/// Writes the bundled `skill` for `agent`, creating parent directories.
 ///
 /// # Errors
 /// [`Error::Io`] if the directories or file cannot be written.
-pub fn install(agent: Agent, home: &Path) -> Result<PathBuf> {
-    let path = agent.skill_path(home);
+pub fn install(skill: Skill, agent: Agent, home: &Path) -> Result<PathBuf> {
+    let path = agent.skill_path(skill, home);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
     }
-    std::fs::write(&path, agent.content()).map_err(|e| Error::io(&path, e))?;
+    std::fs::write(&path, agent.content(skill)).map_err(|e| Error::io(&path, e))?;
     Ok(path)
 }
 

@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Review-companion flow. `beagle context <id>` prints a single
+  self-contained markdown bundle for a reviewer — the full RCA writeup
+  plus the toolbox and the `systems/*.md` docs for the systems that
+  incident touches — to stdout. In the TUI, `y` yanks the selected
+  incident's id to the clipboard. And a new bundled **`/beagle-review`**
+  skill (installed alongside `/beagle` by `beagle skill install` and
+  `beagle update`) takes an id, runs `beagle context`, and answers
+  clarifying questions about the incident — read-only, for understanding
+  rather than editing (#101).
+
 ## [0.19.1] - 2026-07-21
 
 ### Fixed
