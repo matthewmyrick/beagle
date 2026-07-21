@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-07-21
+
 ### Changed
 
 - The `?` help sheet is wider — sized to its longest row, so action
