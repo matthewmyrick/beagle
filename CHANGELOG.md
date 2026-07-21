@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-07-21
+
+### Changed
+
+- The `?` help row for `y` now reads "copy / yank the incident id to
+  clipboard" so filtering the sheet for "copy" or "copy id" finds it —
+  the feature shipped in 0.20.0 but was only described as "yank" (#110).
+
 ## [0.21.1] - 2026-07-21
 
 ### Changed

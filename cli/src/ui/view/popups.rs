@@ -581,7 +581,10 @@ const HELP_ROWS: &[(&str, &str)] = &[
         "find everywhere: fuzzy across all incidents; enter jumps",
     ),
     ("c / C", "copy this tab / whole RCA to clipboard"),
-    ("y", "yank the incident id (for /beagle-review)"),
+    (
+        "y",
+        "copy / yank the incident id to clipboard (/beagle-review)",
+    ),
     (
         "e",
         "export RCA to exports/<id>.md (frontmatter + all tabs)",
