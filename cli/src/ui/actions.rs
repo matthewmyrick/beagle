@@ -54,6 +54,21 @@ impl App {
         }
     }
 
+    /// Copies the selected workspace's id (its slug) to the clipboard —
+    /// the handle to paste into `beagle context <id>` or the
+    /// `/beagle-review` skill.
+    pub(crate) fn copy_id(&mut self) {
+        let Some(rca) = self.selected_rca() else {
+            self.status = Some("no incident selected".to_owned());
+            return;
+        };
+        let id = rca.id.to_string();
+        self.status = Some(match crate::clipboard::copy(&id) {
+            Ok(method) => format!("copied id `{id}` via {method}"),
+            Err(e) => format!("copy failed: {e}"),
+        });
+    }
+
     /// The name and raw content of the currently shown diagram, if any.
     pub(crate) fn current_diagram_raw(
         &self,

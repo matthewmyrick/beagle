@@ -49,6 +49,8 @@ USAGE:
                                             (shared systems and tags, ranked)
     beagle export <id> [--out <file>]     export one RCA as a single markdown
                   [--root <dir>]            document (default: exports/<id>.md)
+    beagle context <id> [--root <dir>]    print the review bundle (writeup +
+                                            toolbox) to stdout (/beagle-review)
     beagle init [--root <dir>]            set up a store: interactively asks
                                             for the root and writes a .beagle
                                             pinning it (skipped with --root or
@@ -184,6 +186,14 @@ pub enum Command {
         /// The workspace slug.
         id: RcaId,
     },
+    /// `beagle context`: print the review bundle (writeup + toolbox) to
+    /// stdout, for a reviewer or the `/beagle-review` skill.
+    Context {
+        /// Explicit `--root`, if given.
+        root: Option<PathBuf>,
+        /// The workspace slug.
+        id: RcaId,
+    },
     /// `beagle export`: write the single-file markdown export.
     Export {
         /// Explicit `--root`, if given.
@@ -257,6 +267,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
         Some("log") => subcommands::parse_log(&mut args, root),
         Some("pr") => subcommands::parse_pr(&mut args, root),
         Some("similar") => subcommands::parse_similar(&mut args, root),
+        Some("context") => subcommands::parse_context(&mut args, root),
         Some("export") => subcommands::parse_export(&mut args, root),
         Some("new") => subcommands::parse_new(&mut args, root),
         Some("init") => {
