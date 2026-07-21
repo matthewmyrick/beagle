@@ -483,6 +483,85 @@ pub(super) fn draw_confirm_delete(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Paragraph::new(lines).block(block), rect);
 }
 
+/// The `!` errors overlay: every broken workspace with its full reason,
+/// then any load warnings. Scrollable; geometry is fed back for clamping,
+/// like the toolbox and content panes.
+pub(super) fn draw_errors(frame: &mut Frame, app: &mut App, area: Rect) {
+    if !app.errors_visible() {
+        return;
+    }
+    let width = area.width.saturating_sub(6).clamp(30, 96);
+    let height = area.height.saturating_sub(2).max(5);
+    let popup = center(area, width, height);
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    if !app.broken().is_empty() {
+        lines.push(Line::styled(
+            "Unloadable workspaces",
+            Style::default()
+                .fg(Color::LightRed)
+                .add_modifier(Modifier::BOLD),
+        ));
+        for broken in app.broken() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled(
+                    " ⚠ ",
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Red)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(" {}", broken.dir_name),
+                    Style::default()
+                        .fg(Color::LightRed)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]));
+            lines.push(Line::styled(
+                broken.reason.clone(),
+                Style::default().fg(Color::Red),
+            ));
+        }
+    }
+    if !app.warnings().is_empty() {
+        if !app.broken().is_empty() {
+            lines.push(Line::from(""));
+        }
+        lines.push(Line::styled(
+            "Warnings",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ));
+        for warning in app.warnings() {
+            lines.push(Line::styled(
+                format!("• {}", warning.0),
+                Style::default().fg(Color::Yellow),
+            ));
+        }
+    }
+
+    let block = Block::default()
+        .title(" load errors — j/k scroll · !/esc close ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Red));
+    let inner = block.inner(popup);
+
+    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
+    let content_lines = u16::try_from(paragraph.line_count(inner.width)).unwrap_or(u16::MAX);
+    app.errors_viewport = (content_lines, inner.height);
+    let scroll = app
+        .errors_scroll()
+        .min(content_lines.saturating_sub(inner.height));
+
+    frame.render_widget(Clear, popup);
+    frame.render_widget(paragraph.block(block).scroll((scroll, 0)), popup);
+}
+
 pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
     let rows = [
         ("j / k, ↓ / ↑", "select incident or scroll content"),
@@ -512,6 +591,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
         ("V", "sign off final-review as verified \u{2192} finished"),
         ("t", "set status: pick the RCA's lifecycle stage"),
         ("#", "edit tags: add / remove, incl. skip-final-review"),
+        ("!", "view load errors / warnings (broken workspaces)"),
         ("D", "delete the selected incident (y/n confirm popup)"),
         ("S", "settings: view + edit the config file"),
         ("n / p", "next / previous diagram"),

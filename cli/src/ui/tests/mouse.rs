@@ -97,3 +97,21 @@ fn click_on_a_sidebar_row_expands_a_collapsed_sidebar_invariantly() {
     assert!(!app.sidebar_collapsed());
     assert_eq!(app.focus(), Focus::List);
 }
+
+#[test]
+fn clicking_the_broken_region_opens_the_errors_overlay() {
+    let mut app = app_with_map(1);
+    std::fs::create_dir_all(app.store.root().join("rcas").join("husk")).expect("mkdir");
+    app.reload();
+    assert_eq!(app.broken().len(), 1);
+
+    // A click low in the sidebar (past the single incident row) opens the
+    // overlay; a subsequent click anywhere dismisses it.
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 5, 12));
+    assert!(
+        app.errors_visible(),
+        "broken-region click opens the overlay"
+    );
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 5, 12));
+    assert!(!app.errors_visible(), "any click dismisses it");
+}

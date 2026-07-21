@@ -52,6 +52,10 @@ impl App {
             self.handle_tags_editor_key(arrow);
             return;
         }
+        if self.show_errors {
+            self.handle_errors_key(arrow);
+            return;
+        }
         if self.finder.is_some() {
             self.handle_finder_key(arrow, false);
             return;
@@ -111,9 +115,20 @@ impl App {
         {
             return;
         }
+        if self.show_errors {
+            self.show_errors = false; // any click dismisses the overlay
+            return;
+        }
         if let Some(row) = self.sidebar_row_at(position) {
             self.select(row);
             self.focus = Focus::List;
+            return;
+        }
+        // A click in the sidebar below the last incident row — the broken
+        // region — opens the errors overlay, matching the `!` key and the
+        // "! or click to view" hint shown there.
+        if !self.broken().is_empty() && self.mouse.sidebar.contains(position) {
+            self.open_errors();
             return;
         }
         if let Some((tab, _)) = self

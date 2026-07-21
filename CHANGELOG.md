@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Broken-workspace rows in the sidebar are now a single compact `⚠ <dir>`
+  line with a `! or click to view` hint, instead of cramming the parse
+  reason into a ~28-column pane where it truncated to noise. Press `!`
+  (or click the broken region) to open a scrollable errors overlay
+  showing every broken workspace with its **full** reason plus any load
+  warnings. The status bar's problem count points at the same key (#95).
+
 ## [0.18.0] - 2026-07-20
 
 ### Added
