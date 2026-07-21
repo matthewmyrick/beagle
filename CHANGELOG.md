@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-07-21
+
 ### Added
 
 - Review-companion flow. `beagle context <id>` prints a single
