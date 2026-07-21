@@ -544,7 +544,7 @@ pub(super) fn draw_errors(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let block = Block::default()
-        .title(" load errors — j/k scroll · !/esc close ")
+        .title(" load errors — j/k scroll · c copy · !/esc close ")
         .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

@@ -691,6 +691,16 @@ fn bang_opens_the_errors_overlay_only_when_there_are_problems() {
     // `!` now opens the overlay; j scrolls; esc closes.
     press(&mut app, KeyCode::Char('!'));
     assert!(app.errors_visible());
+
+    // `c` copies the errors without closing the overlay.
+    press(&mut app, KeyCode::Char('c'));
+    assert!(app.errors_visible(), "copy leaves the overlay open");
+    assert!(
+        app.status_line()
+            .is_some_and(|s| s.contains("copied load errors")),
+        "copy is confirmed in the status bar"
+    );
+
     press(&mut app, KeyCode::Esc);
     assert!(!app.errors_visible());
 

@@ -27,6 +27,7 @@ pub use pane::Pane;
 pub use tabs::{Focus, Tab};
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 
 use ratatui::text::Text;
 
@@ -294,7 +295,21 @@ impl App {
         }
     }
 
-    /// Keystrokes while the errors overlay is open: scroll or close.
+    /// The overlay's contents as plain text, for the clipboard: each
+    /// broken workspace as `⚠ <dir>` then its full reason, then any load
+    /// warnings. Mirrors what [`draw_errors`](view) shows.
+    fn errors_plain_text(&self) -> String {
+        let mut out = String::new();
+        for broken in &self.broken {
+            let _ = writeln!(out, "⚠ {}\n{}\n", broken.dir_name, broken.reason);
+        }
+        for warning in &self.warnings {
+            let _ = writeln!(out, "warning: {}", warning.0);
+        }
+        out.trim_end().to_owned()
+    }
+
+    /// Keystrokes while the errors overlay is open: scroll, copy, or close.
     pub(crate) fn handle_errors_key(&mut self, code: crossterm::event::KeyCode) {
         use crossterm::event::KeyCode;
         let (content_lines, height) = self.errors_viewport;
@@ -302,6 +317,10 @@ impl App {
         let page = height.saturating_sub(1).max(1);
         match code {
             KeyCode::Esc | KeyCode::Char('q' | '!') => self.show_errors = false,
+            KeyCode::Char('c') => {
+                let text = self.errors_plain_text();
+                self.finish_copy("load errors", &text);
+            }
             KeyCode::Char('j') | KeyCode::Down => {
                 self.errors_scroll = self.errors_scroll.saturating_add(1).min(max);
             }
