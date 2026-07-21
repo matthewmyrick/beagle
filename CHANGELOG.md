@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-07-21
+
+### Changed
+
+- Filtering the `?` help sheet now highlights the matched characters in
+  each remaining row (same treatment as the `\` finder), so it's clear
+  why a row matched (#107).
+
 ## [0.21.0] - 2026-07-21
 
 ### Changed

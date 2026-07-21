@@ -607,6 +607,61 @@ const HELP_ROWS: &[(&str, &str)] = &[
 /// Column width reserved for the keys before the action text.
 const HELP_KEY_COL: usize = 20;
 
+/// Renders one help row (`  <keys padded><action>`) as styled spans. The
+/// keys are yellow; when `query` is filtering, the characters it fuzzy-
+/// matched are highlighted (same treatment as the `\` finder) so it's
+/// clear why the row matched. Runs of the same style coalesce into spans.
+fn help_row_spans(
+    keys: &str,
+    action: &str,
+    key_col: usize,
+    query: Option<&str>,
+) -> Vec<Span<'static>> {
+    let text = format!("  {keys:<key_col$}{action}");
+    let keys_end = 2 + keys.chars().count();
+    let matched: Vec<usize> = match query {
+        Some(q) if !q.is_empty() => crate::fuzzy::indices(q, &text)
+            .map(|(_, positions)| positions)
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+    // 0 = matched (highlight), 1 = keys (yellow), 2 = normal.
+    let class = |i: usize| -> u8 {
+        if matched.contains(&i) {
+            0
+        } else if (2..keys_end).contains(&i) {
+            1
+        } else {
+            2
+        }
+    };
+    let style_of = |c: u8| match c {
+        0 => Style::default()
+            .fg(Color::Rgb(214, 160, 30))
+            .add_modifier(Modifier::BOLD),
+        1 => Style::default().fg(Color::Yellow),
+        _ => Style::default(),
+    };
+
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut buf = String::new();
+    let mut buf_class = 2u8;
+    let mut started = false;
+    for (i, ch) in text.chars().enumerate() {
+        let c = class(i);
+        if started && c != buf_class {
+            spans.push(Span::styled(std::mem::take(&mut buf), style_of(buf_class)));
+        }
+        buf_class = c;
+        started = true;
+        buf.push(ch);
+    }
+    if started {
+        spans.push(Span::styled(buf, style_of(buf_class)));
+    }
+    spans
+}
+
 pub(super) fn draw_help(frame: &mut Frame, app: &App, area: Rect) {
     let query = app.help_filter();
 
@@ -639,13 +694,12 @@ pub(super) fn draw_help(frame: &mut Frame, app: &App, area: Rect) {
             _ => true,
         })
         .map(|(keys, action)| {
-            ListItem::new(Line::from(vec![
-                Span::styled(
-                    format!("  {keys:<key_col$}"),
-                    Style::default().fg(Color::Yellow),
-                ),
-                Span::raw(truncate(action, action_room)),
-            ]))
+            ListItem::new(Line::from(help_row_spans(
+                keys,
+                &truncate(action, action_room),
+                key_col,
+                query,
+            )))
         })
         .collect();
     if items.is_empty() {
