@@ -68,7 +68,7 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     draw_tags_editor(frame, app, frame.area());
     draw_confirm_delete(frame, app, frame.area());
     if app.help_visible() {
-        draw_help(frame, frame.area());
+        draw_help(frame, app, frame.area());
     }
 }
 

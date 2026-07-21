@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The `?` help sheet is wider — sized to its longest row, so action
+  descriptions are no longer truncated (`skip-fi…`) on a normal-width
+  terminal — and its keys are **filterable**: press `f` in the sheet and
+  type to narrow the list (fuzzy match over keys + description, reusing
+  the existing matcher — no new dependency). The box stays the same size
+  while filtering; esc clears the filter, a second esc closes (#104).
+
 ## [0.20.0] - 2026-07-21
 
 ### Added

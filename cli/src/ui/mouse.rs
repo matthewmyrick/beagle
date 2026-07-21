@@ -101,7 +101,7 @@ impl App {
     /// pickers keep their keyboard flow.
     fn click(&mut self, position: Position) {
         if self.show_help {
-            self.show_help = false;
+            self.close_help();
             return;
         }
         if self.finder.is_some()

@@ -30,7 +30,10 @@ impl App {
             // Shift-Q only: a plain `q` next to tab/scroll keys quit the app
             // by accident too easily. Ctrl-C is handled above.
             KeyCode::Char('Q') => return Flow::Quit,
-            KeyCode::Char('?') => self.show_help = true,
+            KeyCode::Char('?') => {
+                self.show_help = true;
+                self.help_filter = None;
+            }
             KeyCode::Char('T') => self.open_toolbox(),
             KeyCode::Char('o') => self.open_links(),
             KeyCode::Char('R') => self.open_related(),
@@ -138,11 +141,38 @@ impl App {
         } else if self.toolbox.is_some() {
             self.handle_toolbox_key(key.code);
         } else if self.show_help {
-            self.show_help = false;
+            self.handle_help_key(key.code);
         } else {
             return false;
         }
         true
+    }
+
+    /// Keystrokes while the `?` help sheet is open. Not filtering: `f`
+    /// starts a filter, any other key closes (as the sheet always has).
+    /// Filtering: chars/backspace edit the query (rows narrow live), esc
+    /// clears the filter — a second esc then closes.
+    fn handle_help_key(&mut self, code: KeyCode) {
+        if self.help_filter.is_some() {
+            match code {
+                KeyCode::Esc => self.help_filter = None,
+                KeyCode::Backspace => {
+                    if let Some(q) = self.help_filter.as_mut() {
+                        q.pop();
+                    }
+                }
+                KeyCode::Char(c) => {
+                    if let Some(q) = self.help_filter.as_mut() {
+                        q.push(c);
+                    }
+                }
+                _ => {}
+            }
+        } else if code == KeyCode::Char('f') {
+            self.help_filter = Some(String::new());
+        } else {
+            self.close_help();
+        }
     }
 
     /// `E`: the file behind the current tab, to open in the user's editor.
