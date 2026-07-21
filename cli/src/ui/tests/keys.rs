@@ -731,3 +731,42 @@ fn y_yanks_the_selected_incident_id() {
         .status_line()
         .is_some_and(|s| s.contains("no incident selected")));
 }
+
+#[test]
+fn help_pane_f_filters_and_esc_peels_then_closes() {
+    let mut app = app_with(1);
+
+    // `?` opens help, no filter yet.
+    press(&mut app, KeyCode::Char('?'));
+    assert!(app.help_visible());
+    assert_eq!(app.help_filter(), None);
+
+    // `f` starts filtering; typing builds the query (not a close).
+    press(&mut app, KeyCode::Char('f'));
+    assert_eq!(app.help_filter(), Some(""));
+    for c in "tag".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    assert_eq!(app.help_filter(), Some("tag"));
+    assert!(app.help_visible(), "typing does not close help");
+    press(&mut app, KeyCode::Backspace);
+    assert_eq!(app.help_filter(), Some("ta"));
+
+    // esc peels the filter first, then closes.
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(app.help_filter(), None);
+    assert!(app.help_visible());
+    press(&mut app, KeyCode::Esc);
+    assert!(!app.help_visible());
+}
+
+#[test]
+fn help_pane_any_key_closes_when_not_filtering() {
+    let mut app = app_with(1);
+    press(&mut app, KeyCode::Char('?'));
+    assert!(app.help_visible());
+    // A non-f key with no active filter closes the sheet, as before.
+    press(&mut app, KeyCode::Char('j'));
+    assert!(!app.help_visible());
+    assert_eq!(app.help_filter(), None);
+}

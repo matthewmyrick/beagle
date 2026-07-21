@@ -562,69 +562,110 @@ pub(super) fn draw_errors(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_widget(paragraph.block(block).scroll((scroll, 0)), popup);
 }
 
-pub(super) fn draw_help(frame: &mut Frame, area: Rect) {
-    let rows = [
-        ("j / k, ↓ / ↑", "select incident or scroll content"),
-        ("enter / l", "focus the content pane"),
-        ("b / esc", "back to the incident list"),
-        ("tab / [ / ], ← / →", "cycle tabs"),
-        ("1–8", "jump to a tab"),
-        ("f", "filter list: i/r/a/v/f status · c/h/m/l sev · / text"),
-        ("F", "follow: reloads stick to the bottom (tail -f)"),
-        ("s", "hide / show the sidebar (full-width content)"),
-        ("a", "show / hide archived incidents (dimmed)"),
-        ("/", "search the incident: every tab, live highlight"),
-        ("n / N", "next / previous search match"),
-        (
-            "\\",
-            "find everywhere: fuzzy across all incidents; enter jumps",
-        ),
-        ("c / C", "copy this tab / whole RCA to clipboard"),
-        ("y", "yank the incident id (for /beagle-review)"),
-        (
-            "e",
-            "export RCA to exports/<id>.md (frontmatter + all tabs)",
-        ),
-        ("E", "open this tab's file in your editor"),
-        ("T", "toolbox: toolbox.md + systems/ context"),
-        ("o", "links: open attached PRs / URLs on this tab"),
-        ("R", "related incidents (shared systems/tags); enter jumps"),
-        ("V", "sign off final-review as verified \u{2192} finished"),
-        ("t", "set status: pick the RCA's lifecycle stage"),
-        ("#", "edit tags: add / remove, incl. skip-final-review"),
-        ("!", "view load errors / warnings (broken workspaces)"),
-        ("D", "delete the selected incident (y/n confirm popup)"),
-        ("S", "settings: view + edit the config file"),
-        ("n / p", "next / previous diagram"),
-        ("h / l, ← / →", "pan diagrams horizontally"),
-        ("space / pgdn / pgup", "page through content"),
-        ("g / G", "top / bottom"),
-        ("r", "reload from disk"),
-        ("Q / ctrl-c", "quit"),
-    ];
-    let mut lines = vec![Line::from("")];
-    lines.extend(rows.iter().map(|(keys, action)| {
-        Line::from(vec![
-            Span::styled(format!("  {keys:<20}"), Style::default().fg(Color::Yellow)),
-            Span::raw(*action),
-        ])
-    }));
+/// Every keybinding row: `(keys, action)`. Kept as a const so the pane can
+/// size itself to the widest row and filter without re-listing.
+const HELP_ROWS: &[(&str, &str)] = &[
+    ("j / k, ↓ / ↑", "select incident or scroll content"),
+    ("enter / l", "focus the content pane"),
+    ("b / esc", "back to the incident list"),
+    ("tab / [ / ], ← / →", "cycle tabs"),
+    ("1–8", "jump to a tab"),
+    ("f", "filter list: i/r/a/v/f status · c/h/m/l sev · / text"),
+    ("F", "follow: reloads stick to the bottom (tail -f)"),
+    ("s", "hide / show the sidebar (full-width content)"),
+    ("a", "show / hide archived incidents (dimmed)"),
+    ("/", "search the incident: every tab, live highlight"),
+    ("n / N", "next / previous search match"),
+    (
+        "\\",
+        "find everywhere: fuzzy across all incidents; enter jumps",
+    ),
+    ("c / C", "copy this tab / whole RCA to clipboard"),
+    ("y", "yank the incident id (for /beagle-review)"),
+    (
+        "e",
+        "export RCA to exports/<id>.md (frontmatter + all tabs)",
+    ),
+    ("E", "open this tab's file in your editor"),
+    ("T", "toolbox: toolbox.md + systems/ context"),
+    ("o", "links: open attached PRs / URLs on this tab"),
+    ("R", "related incidents (shared systems/tags); enter jumps"),
+    ("V", "sign off final-review as verified \u{2192} finished"),
+    ("t", "set status: pick the RCA's lifecycle stage"),
+    ("#", "edit tags: add / remove, incl. skip-final-review"),
+    ("!", "view load errors / warnings (broken workspaces)"),
+    ("D", "delete the selected incident (y/n confirm popup)"),
+    ("S", "settings: view + edit the config file"),
+    ("n / p", "next / previous diagram"),
+    ("h / l, ← / →", "pan diagrams horizontally"),
+    ("space / pgdn / pgup", "page through content"),
+    ("g / G", "top / bottom"),
+    ("r", "reload from disk"),
+    ("Q / ctrl-c", "quit"),
+];
 
-    // Sized to the actual row count (plus borders) so the last rows are
-    // never silently clipped as keys are added.
-    let width = 62.min(area.width.saturating_sub(4));
-    let height = u16::try_from(lines.len())
+/// Column width reserved for the keys before the action text.
+const HELP_KEY_COL: usize = 20;
+
+pub(super) fn draw_help(frame: &mut Frame, app: &App, area: Rect) {
+    let query = app.help_filter();
+
+    // Width fits the widest full row, so nothing is truncated on a normal
+    // terminal (clamped to what's on screen).
+    let needed = HELP_ROWS
+        .iter()
+        .map(|(k, a)| 4 + HELP_KEY_COL.max(k.chars().count()) + a.chars().count())
+        .max()
+        .unwrap_or(40);
+    let width = u16::try_from(needed)
+        .unwrap_or(u16::MAX)
+        .clamp(40, area.width.saturating_sub(4).max(40));
+    // Height comes from the FULL row count, so filtering narrows the list
+    // without ever resizing the box.
+    let height = u16::try_from(HELP_ROWS.len())
         .unwrap_or(u16::MAX)
         .saturating_add(2)
         .min(area.height.saturating_sub(2));
     let popup = center(area, width, height);
+    let action_room = usize::from(width).saturating_sub(4 + HELP_KEY_COL);
+    let key_col = HELP_KEY_COL;
 
+    let mut items: Vec<ListItem<'_>> = HELP_ROWS
+        .iter()
+        .filter(|(keys, action)| match query {
+            Some(q) if !q.is_empty() => {
+                crate::fuzzy::score(q, &format!("{keys} {action}")).is_some()
+            }
+            _ => true,
+        })
+        .map(|(keys, action)| {
+            ListItem::new(Line::from(vec![
+                Span::styled(
+                    format!("  {keys:<key_col$}"),
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::raw(truncate(action, action_room)),
+            ]))
+        })
+        .collect();
+    if items.is_empty() {
+        items.push(ListItem::new(Line::styled(
+            "  (no matching keys)",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    let bottom = match query {
+        Some(q) => format!(" filter: {q}▌ · esc clears "),
+        None => " f filter · any key closes ".to_owned(),
+    };
     let block = Block::default()
-        .title(" keys (any key to close) ")
+        .title(" keys ")
         .title_alignment(Alignment::Center)
+        .title_bottom(Line::from(bottom).centered())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Yellow));
     frame.render_widget(Clear, popup);
-    frame.render_widget(Paragraph::new(lines).block(block), popup);
+    frame.render_widget(List::new(items).block(block), popup);
 }

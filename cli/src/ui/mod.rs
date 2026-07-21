@@ -69,6 +69,10 @@ pub struct App {
     scroll: u16,
     hscroll: u16,
     show_help: bool,
+    /// The `?` sheet's keybinding filter: `Some` while a query is being
+    /// typed (empty string = filter active, no query yet), `None` when not
+    /// filtering. Narrows the rows by fuzzy match over keys + description.
+    help_filter: Option<String>,
     status: Option<String>,
     /// Content cache for the current (workspace, tab, diagram) triple.
     pane: Option<(PaneKey, Pane)>,
@@ -204,6 +208,7 @@ impl App {
             scroll: 0,
             hscroll: 0,
             show_help: false,
+            help_filter: None,
             status: None,
             pane: None,
             tick: 0,
@@ -451,6 +456,18 @@ impl App {
 
     pub(crate) fn help_visible(&self) -> bool {
         self.show_help
+    }
+
+    /// The `?` sheet's active keybinding filter query, if one is being
+    /// typed. `None` when not filtering.
+    pub(crate) fn help_filter(&self) -> Option<&str> {
+        self.help_filter.as_deref()
+    }
+
+    /// Closes the help sheet and drops any filter.
+    pub(crate) fn close_help(&mut self) {
+        self.show_help = false;
+        self.help_filter = None;
     }
 
     pub(crate) fn status_line(&self) -> Option<&str> {
