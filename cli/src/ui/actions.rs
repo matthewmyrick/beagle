@@ -102,7 +102,7 @@ impl App {
         });
     }
 
-    fn finish_copy(&mut self, label: &str, content: &str) {
+    pub(super) fn finish_copy(&mut self, label: &str, content: &str) {
         self.status = Some(match crate::clipboard::copy(content) {
             Ok(method) => format!(
                 "copied {label} ({}) via {method}",

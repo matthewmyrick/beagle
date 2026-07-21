@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-07-21
+
+### Fixed
+
+- The `!` errors overlay now copies with `c` — the whole thing (every
+  broken workspace, its full reason, and any warnings) to the clipboard,
+  handy when a parse error is long. The overlay was already scrollable
+  (`j`/`k`, space, `PageDown`/`PageUp`, `g`/`G`); its title now says so
+  (#98).
+
 ## [0.19.0] - 2026-07-21
 
 ### Changed
