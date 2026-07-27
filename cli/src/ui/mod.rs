@@ -57,6 +57,9 @@ pub struct App {
     /// Severity facets toggled in filter mode (`c`/`h`/`m`/`l`); empty
     /// means every severity passes.
     facet_severities: HashSet<crate::model::Severity>,
+    /// `p` facet: when set, only incidents with at least one attached PR
+    /// pass. Off by default (every incident passes).
+    facet_has_pr: bool,
     /// Filter-mode input state: which keys the filter is capturing.
     filter_input: FilterInput,
     /// Indices into `rcas` that match `filter`, best match first.
@@ -199,6 +202,7 @@ impl App {
             filter: String::new(),
             facet_statuses: HashSet::new(),
             facet_severities: HashSet::new(),
+            facet_has_pr: false,
             filter_input: FilterInput::Off,
             visible,
             selected: 0,
@@ -260,6 +264,7 @@ impl App {
                 self.facet_severities.is_empty()
                     || self.facet_severities.contains(&rca.meta.severity)
             })
+            .filter(|(_, rca)| !self.facet_has_pr || !rca.meta.prs.is_empty())
             .filter_map(|(index, rca)| {
                 let haystack = format!(
                     "{} {} {} {}",
@@ -366,6 +371,7 @@ impl App {
         !self.filter.is_empty()
             || !self.facet_statuses.is_empty()
             || !self.facet_severities.is_empty()
+            || self.facet_has_pr
     }
 
     /// Clears every filter dimension and restores the full list, keeping
@@ -375,6 +381,7 @@ impl App {
         self.filter.clear();
         self.facet_statuses.clear();
         self.facet_severities.clear();
+        self.facet_has_pr = false;
         self.recompute_visible(keep);
     }
 
@@ -391,6 +398,9 @@ impl App {
             if self.facet_statuses.contains(&status) {
                 parts.push(status.as_str());
             }
+        }
+        if self.facet_has_pr {
+            parts.push("has PR");
         }
         if parts.is_empty() {
             String::new()

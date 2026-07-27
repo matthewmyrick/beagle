@@ -274,6 +274,10 @@ impl App {
             KeyCode::Char('h') => self.toggle_severity_facet(Severity::High),
             KeyCode::Char('m') => self.toggle_severity_facet(Severity::Medium),
             KeyCode::Char('l') => self.toggle_severity_facet(Severity::Low),
+            KeyCode::Char('p') => {
+                self.facet_has_pr = !self.facet_has_pr;
+                self.recompute_visible(None);
+            }
             KeyCode::Backspace => {
                 self.filter.pop();
                 self.recompute_visible(None);

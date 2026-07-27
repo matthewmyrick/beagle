@@ -770,3 +770,30 @@ fn help_pane_any_key_closes_when_not_filtering() {
     assert!(!app.help_visible());
     assert_eq!(app.help_filter(), None);
 }
+
+#[test]
+fn p_facet_filters_to_incidents_with_a_pr() {
+    use crate::model::RcaId;
+
+    let mut app = app_with_variety();
+    let id = RcaId::new("ses-rev-high").expect("id");
+    app.store
+        .add_pr(&id, "https://github.com/o/r/pull/1")
+        .expect("pr");
+    app.reload();
+    let total = app.visible_len();
+
+    press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('p')); // has-PR facet
+    assert_eq!(app.visible_len(), 1, "only the incident with a PR");
+    assert_eq!(
+        app.selected_rca().expect("match").id.as_str(),
+        "ses-rev-high"
+    );
+    assert_eq!(app.facet_label(), "[has PR]");
+    assert!(app.filter().is_empty(), "p does not type");
+
+    press(&mut app, KeyCode::Char('p')); // toggle off
+    assert_eq!(app.visible_len(), total, "all incidents return");
+    assert_eq!(app.facet_label(), "");
+}

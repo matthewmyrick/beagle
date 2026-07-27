@@ -249,10 +249,6 @@ fn rca_list_item(
             tinted(style),
         ));
     }
-    detail_spans.push(Span::styled(
-        format!("  {}", truncate(rca.id.as_str(), 20)),
-        tinted(Style::default().fg(Color::DarkGray)),
-    ));
     if has_unread {
         detail_spans.push(Span::styled(
             " ●",
@@ -507,7 +503,7 @@ fn filter_prompt_line(app: &App) -> Line<'static> {
         ));
     } else {
         spans.push(Span::styled(
-            "   i/r/a/v/f status · c/h/m/l severity · / type · enter keep · esc clear",
+            "   i/r/a/v/f status · c/h/m/l severity · p has-PR · / type · enter keep · esc clear",
             Style::default().fg(Color::DarkGray),
         ));
     }

@@ -12,7 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 /// How often the poller re-queries `gh` for PR states.
-pub const POLL_INTERVAL: Duration = Duration::from_secs(30 * 60);
+pub const POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 /// Where a pull request stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

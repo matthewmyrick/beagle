@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-07-27
+
+### Added
+
+- `p` filter facet: inside `f` filter mode, `p` toggles a "has a PR
+  attached" filter, narrowing the list to incidents that are tracking a
+  PR (shown as `[has PR]` in the sidebar title). Stacks with the status
+  and severity facets like the others (#116).
+
+### Changed
+
+- The sidebar detail line no longer shows the workspace id/slug — it was
+  redundant with the title and only got truncated (`2026-07-20-s…`) in
+  the narrow pane. The status, PR indicator, and ☑ checklist progress
+  remain (#116).
+- PR merge states are now polled every **5 minutes** by default (was 30),
+  so the sidebar/header PR indicators update sooner (#116).
+
 ## [0.22.0] - 2026-07-21
 
 ### Added

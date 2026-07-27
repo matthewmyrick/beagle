@@ -570,7 +570,10 @@ const HELP_ROWS: &[(&str, &str)] = &[
     ("b / esc", "back to the incident list"),
     ("tab / [ / ], ← / →", "cycle tabs"),
     ("1–8", "jump to a tab"),
-    ("f", "filter list: i/r/a/v/f status · c/h/m/l sev · / text"),
+    (
+        "f",
+        "filter list: i/r/a/v/f status · c/h/m/l sev · p has-PR · / text",
+    ),
     ("F", "follow: reloads stick to the bottom (tail -f)"),
     ("s", "hide / show the sidebar (full-width content)"),
     ("a", "show / hide archived incidents (dimmed)"),
