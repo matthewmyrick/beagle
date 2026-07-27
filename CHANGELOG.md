@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-07-21
+
 ### Added
 
 - The sidebar detail line now shows a **PR indicator** for each incident,
