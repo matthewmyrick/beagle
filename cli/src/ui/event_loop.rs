@@ -48,7 +48,7 @@ impl App {
         watcher.watch(self.store.watch_root(), RecursiveMode::Recursive)?;
 
         // PR merge-status polling: a background thread queries `gh` (every
-        // 30 min, plus whenever the attached-PR set changes) and reports
+        // 5 min, plus whenever the attached-PR set changes) and reports
         // over a channel, so the UI thread never blocks on the network.
         // Without gh, the poller exits and PRs stay plain links.
         let (urls_tx, urls_rx) = mpsc::channel::<Vec<String>>();
