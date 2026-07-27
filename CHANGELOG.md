@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The sidebar detail line now shows a **PR indicator** for each incident,
+  from the merge states beagle already polls: `PR ✓` (all attached PRs
+  merged, green), `PR m/t` (some merged, yellow), `PR ✗` (closed, none
+  merged, red), or `PR·n` (PR links known but no `gh` state yet, gray).
+  An incident in `review`/`agent` with no PR attached shows a dim
+  `no PR`, so it's clear at a glance whether a review is tracking a PR.
+  It sits right after the status, so it survives the narrow sidebar's
+  truncation (#113).
+
 ## [0.21.2] - 2026-07-21
 
 ### Changed

@@ -30,7 +30,7 @@ fn sample_summary(severity: Severity) -> crate::model::RcaSummary {
 fn selected_row_keeps_the_badge_background_and_tints_the_rest() {
     let rca = sample_summary(Severity::High);
 
-    let selected = rca_list_item(&rca, 0, false, true, None);
+    let selected = rca_list_item(&rca, 0, false, true, None, None);
     let badge = &selected[0].spans[0];
     assert_eq!(
         badge.style.bg,
@@ -53,7 +53,7 @@ fn selected_row_keeps_the_badge_background_and_tints_the_rest() {
         );
     }
 
-    let unselected = rca_list_item(&rca, 0, false, false, None);
+    let unselected = rca_list_item(&rca, 0, false, false, None, None);
     assert_eq!(
         unselected[0].spans[0].style.bg,
         Some(Color::LightRed),
@@ -71,7 +71,7 @@ fn selected_row_keeps_the_badge_background_and_tints_the_rest() {
 fn sidebar_detail_line_shows_checklist_progress() {
     let rca = sample_summary(Severity::High);
 
-    let partial = rca_list_item(&rca, 0, false, false, Some((2, 7)));
+    let partial = rca_list_item(&rca, 0, false, false, Some((2, 7)), None);
     let detail: String = partial[1]
         .spans
         .iter()
@@ -82,7 +82,7 @@ fn sidebar_detail_line_shows_checklist_progress() {
         "progress in detail line: {detail}"
     );
 
-    let complete = rca_list_item(&rca, 0, false, false, Some((4, 4)));
+    let complete = rca_list_item(&rca, 0, false, false, Some((4, 4)), None);
     let progress_span = complete[1]
         .spans
         .iter()
@@ -90,7 +90,7 @@ fn sidebar_detail_line_shows_checklist_progress() {
         .expect("progress span");
     assert_eq!(progress_span.style.fg, Some(Color::LightGreen));
 
-    let none = rca_list_item(&rca, 0, false, false, None);
+    let none = rca_list_item(&rca, 0, false, false, None, None);
     let detail: String = none[1].spans.iter().map(|s| s.content.as_ref()).collect();
     assert!(!detail.contains('☑'), "no progress without checkboxes");
 }
@@ -192,5 +192,69 @@ fn finder_popup_grows_with_matches() {
     assert!(
         typed_height > empty_height,
         "matches grow the popup: {typed_height} vs {empty_height}"
+    );
+}
+
+#[test]
+fn pr_summary_reflects_review_pr_state() {
+    use crate::model::Status;
+    use crate::prs::PrState;
+    use crate::ui::testutil::app_with;
+
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+    app.store.set_status(&id, Status::Review).expect("review");
+    app.reload();
+
+    // A review with no PR attached: a dim "no PR" hint.
+    {
+        let rca = app.selected_rca().expect("selected");
+        assert_eq!(
+            pr_summary(&app, rca),
+            Some(("no PR".to_owned(), Color::DarkGray))
+        );
+    }
+
+    // Attach a PR but no gh state yet: shows the link count, gray.
+    app.store
+        .add_pr(&id, "https://github.com/o/r/pull/1")
+        .expect("pr");
+    app.reload();
+    {
+        let rca = app.selected_rca().expect("selected");
+        assert_eq!(
+            pr_summary(&app, rca),
+            Some(("PR·1".to_owned(), Color::Gray))
+        );
+    }
+
+    // Merged: green check.
+    app.pr_states
+        .insert("https://github.com/o/r/pull/1".to_owned(), PrState::Merged);
+    {
+        let rca = app.selected_rca().expect("selected");
+        assert_eq!(
+            pr_summary(&app, rca),
+            Some(("PR ✓".to_owned(), Color::Green))
+        );
+    }
+
+    // A finished incident with no PR stays quiet (no indicator).
+    app.store
+        .set_status(&id, Status::Investigating)
+        .expect("back");
+    let id2 = crate::model::RcaId::new("no-pr-inv").expect("id");
+    app.store
+        .scaffold(
+            &id2,
+            &crate::store::new_meta("Inv".to_owned(), Severity::Low),
+        )
+        .expect("scaffold");
+    app.reload();
+    let inv = app.rcas().iter().find(|r| r.id == id2).expect("found");
+    assert_eq!(
+        pr_summary(&app, inv),
+        None,
+        "investigating + no PR is quiet"
     );
 }

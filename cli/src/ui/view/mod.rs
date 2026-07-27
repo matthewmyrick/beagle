@@ -18,7 +18,7 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Frame;
 
-use crate::model::RcaSummary;
+use crate::model::{RcaSummary, Status};
 
 use super::{App, Focus, Pane, Tab};
 
@@ -108,6 +108,7 @@ fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
                 app.has_unread(&rca.id),
                 row == app.selected_index(),
                 app.checklist_progress(&rca.id),
+                pr_summary(app, rca),
             ))
         })
         .collect();
@@ -143,6 +144,38 @@ fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
 /// Background of the selected sidebar row.
 const SELECTED_BG: Color = Color::Rgb(40, 44, 60);
 
+/// A compact PR indicator for the sidebar detail line, from the merge
+/// states beagle already polls: `PR ✓` (all merged), `PR m/t` (some
+/// merged), `PR ✗` (closed, none merged), `PR·n` (links known but no `gh`
+/// state yet), or — for a `review`/`agent` incident with no PR attached —
+/// a dim `no PR` so it's clear the review isn't tracking one. `None` for
+/// other statuses without a PR, to keep those rows quiet.
+fn pr_summary(app: &App, rca: &RcaSummary) -> Option<(String, Color)> {
+    use crate::prs::PrState;
+    if rca.meta.prs.is_empty() {
+        return matches!(rca.meta.status, Status::Review | Status::Agent)
+            .then(|| ("no PR".to_owned(), Color::DarkGray));
+    }
+    let total = rca.meta.prs.len();
+    let known: Vec<PrState> = rca
+        .meta
+        .prs
+        .iter()
+        .filter_map(|u| app.pr_state(u))
+        .collect();
+    if known.is_empty() {
+        return Some((format!("PR·{total}"), Color::Gray));
+    }
+    let merged = known.iter().filter(|s| **s == PrState::Merged).count();
+    if merged == total {
+        return Some(("PR ✓".to_owned(), Color::Green));
+    }
+    if merged == 0 && known.iter().all(|s| *s == PrState::Closed) {
+        return Some(("PR ✗".to_owned(), Color::Red));
+    }
+    Some((format!("PR {merged}/{total}"), Color::Yellow))
+}
+
 /// The two sidebar lines for one workspace. Returned as lines (not a
 /// [`ListItem`]) so tests can inspect the span styles.
 fn rca_list_item(
@@ -151,6 +184,7 @@ fn rca_list_item(
     has_unread: bool,
     selected: bool,
     progress: Option<(usize, usize)>,
+    pr: Option<(String, Color)>,
 ) -> Vec<Line<'static>> {
     let (badge, mut badge_style) = severity_badge(rca.meta.severity);
     let (symbol, mut symbol_style) = status_symbol(rca.meta.status, tick);
@@ -194,6 +228,14 @@ fn rca_list_item(
     ];
     if rca.archived {
         detail_spans.push(Span::styled(" · archived", tinted(base)));
+    }
+    // PR state comes right after the status — the thing you most want to
+    // know about a review, and placed early so it survives truncation.
+    if let Some((label, color)) = pr {
+        detail_spans.push(Span::styled(
+            format!("  {label}"),
+            tinted(Style::default().fg(color)),
+        ));
     }
     if let Some((checked, total)) = progress {
         // Checklist progress across all sections: green once complete.
