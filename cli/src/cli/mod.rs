@@ -1,9 +1,11 @@
-//! Argument parsing for the `beagle` binary.
+//! Argument parsing for the `beagle` binary, plus the machine-readable
+//! rendering of what it prints ([`json`]).
 //!
-//! Parsing here is pure (no filesystem, no network); `main.rs` does the I/O.
-//! Everything is parsed into the typed [`Command`] at this boundary, so the
-//! rest of the binary never re-inspects raw strings.
+//! Everything here is pure (no filesystem, no network); `main.rs` does the
+//! I/O. Arguments are parsed into the typed [`Command`] at this boundary, so
+//! the rest of the binary never re-inspects raw strings.
 
+pub mod json;
 mod subcommands;
 
 use std::path::PathBuf;
@@ -24,6 +26,8 @@ USAGE:
     beagle list [--status <status>]       print workspaces to stdout,
                   [--severity <sev>]           optionally filtered
                   [--archived]                 include archived workspaces
+                  [--json]                     emit a JSON array instead of
+                                                 the text table (for scripts)
                   [--root <dir>]
     beagle archive <id> [--force]         move a finished RCA to
                   [--root <dir>]            rcas/archive/ (kept, but out of
@@ -112,6 +116,8 @@ pub enum Command {
         severity: Option<Severity>,
         /// Include archived workspaces (`--archived`).
         archived: bool,
+        /// Emit a JSON array instead of the text table (`--json`).
+        json: bool,
     },
     /// `beagle archive`: move a finished workspace to `rcas/archive/`.
     Archive {

@@ -80,6 +80,7 @@ beagle                    # open the TUI against ./rcas
 beagle --root ~/oncall    # or point it anywhere
 beagle list               # print workspaces to stdout
 beagle list --status investigating --severity high       # filtered
+beagle list --json        # the same listing as a JSON array, for scripts/jq
 beagle new <slug> --title "..." [--severity high] [--system payments-api]...
 beagle status <slug> investigating   # flip status; a running TUI updates live
 beagle handoff <slug>     # launch the configured agent on a reviewed RCA

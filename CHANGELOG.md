@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `beagle list --json` emits the listing as a JSON array — one object per
+  workspace (`id`, `title`, `severity`, `status`, `created`, `updated`,
+  `systems`, `tags`, `prs`, `published`, `published_at`, `archived`),
+  honouring the same `--status` / `--severity` / `--archived` filters. Keys
+  are always present (`null` / `[]` when unset) so consumers never have to
+  tell "absent" from "empty", and workspaces that fail to load stay out of
+  the array — their warnings go to stderr, leaving stdout pipeable straight
+  into `jq`. Without the flag the text table is unchanged (#119).
+
 ## [0.23.0] - 2026-07-27
 
 ### Added

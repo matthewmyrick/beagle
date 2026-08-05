@@ -14,8 +14,8 @@ use std::io::IsTerminal as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use beagle::model::{RcaId, Severity, Status};
-use beagle::store::{new_meta, Store};
+use beagle::model::{RcaId, RcaSummary, Severity, Status};
+use beagle::store::{new_meta, BrokenWorkspace, Store};
 use beagle::{config, ui, update, Error};
 
 use beagle::skill::{self, Agent, Skill, SkillStatus};
@@ -88,7 +88,8 @@ fn run(command: Command) -> Result<(), Error> {
             status,
             severity,
             archived,
-        } => run_list(root, status, severity, archived),
+            json,
+        } => run_list(root, status, severity, archived, json),
         Command::Archive { root, id, force } => run_archive(root, &id, force),
         Command::Unarchive { root, id } => run_unarchive(root, &id),
         Command::SetPublished {
@@ -142,12 +143,15 @@ fn run(command: Command) -> Result<(), Error> {
     }
 }
 
-/// `beagle list`: workspaces to stdout, warnings to stderr.
+/// `beagle list`: workspaces to stdout, warnings to stderr. With `json`,
+/// stdout is a JSON array of the matching workspaces and nothing else, so it
+/// pipes straight into `jq`.
 fn run_list(
     root: Option<PathBuf>,
     status: Option<Status>,
     severity: Option<Severity>,
     archived: bool,
+    json: bool,
 ) -> Result<(), Error> {
     let store = Store::open(&effective_root(root)?)?;
     let listing = if archived {
@@ -155,25 +159,42 @@ fn run_list(
     } else {
         store.list()?
     };
-    let (summaries, warnings) = (listing.summaries, listing.warnings);
-    for rca in summaries
+    let matched: Vec<&RcaSummary> = listing
+        .summaries
         .iter()
         .filter(|rca| status.map_or(true, |s| rca.meta.status == s))
         .filter(|rca| severity.map_or(true, |s| rca.meta.severity == s))
-    {
+        .collect();
+
+    if json {
+        println!("{}", cli::json::list(&matched)?);
+        // Broken workspaces have no manifest to render, so they join the
+        // warnings on stderr rather than polluting the array.
+        for broken in &listing.broken {
+            eprintln!("warning: broken `{}`: {}", broken.dir_name, broken.reason);
+        }
+    } else {
+        print_list_table(&matched, &listing.broken);
+    }
+    for warning in &listing.warnings {
+        eprintln!("warning: {}", warning.0);
+    }
+    Ok(())
+}
+
+/// The human-readable `beagle list` table: one fixed-width row per
+/// workspace, then a row per directory that failed to load.
+fn print_list_table(matched: &[&RcaSummary], broken: &[BrokenWorkspace]) {
+    for rca in matched {
         let marker = if rca.archived { "  [archived]" } else { "" };
         println!(
             "{:<10} {:<14} {:<30} {}{marker}",
             rca.meta.severity, rca.meta.status, rca.id, rca.meta.title,
         );
     }
-    for broken in &listing.broken {
+    for broken in broken {
         println!("⚠ broken     {:<30} {}", broken.dir_name, broken.reason);
     }
-    for warning in &warnings {
-        eprintln!("warning: {}", warning.0);
-    }
-    Ok(())
 }
 
 /// `beagle init`: scaffold toolbox.md + systems/ agent context templates.
