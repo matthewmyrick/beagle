@@ -118,6 +118,25 @@ fn list_parses_filters() {
 }
 
 #[test]
+fn list_parses_the_json_flag_alongside_filters() {
+    match parse(&["list", "--json", "--status", "agent"]).expect("parse") {
+        Command::List { status, json, .. } => {
+            assert_eq!(status, Some(Status::Agent));
+            assert!(json, "--json selects machine-readable output");
+        }
+        other => panic!("wrong command: {other:?}"),
+    }
+    match parse(&["list"]).expect("parse") {
+        Command::List { json, .. } => assert!(!json, "the text table stays the default"),
+        other => panic!("wrong command: {other:?}"),
+    }
+    assert!(
+        parse(&["list", "--json", "pretty"]).is_err(),
+        "--json takes no value"
+    );
+}
+
+#[test]
 fn status_parses_id_status_and_root() {
     match parse(&["status", "my-rca", "investigating", "--root", "/x"]) {
         Ok(Command::SetStatus { root, id, status }) => {

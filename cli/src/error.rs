@@ -41,6 +41,11 @@ pub enum Error {
     #[error("failed to serialize manifest: {0}")]
     SerializeManifest(#[from] toml::ser::Error),
 
+    /// Machine-readable output (`--json`) failed to serialize (should only
+    /// occur on programmer error — the rendered types are plain data).
+    #[error("failed to serialize JSON output: {0}")]
+    SerializeJson(#[from] serde_json::Error),
+
     /// Scaffolding refused to overwrite an existing workspace.
     #[error("RCA `{0}` already exists")]
     AlreadyExists(String),

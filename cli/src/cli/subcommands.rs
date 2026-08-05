@@ -44,11 +44,13 @@ pub(super) fn parse_list(
     let mut status: Option<Status> = None;
     let mut severity: Option<Severity> = None;
     let mut archived = false;
+    let mut json = false;
     while let Some(flag) = args.next() {
         match flag.as_str() {
             "--status" => status = Some(take_value(args, "--status")?.parse()?),
             "--severity" => severity = Some(take_value(args, "--severity")?.parse()?),
             "--archived" => archived = true,
+            "--json" => json = true,
             "--root" => root = Some(PathBuf::from(take_value(args, "--root")?)),
             other => return Err(format!("unknown flag `{other}` for `list`")),
         }
@@ -58,6 +60,7 @@ pub(super) fn parse_list(
         status,
         severity,
         archived,
+        json,
     })
 }
 
