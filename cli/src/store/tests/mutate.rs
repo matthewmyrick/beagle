@@ -48,6 +48,11 @@ fn scaffold_creates_all_sections_and_they_read_back() {
 
     for kind in SectionKind::ALL {
         let content = store.read_section(&id, kind).expect("read section");
+        if kind.is_optional() {
+            // Optional sections (Commands) are not scaffolded.
+            assert!(content.is_none(), "optional {kind:?} is not created");
+            continue;
+        }
         let content = content.unwrap_or_else(|| panic!("section {kind:?} missing"));
         assert!(content.starts_with(&format!("# {}", kind.title())));
     }

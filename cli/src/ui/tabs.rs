@@ -16,6 +16,9 @@ pub enum Tab {
     Impact,
     /// How to fix it ([`SectionKind::Remediation`]).
     Remediation,
+    /// Optional test commands ([`SectionKind::Commands`]); its tab shows
+    /// only when `commands.md` exists.
+    Commands,
     /// The verification checklist ([`SectionKind::FinalReview`]).
     FinalReview,
     /// ASCII diagrams from the workspace's `diagrams/` directory.
@@ -27,13 +30,16 @@ pub enum Tab {
 }
 
 impl Tab {
-    /// Every tab, in display order.
-    pub const ALL: [Self; 9] = [
+    /// Every tab, in display order. `Commands` is optional — hidden unless
+    /// the workspace has a `commands.md`; the app filters `ALL` down to the
+    /// visible set per incident.
+    pub const ALL: [Self; 10] = [
         Self::Summary,
         Self::Timeline,
         Self::RootCause,
         Self::Impact,
         Self::Remediation,
+        Self::Commands,
         Self::FinalReview,
         Self::Diagrams,
         Self::Notes,
@@ -50,6 +56,7 @@ impl Tab {
             Self::RootCause => SectionKind::RootCause.title(),
             Self::Impact => SectionKind::Impact.title(),
             Self::Remediation => SectionKind::Remediation.title(),
+            Self::Commands => SectionKind::Commands.title(),
             Self::FinalReview => SectionKind::FinalReview.title(),
             Self::Notes => SectionKind::Notes.title(),
             Self::Log => SectionKind::Log.title(),
@@ -65,11 +72,18 @@ impl Tab {
             Self::RootCause => Some(SectionKind::RootCause),
             Self::Impact => Some(SectionKind::Impact),
             Self::Remediation => Some(SectionKind::Remediation),
+            Self::Commands => Some(SectionKind::Commands),
             Self::FinalReview => Some(SectionKind::FinalReview),
             Self::Notes => Some(SectionKind::Notes),
             Self::Log => Some(SectionKind::Log),
             Self::Diagrams => None,
         }
+    }
+
+    /// Whether this tab is optional (shown only when its file exists).
+    #[must_use]
+    pub fn is_optional(self) -> bool {
+        self.section().is_some_and(SectionKind::is_optional)
     }
 
     /// Position of this tab within [`Tab::ALL`].

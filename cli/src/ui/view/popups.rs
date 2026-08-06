@@ -572,7 +572,7 @@ const HELP_ROWS: &[(&str, &str)] = &[
     ("1–8", "jump to a tab"),
     (
         "f",
-        "filter list: i/r/a/v/f status · c/h/m/l sev · p has-PR · / text",
+        "filter: i/r/a/v/f status · c/h/m/l sev · p has-PR · s security · / text",
     ),
     ("F", "follow: reloads stick to the bottom (tail -f)"),
     ("s", "hide / show the sidebar (full-width content)"),

@@ -79,6 +79,7 @@ pub(super) struct TabHit {
 pub(super) fn flow_tabs(
     selected: Tab,
     width: u16,
+    tabs: &[Tab],
     unread: &[bool],
 ) -> (Vec<Line<'static>>, Vec<TabHit>) {
     let width = usize::from(width.max(1));
@@ -87,7 +88,7 @@ pub(super) fn flow_tabs(
     let mut spans: Vec<Span<'static>> = Vec::new();
     let mut used = 0usize;
 
-    for (i, tab) in Tab::ALL.iter().enumerate() {
+    for (i, tab) in tabs.iter().enumerate() {
         let is_unread = unread.get(i).copied().unwrap_or(false);
         let dot = if is_unread { "●" } else { "" };
         let label = format!(" {} {}{dot} ", i + 1, tab.title());

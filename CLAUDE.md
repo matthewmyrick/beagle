@@ -47,6 +47,7 @@ go: `investigating → review → agent → final-review → finished` — the e
 | `root-cause.md` | Root Cause | Numbered causal chain from symptom down to root, plus "why it wasn't caught". |
 | `impact.md` | Impact | Quantified: requests, users, duration, money, SLO budget burned. |
 | `remediation.md` | Fix | Immediate mitigation first, then durable fixes with owners and status. |
+| `commands.md` | Commands | *Optional.* The test commands to run to validate the theory — bash in ```` ```bash ```` fences. Create it only when there's something to run; the tab appears only when the file exists. |
 | `final-review.md` | Final Review | Verification checklist (`- [ ]` per checkable prediction) written **during** the investigation; worked through after the fix PR merges. |
 | `notes.md` | Notes | Raw evidence: metrics tables, queries, log excerpts, links, open questions. |
 | `log.md` | Log | Live investigation narration — append `beagle log <slug> "..."` at every step. |
@@ -58,7 +59,9 @@ string), optional `updated`, `systems`, `tags`, `prs` (remediation PR URLs —
 attach with `beagle pr add <slug> <url>`). Unknown fields are rejected —
 don't invent new ones. One tag is special: `skip-final-review` advances
 the RCA straight to `finished` when every attached PR merges, skipping
-the verification pass — only when the user asks for it.
+the verification pass — only when the user asks for it. Another,
+`security`, marks a security-relevant incident — the TUI's `s` filter
+facet narrows to it.
 
 ## Markdown that renders well
 

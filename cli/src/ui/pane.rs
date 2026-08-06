@@ -45,6 +45,10 @@ pub(crate) struct PaneKey {
 impl App {
     /// Loads (or reuses) the content for the current workspace + tab.
     pub(crate) fn ensure_pane(&mut self) {
+        // The selected incident may not have the current (optional) tab —
+        // e.g. after moving off one that had a `commands.md`. Snap back to
+        // a visible tab before loading.
+        self.ensure_tab_visible();
         let Some(rca) = self.selected_rca() else {
             self.pane = None;
             return;

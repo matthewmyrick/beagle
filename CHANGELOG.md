@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Optional **Commands** tab: a new `commands.md` section holding the test
+  commands to run to validate the RCA's theory (bash in code fences). It
+  is opt-in — never scaffolded — and its tab appears **only when the file
+  exists**, so incidents without one are unchanged. Number keys, tab
+  cycling, and the tab bar all skip it when absent; it's included in
+  `beagle export` / `beagle context` when present. The `/beagle` skill
+  tells agents to write it only when there's something concrete to run
+  (#121).
+- `s` filter facet: inside `f` filter mode, `s` toggles a filter to
+  incidents tagged `security` (shown as `[security]`), stacking with the
+  status/severity/has-PR facets (#121).
 - `beagle list --json` emits the listing as a JSON array — one object per
   workspace (`id`, `title`, `severity`, `status`, `created`, `updated`,
   `systems`, `tags`, `prs`, `published`, `published_at`, `archived`),

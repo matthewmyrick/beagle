@@ -270,6 +270,10 @@ pub struct RcaMeta {
 /// `tags`, so no manifest-format change and older binaries read it fine.
 pub const SKIP_FINAL_REVIEW_TAG: &str = "skip-final-review";
 
+/// Tag marking a security-relevant incident. The `s` filter facet narrows
+/// to workspaces carrying it.
+pub const SECURITY_TAG: &str = "security";
+
 impl RcaMeta {
     /// Whether the [`SKIP_FINAL_REVIEW_TAG`] is set — merged fix PRs then
     /// advance this workspace straight to `finished`.
@@ -321,6 +325,10 @@ pub enum SectionKind {
     Impact,
     /// How to fix it: immediate mitigation and durable fix.
     Remediation,
+    /// Optional: the test commands to run to validate the RCA's theory
+    /// (bash in code fences). Opt-in — not scaffolded; its tab appears
+    /// only when `commands.md` exists.
+    Commands,
     /// The verification checklist: concrete, checkable predictions of what
     /// "fixed" looks like, written **during** the investigation so the
     /// `final-review` phase knows exactly what to confirm once the fix
@@ -334,17 +342,28 @@ pub enum SectionKind {
 }
 
 impl SectionKind {
-    /// Every section, in tab order.
-    pub const ALL: [Self; 8] = [
+    /// Every section, in tab order. Includes the optional `Commands`
+    /// section so reads, exports, and mtime tracking treat it uniformly;
+    /// [`is_optional`](Self::is_optional) marks the ones that are opt-in
+    /// (not scaffolded, tab hidden until the file exists).
+    pub const ALL: [Self; 9] = [
         Self::Summary,
         Self::Timeline,
         Self::RootCause,
         Self::Impact,
         Self::Remediation,
+        Self::Commands,
         Self::FinalReview,
         Self::Notes,
         Self::Log,
     ];
+
+    /// Whether this section is opt-in: not created by `scaffold`, and its
+    /// tab appears only once the file exists. Core sections return `false`.
+    #[must_use]
+    pub fn is_optional(self) -> bool {
+        matches!(self, Self::Commands)
+    }
 
     /// The file name backing this section inside the workspace directory.
     #[must_use]
@@ -355,6 +374,7 @@ impl SectionKind {
             Self::RootCause => "root-cause.md",
             Self::Impact => "impact.md",
             Self::Remediation => "remediation.md",
+            Self::Commands => "commands.md",
             Self::FinalReview => "final-review.md",
             Self::Notes => "notes.md",
             Self::Log => "log.md",
@@ -370,6 +390,7 @@ impl SectionKind {
             Self::RootCause => "Root Cause",
             Self::Impact => "Impact",
             Self::Remediation => "Fix",
+            Self::Commands => "Commands",
             Self::FinalReview => "Final Review",
             Self::Notes => "Notes",
             Self::Log => "Log",

@@ -797,3 +797,64 @@ fn p_facet_filters_to_incidents_with_a_pr() {
     assert_eq!(app.visible_len(), total, "all incidents return");
     assert_eq!(app.facet_label(), "");
 }
+
+#[test]
+fn commands_tab_appears_only_when_commands_md_exists() {
+    use crate::ui::Tab;
+
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    // No commands.md → Commands tab hidden; number keys skip it.
+    assert!(!app.visible_tabs().contains(&Tab::Commands));
+
+    // Write commands.md and reload: the tab appears.
+    std::fs::write(
+        app.store.workspace_dir(&id).join("commands.md"),
+        "# Commands\n\n```bash\ncargo test\n```\n",
+    )
+    .expect("write");
+    app.reload();
+    assert!(
+        app.visible_tabs().contains(&Tab::Commands),
+        "Commands tab shows once the file exists"
+    );
+
+    // Selecting the tab loads it without error.
+    app.switch_tab(Tab::Commands);
+    app.ensure_pane();
+    assert_eq!(app.tab(), Tab::Commands);
+
+    // Remove it again: the tab hides and the view snaps back to a visible
+    // tab instead of showing an empty Commands pane.
+    std::fs::remove_file(app.store.workspace_dir(&id).join("commands.md")).expect("rm");
+    app.reload();
+    app.ensure_pane();
+    assert!(!app.visible_tabs().contains(&Tab::Commands));
+    assert_ne!(app.tab(), Tab::Commands, "snapped off the vanished tab");
+}
+
+#[test]
+fn s_facet_filters_to_security_tagged_incidents() {
+    let mut app = app_with_variety();
+    // Tag one incident `security`.
+    let id = crate::model::RcaId::new("ses-rev-high").expect("id");
+    app.store
+        .set_tags(&id, vec!["security".to_owned()])
+        .expect("tag");
+    app.reload();
+    let total = app.visible_len();
+
+    press(&mut app, KeyCode::Char('f'));
+    press(&mut app, KeyCode::Char('s')); // security facet
+    assert_eq!(app.visible_len(), 1, "only the security-tagged incident");
+    assert_eq!(
+        app.selected_rca().expect("match").id.as_str(),
+        "ses-rev-high"
+    );
+    assert_eq!(app.facet_label(), "[security]");
+
+    press(&mut app, KeyCode::Char('s')); // toggle off
+    assert_eq!(app.visible_len(), total);
+    assert_eq!(app.facet_label(), "");
+}
