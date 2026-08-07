@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-08-07
+
 ### Added
 
 - Visual-line selection in the content pane: `v` starts a selection at
