@@ -589,8 +589,13 @@ const HELP_ROWS: &[(&str, &str)] = &[
     ("c / C", "copy this tab / whole RCA to clipboard"),
     (
         "y",
-        "yank/copy: the incident id (list) · the cursor line (content)",
+        "yank the cursor line / selection to clipboard (content)",
     ),
+    (
+        "v",
+        "visual-line select: extend with j/k · y yanks · v/esc cancel",
+    ),
+    ("Y", "yank the incident id to clipboard (/beagle-review)"),
     (
         "e",
         "export RCA to exports/<id>.md (frontmatter + all tabs)",

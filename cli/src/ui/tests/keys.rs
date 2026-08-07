@@ -201,10 +201,45 @@ fn y_in_content_yanks_the_cursor_line() {
         "y in content yanks the cursor line: {:?}",
         app.status_line()
     );
-    // In list focus, y still yanks the incident id.
+    // `Y` yanks the incident id, from either pane.
     press(&mut app, KeyCode::Char('b')); // back to the list
-    press(&mut app, KeyCode::Char('y'));
+    press(&mut app, KeyCode::Char('Y'));
     assert!(app.status_line().is_some_and(|s| s.contains("copied id")));
+}
+
+#[test]
+fn v_visual_select_extends_and_y_yanks_the_range() {
+    let mut app = app_with(1);
+    set_summary(&mut app, "alpha\nbravo\ncharlie\ndelta\n");
+    app.viewport = ViewportInfo {
+        content_lines: 4,
+        height: 10,
+        width: 80,
+    };
+    app.ensure_pane();
+    press(&mut app, KeyCode::Enter); // content focus, cursor on line 0
+
+    // v starts a selection; j extends it to line 1.
+    press(&mut app, KeyCode::Char('v'));
+    assert_eq!(app.selection_lines(), Some((0, 0)));
+    press(&mut app, KeyCode::Char('j'));
+    assert_eq!(app.selection_lines(), Some((0, 1)), "selection extends");
+
+    // y yanks the two-line range and ends the selection.
+    press(&mut app, KeyCode::Char('y'));
+    assert_eq!(app.selection_lines(), None, "yank ends the selection");
+    assert!(
+        app.status_line()
+            .is_some_and(|s| s.contains("copied 2 lines")),
+        "yanks the range: {:?}",
+        app.status_line()
+    );
+
+    // v again then v cancels without yanking.
+    press(&mut app, KeyCode::Char('v'));
+    assert!(app.selection_lines().is_some());
+    press(&mut app, KeyCode::Char('v'));
+    assert_eq!(app.selection_lines(), None, "second v cancels");
 }
 
 #[test]
@@ -761,10 +796,10 @@ fn bang_opens_the_errors_overlay_only_when_there_are_problems() {
 }
 
 #[test]
-fn y_yanks_the_selected_incident_id() {
+fn shift_y_yanks_the_selected_incident_id() {
     let mut app = app_with(1);
     let id = app.selected_rca().expect("selected").id.to_string();
-    press(&mut app, KeyCode::Char('y'));
+    press(&mut app, KeyCode::Char('Y'));
     assert!(
         app.status_line()
             .is_some_and(|s| s.contains("copied id") && s.contains(&id)),
@@ -774,7 +809,7 @@ fn y_yanks_the_selected_incident_id() {
 
     // Nothing selected: reports instead of copying.
     let mut empty = app_with(0);
-    press(&mut empty, KeyCode::Char('y'));
+    press(&mut empty, KeyCode::Char('Y'));
     assert!(empty
         .status_line()
         .is_some_and(|s| s.contains("no incident selected")));

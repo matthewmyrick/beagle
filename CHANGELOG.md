@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Visual-line selection in the content pane: `v` starts a selection at
+  the cursor line, `j`/`k` extend it (highlighted light orange), `v` or
+  esc cancels, and `y` yanks the selected lines and ends the selection.
+- The content line cursor now highlights the **full row width**, so it's
+  visible on blank/gap lines too.
+
+### Changed
+
+- `y` in the content pane yanks the line (or selection); the incident-id
+  yank moved to **`Y`** (shift-Y), which works from either pane (#128).
+
 ## [0.25.0] - 2026-08-07
 
 ### Added

@@ -80,6 +80,9 @@ impl App {
         // range (without yanking the scroll — reveal only re-clamps here).
         let len = self.pane_raw_lines().map_or(0, <[String]>::len);
         self.content_cursor = self.content_cursor.min(len.saturating_sub(1));
+        if let Some(anchor) = self.content_select_anchor.as_mut() {
+            *anchor = (*anchor).min(len.saturating_sub(1));
+        }
         // The search query survives pane changes; its matches don't.
         // No jump: switching tabs must not yank the scroll around.
         self.recompute_content_matches(false);
@@ -211,19 +214,65 @@ impl App {
         }
     }
 
-    /// Copies the line under the cursor (`y` in content focus) — the raw
-    /// source text, so a command copies exactly as written.
-    pub(crate) fn copy_current_line(&mut self) {
-        let Some(line) = self
-            .pane_raw_lines()
-            .and_then(|lines| lines.get(self.content_cursor))
-            .cloned()
-        else {
+    /// Toggles visual-line selection (`v`): starts a selection anchored at
+    /// the cursor line, or cancels an active one. A no-op when the pane
+    /// isn't line-addressable.
+    pub(crate) fn toggle_visual_select(&mut self) {
+        if self.pane_raw_lines().is_none() {
+            return;
+        }
+        if self.content_select_anchor.is_some() {
+            self.content_select_anchor = None;
+            self.status = Some("selection cancelled".to_owned());
+        } else {
+            self.content_select_anchor = Some(self.content_cursor);
+            self.status = Some("visual: j/k extend · y yank · v/esc cancel".to_owned());
+        }
+    }
+
+    /// Cancels any active visual-line selection.
+    pub(crate) fn clear_visual_select(&mut self) {
+        self.content_select_anchor = None;
+    }
+
+    /// The inclusive line range currently selected (`v`), if any:
+    /// `(min, max)` of the anchor and the cursor.
+    pub(crate) fn selection_lines(&self) -> Option<(usize, usize)> {
+        self.content_select_anchor.map(|anchor| {
+            (
+                anchor.min(self.content_cursor),
+                anchor.max(self.content_cursor),
+            )
+        })
+    }
+
+    /// Yanks the content under the cursor (`y` in content focus): the
+    /// selected lines when a visual selection is active (ending it), else
+    /// the single cursor line. Copies the raw source text, so a command
+    /// copies exactly as written.
+    pub(crate) fn yank_content(&mut self) {
+        let Some(lines) = self.pane_raw_lines() else {
             self.status = Some("nothing to copy here".to_owned());
             return;
         };
-        self.status = Some(match crate::clipboard::copy(&line) {
-            Ok(method) => format!("copied line via {method}"),
+        let (text, count) = if let Some((lo, hi)) = self.selection_lines() {
+            let hi = hi.min(lines.len().saturating_sub(1));
+            (lines[lo..=hi].join("\n"), hi - lo + 1)
+        } else if let Some(line) = lines.get(self.content_cursor) {
+            (line.clone(), 1)
+        } else {
+            self.status = Some("nothing to copy here".to_owned());
+            return;
+        };
+        self.content_select_anchor = None; // yank ends the selection
+        self.status = Some(match crate::clipboard::copy(&text) {
+            Ok(method) => {
+                if count > 1 {
+                    format!("copied {count} lines via {method}")
+                } else {
+                    format!("copied line via {method}")
+                }
+            }
             Err(e) => format!("copy failed: {e}"),
         });
     }
