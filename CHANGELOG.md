@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-08-07
+
+### Fixed
+
+- The content line cursor no longer doubles a blank line into two
+  highlighted rows. The full-width bar is now painted onto the frame
+  buffer instead of faked with trailing spaces — an all-whitespace line
+  padded to the width wrapped to a second row, pushing content down
+  (#131).
+
 ## [0.26.0] - 2026-08-07
 
 ### Added
