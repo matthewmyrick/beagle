@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-08-07
+
 ### Added
 
 - Optional **Commands** tab: a new `commands.md` section holding the test
