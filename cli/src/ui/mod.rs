@@ -77,6 +77,10 @@ pub struct App {
     /// lines, used while the content is focused for line navigation and
     /// yank (`y`). Clamped to the content on every move/reload.
     content_cursor: usize,
+    /// Visual-line selection anchor (`v`): `Some(line)` while a multi-line
+    /// selection is active; the selection spans anchor..=cursor. `None`
+    /// when not selecting.
+    content_select_anchor: Option<usize>,
     show_help: bool,
     /// The `?` sheet's keybinding filter: `Some` while a query is being
     /// typed (empty string = filter active, no query yet), `None` when not
@@ -219,6 +223,7 @@ impl App {
             scroll: 0,
             hscroll: 0,
             content_cursor: 0,
+            content_select_anchor: None,
             show_help: false,
             help_filter: None,
             status: None,

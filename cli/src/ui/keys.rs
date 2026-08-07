@@ -65,15 +65,17 @@ impl App {
             }
             KeyCode::Char('c') => self.copy_current_tab(),
             KeyCode::Char('C') => self.copy_workspace(),
-            // `y` yanks: the incident id from the list, the cursor line
-            // from the content pane (vim-style).
+            // `y` yanks the content line (or visual selection); `Y` yanks
+            // the incident id from anywhere.
             KeyCode::Char('y') => {
                 if self.focus == Focus::Content {
-                    self.copy_current_line();
+                    self.yank_content();
                 } else {
-                    self.copy_id();
+                    self.status =
+                        Some("open an incident (enter) to yank lines — Y yanks the id".to_owned());
                 }
             }
+            KeyCode::Char('Y') => self.copy_id(),
             KeyCode::Char('e') => self.export_current(),
             KeyCode::Char('r') => {
                 let _ = self.reload();
@@ -116,9 +118,11 @@ impl App {
         }
         // Invariant: the sidebar is never collapsed while the list has
         // focus — `b`, esc, `f`, and every other back-to-list path would
-        // otherwise leave the selection cursor invisible.
+        // otherwise leave the selection cursor invisible. Leaving the
+        // content also ends any visual-line selection.
         if self.focus == Focus::List {
             self.sidebar_collapsed = false;
+            self.clear_visual_select();
         }
         Flow::Continue
     }
@@ -342,8 +346,12 @@ impl App {
     fn handle_content_key(&mut self, code: KeyCode) {
         let page = isize::try_from(self.viewport.height.saturating_sub(1).max(1)).unwrap_or(1);
         match code {
-            // Esc peels one layer at a time: search highlights, then follow
-            // mode, then back to the list.
+            // Esc peels one layer: visual selection, then search, follow,
+            // then back to the list.
+            KeyCode::Esc if self.selection_lines().is_some() => {
+                self.clear_visual_select();
+                self.status = Some("selection cancelled".to_owned());
+            }
             KeyCode::Esc if self.content_search.is_some() => self.clear_content_search(),
             KeyCode::Esc if self.follow => {
                 self.follow = false;
@@ -352,6 +360,9 @@ impl App {
             KeyCode::Esc => {
                 self.focus = Focus::List;
             }
+            // `v` starts/stops a visual-line selection anchored at the
+            // cursor; j/k then extend it (and the view follows).
+            KeyCode::Char('v') => self.toggle_visual_select(),
             // j/k move a line cursor (vim-style); the view follows it. `y`
             // (handled globally, in content focus) yanks the cursor line.
             KeyCode::Char('j') | KeyCode::Down => self.move_cursor(1),
@@ -430,6 +441,7 @@ impl App {
         self.scroll = 0;
         self.hscroll = 0;
         self.content_cursor = 0;
+        self.content_select_anchor = None;
     }
 }
 

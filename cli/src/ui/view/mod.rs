@@ -418,7 +418,7 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
     let inner = block.inner(area);
 
     let mut text = text.clone();
-    highlight_cursor_line(&mut text, app, focused);
+    highlight_cursor_line(&mut text, app, focused, inner.width);
     highlight_search_matches(&mut text, app);
 
     // Feed real geometry back so scrolling clamps to actual wrapped height.
@@ -443,19 +443,40 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
 /// Highlights the matched text itself on the visible tab — the occurrence,
 /// not the whole line, so the eye lands exactly on it. The current hit's
 /// occurrences pop in amber-on-black; other hits get a quieter steel tint.
-/// Tints the line under the content cursor while the pane is focused, so
-/// `y` (yank line) and j/k navigation have a visible anchor. Search
-/// highlights are applied afterwards and win on the same line.
-fn highlight_cursor_line(text: &mut Text<'static>, app: &App, focused: bool) {
+/// Tints the content line cursor — or the whole visual-line selection —
+/// while the pane is focused, so `y` and j/k navigation have a visible
+/// anchor. Each highlighted row is padded to the full width, so blank
+/// lines show the bar too. Search highlights are applied afterwards and
+/// win on the same line.
+fn highlight_cursor_line(text: &mut Text<'static>, app: &App, focused: bool, width: u16) {
     if !focused {
         return;
     }
-    if let Some(line) = text.lines.get_mut(app.content_cursor()) {
-        let bg = Color::Rgb(48, 52, 70);
+    // Visual selection is a warm orange; the plain cursor a subtle bar.
+    let (range, bg) = if let Some((lo, hi)) = app.selection_lines() {
+        ((lo, hi), Color::Rgb(150, 100, 45))
+    } else {
+        let c = app.content_cursor();
+        ((c, c), Color::Rgb(48, 52, 70))
+    };
+    for idx in range.0..=range.1 {
+        let Some(line) = text.lines.get_mut(idx) else {
+            continue;
+        };
+        let mut used = 0usize;
         for span in &mut line.spans {
             if span.style.bg.is_none() {
                 span.style = span.style.bg(bg);
             }
+            used += span.content.chars().count();
+        }
+        // Pad to the full row so short/empty lines still show the bar.
+        let full = usize::from(width);
+        if used < full {
+            line.spans.push(Span::styled(
+                " ".repeat(full - used),
+                Style::default().bg(bg),
+            ));
         }
     }
 }
@@ -607,7 +628,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 "  j/k select · enter open · ←/→ tabs · f filter · / search · T toolbox · R related · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
-                "  j/k line · y copy line · ←/→ tabs · / search · F follow · s sidebar · o links · c copy · b back · ? help · Q quit"
+                "  j/k line · v select · y yank · ←/→ tabs · / search · F follow · s sidebar · c copy · b back · ? help · Q quit"
             }
         },
         Style::default().fg(Color::DarkGray),
