@@ -132,7 +132,9 @@ fn section_mtimes_cover_scaffolded_sections_and_skip_absent_ones() {
         .expect("scaffold");
 
     let mtimes = store.section_mtimes(&id);
-    assert_eq!(mtimes.len(), SectionKind::ALL.len());
+    // Optional sections (Commands) aren't scaffolded, so no mtime for them.
+    let scaffolded = SectionKind::ALL.iter().filter(|k| !k.is_optional()).count();
+    assert_eq!(mtimes.len(), scaffolded);
 
     fs::remove_file(
         store

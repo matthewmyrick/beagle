@@ -20,7 +20,7 @@ use ratatui::Frame;
 
 use crate::model::{RcaSummary, Status};
 
-use super::{App, Focus, Pane, Tab};
+use super::{App, Focus, Pane};
 
 use header::{banner_fits, draw_banner, flow_tabs, header_paragraph, BANNER_COLS};
 use popups::{
@@ -329,11 +329,12 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
         .unwrap_or(2)
         .min(6);
 
-    let unread: Vec<bool> = Tab::ALL
+    let tabs = app.visible_tabs();
+    let unread: Vec<bool> = tabs
         .iter()
         .map(|tab| app.is_unread(&rca.id, *tab))
         .collect();
-    let (tab_lines, tab_hits) = flow_tabs(app.tab(), head_width, &unread);
+    let (tab_lines, tab_hits) = flow_tabs(app.tab(), head_width, &tabs, &unread);
     let tab_height = u16::try_from(tab_lines.len()).unwrap_or(1);
 
     let banner_height = if banner_cols > 0 {
@@ -503,7 +504,7 @@ fn filter_prompt_line(app: &App) -> Line<'static> {
         ));
     } else {
         spans.push(Span::styled(
-            "   i/r/a/v/f status · c/h/m/l severity · p has-PR · / type · enter keep · esc clear",
+            "   i/r/a/v/f status · c/h/m/l severity · p has-PR · s security · / type · esc clear",
             Style::default().fg(Color::DarkGray),
         ));
     }

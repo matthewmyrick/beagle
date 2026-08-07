@@ -104,6 +104,11 @@ Then the sections:
 4. `impact.md` — quantify: requests, users, minutes, money, SLO budget burned.
 5. `remediation.md` — the Fix tab: immediate mitigation first (with
    timestamps), then durable fixes with owners and status, then how to verify.
+   Optional: `commands.md` — the Commands tab. Write it **only when there
+   are concrete commands to run** to validate the theory or reproduce the
+   bug: bash in ```` ```bash ```` fences, one per thing to check, with a
+   line saying what each proves. The tab appears only when this file
+   exists, so don't create an empty one.
 6. `final-review.md` — the verification checklist, written **while the fix
    is still forming, not after**. One `- [ ]` checkbox per concrete,
    checkable prediction of what "fixed" looks like — metric thresholds,

@@ -82,15 +82,16 @@ impl App {
                 }
             }
             KeyCode::Tab | KeyCode::Char(']') | KeyCode::Right => {
-                self.switch_tab(self.tab.next());
+                self.switch_tab(self.next_tab());
             }
             KeyCode::BackTab | KeyCode::Char('[') | KeyCode::Left => {
-                self.switch_tab(self.tab.prev());
+                self.switch_tab(self.prev_tab());
             }
             KeyCode::Char(c @ '1'..='9') => {
-                // '1'..='9' maps exactly onto Tab::ALL's nine entries.
+                // '1'..='9' index into the *visible* tabs for this incident,
+                // so hidden optional tabs don't leave gaps in the numbering.
                 let index = (c as usize).saturating_sub('1' as usize);
-                if let Some(tab) = Tab::ALL.get(index) {
+                if let Some(tab) = self.visible_tabs().get(index) {
                     self.switch_tab(*tab);
                 }
             }
@@ -276,6 +277,10 @@ impl App {
             KeyCode::Char('l') => self.toggle_severity_facet(Severity::Low),
             KeyCode::Char('p') => {
                 self.facet_has_pr = !self.facet_has_pr;
+                self.recompute_visible(None);
+            }
+            KeyCode::Char('s') => {
+                self.facet_security = !self.facet_security;
                 self.recompute_visible(None);
             }
             KeyCode::Backspace => {

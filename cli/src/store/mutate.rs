@@ -40,6 +40,11 @@ impl Store {
         write_atomic(&dir.join(MANIFEST_FILE), &manifest)?;
 
         for kind in SectionKind::ALL {
+            // Optional sections (e.g. Commands) are opt-in: an agent
+            // creates the file only when there's something to put there.
+            if kind.is_optional() {
+                continue;
+            }
             let body = section_template(kind, &meta.title);
             write_atomic(&dir.join(kind.file_name()), &body)?;
         }
@@ -314,6 +319,7 @@ fn section_template(kind: SectionKind, title: &str) -> String {
         SectionKind::Remediation => {
             "How to fix it. Immediate mitigation first, then the durable fix."
         }
+        SectionKind::Commands => "Test commands to validate the theory — bash in code fences.",
         SectionKind::FinalReview => {
             "How we'll know the fix worked — write this DURING the \
              investigation. One `- [ ]` checkbox per concrete, checkable \

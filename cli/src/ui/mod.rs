@@ -60,6 +60,8 @@ pub struct App {
     /// `p` facet: when set, only incidents with at least one attached PR
     /// pass. Off by default (every incident passes).
     facet_has_pr: bool,
+    /// `s` facet: when set, only incidents tagged `security` pass.
+    facet_security: bool,
     /// Filter-mode input state: which keys the filter is capturing.
     filter_input: FilterInput,
     /// Indices into `rcas` that match `filter`, best match first.
@@ -203,6 +205,7 @@ impl App {
             facet_statuses: HashSet::new(),
             facet_severities: HashSet::new(),
             facet_has_pr: false,
+            facet_security: false,
             filter_input: FilterInput::Off,
             visible,
             selected: 0,
@@ -265,6 +268,14 @@ impl App {
                     || self.facet_severities.contains(&rca.meta.severity)
             })
             .filter(|(_, rca)| !self.facet_has_pr || !rca.meta.prs.is_empty())
+            .filter(|(_, rca)| {
+                !self.facet_security
+                    || rca
+                        .meta
+                        .tags
+                        .iter()
+                        .any(|t| t == crate::model::SECURITY_TAG)
+            })
             .filter_map(|(index, rca)| {
                 let haystack = format!(
                     "{} {} {} {}",
@@ -372,6 +383,7 @@ impl App {
             || !self.facet_statuses.is_empty()
             || !self.facet_severities.is_empty()
             || self.facet_has_pr
+            || self.facet_security
     }
 
     /// Clears every filter dimension and restores the full list, keeping
@@ -382,6 +394,7 @@ impl App {
         self.facet_statuses.clear();
         self.facet_severities.clear();
         self.facet_has_pr = false;
+        self.facet_security = false;
         self.recompute_visible(keep);
     }
 
@@ -401,6 +414,9 @@ impl App {
         }
         if self.facet_has_pr {
             parts.push("has PR");
+        }
+        if self.facet_security {
+            parts.push("security");
         }
         if parts.is_empty() {
             String::new()
@@ -503,6 +519,65 @@ impl App {
     /// How many loaded workspaces are archived.
     pub(crate) fn archived_count(&self) -> usize {
         self.rcas.iter().filter(|rca| rca.archived).count()
+    }
+
+    /// Whether the selected workspace has `section` on disk. Checked
+    /// against the file directly (a stat) so a created or deleted optional
+    /// section flips the tab's visibility immediately, without waiting for
+    /// the mtime snapshot — and without a stale entry keeping it "present".
+    fn has_section(&self, kind: SectionKind) -> bool {
+        self.selected_rca().is_some_and(|rca| {
+            self.store
+                .workspace_dir(&rca.id)
+                .join(kind.file_name())
+                .exists()
+        })
+    }
+
+    /// The tabs to show for the selected incident: every core tab, plus
+    /// each optional tab whose backing file exists. Navigation and the tab
+    /// bar operate on this set so hidden tabs are never reachable.
+    pub(crate) fn visible_tabs(&self) -> Vec<Tab> {
+        Tab::ALL
+            .iter()
+            .copied()
+            .filter(|tab| {
+                !tab.is_optional() || tab.section().is_some_and(|kind| self.has_section(kind))
+            })
+            .collect()
+    }
+
+    /// The next visible tab after the current one, wrapping.
+    pub(crate) fn next_tab(&self) -> Tab {
+        self.step_tab(true)
+    }
+
+    /// The previous visible tab, wrapping.
+    pub(crate) fn prev_tab(&self) -> Tab {
+        self.step_tab(false)
+    }
+
+    fn step_tab(&self, forward: bool) -> Tab {
+        let tabs = self.visible_tabs();
+        if tabs.is_empty() {
+            return self.tab;
+        }
+        let here = tabs.iter().position(|t| *t == self.tab).unwrap_or(0);
+        let len = tabs.len();
+        let idx = if forward {
+            (here + 1) % len
+        } else {
+            (here + len - 1) % len
+        };
+        tabs[idx]
+    }
+
+    /// If the current tab is not among the visible ones (e.g. the incident
+    /// changed and lost its `commands.md`), fall back to Summary.
+    pub(crate) fn ensure_tab_visible(&mut self) {
+        if !self.visible_tabs().contains(&self.tab) {
+            self.tab = Tab::Summary;
+        }
     }
 
     /// Whether `tab` of workspace `id` changed on disk since last viewed.
