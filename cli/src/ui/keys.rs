@@ -39,6 +39,7 @@ impl App {
             KeyCode::Char('R') => self.open_related(),
             KeyCode::Char('V') => self.verify_final_review(),
             KeyCode::Char('t') => self.open_status_picker(),
+            KeyCode::Char('P') => self.open_pr_prompt(),
             KeyCode::Char('#') => self.open_tags_editor(),
             KeyCode::Char('!') => self.open_errors(),
             KeyCode::Char('S') => self.open_settings(),
@@ -131,7 +132,9 @@ impl App {
     /// did. The delete confirmation is checked first: while it is open,
     /// nothing else may interpret a key — least of all `y`.
     fn route_modal_key(&mut self, key: KeyEvent) -> bool {
-        if self.confirm_delete.is_some() {
+        if self.pr_prompt.is_some() {
+            self.handle_pr_prompt_key(key.code);
+        } else if self.confirm_delete.is_some() {
             self.handle_confirm_delete_key(key.code);
         } else if self.status_picker.is_some() {
             self.handle_status_picker_key(key.code);

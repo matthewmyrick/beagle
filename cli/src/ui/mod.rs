@@ -129,6 +129,8 @@ pub struct App {
     finder: Option<finder::Finder>,
     /// The `S` settings overlay; `Some` while open.
     settings: Option<SettingsOverlay>,
+    /// The `P` attach-PR prompt; `Some` while a URL is being typed.
+    pr_prompt: Option<overlays::PrPrompt>,
     /// The `D` delete confirmation popup; `Some` while it awaits y/n.
     confirm_delete: Option<overlays::ConfirmDelete>,
     /// The `t` status picker; `Some` while open.
@@ -243,6 +245,7 @@ impl App {
             content_search: None,
             finder: None,
             settings: None,
+            pr_prompt: None,
             confirm_delete: None,
             status_picker: None,
             tags_editor: None,
