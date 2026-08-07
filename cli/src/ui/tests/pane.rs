@@ -11,7 +11,7 @@ use super::*;
 fn sections_render_and_missing_tab_content_is_hint_not_error() {
     let mut app = app_with(1);
     app.ensure_pane();
-    assert!(matches!(app.pane(), Some(Pane::Section(_))));
+    assert!(matches!(app.pane(), Some(Pane::Section { .. })));
 
     // Diagrams (tab 7) is empty after scaffold → Empty hint, not an error.
     press(&mut app, KeyCode::Char('7'));

@@ -383,12 +383,13 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
     let (scroll, hscroll) = app.scroll_offsets();
 
     let (text, wrapped, title): (&Text<'static>, bool, String) = match app.pane() {
-        Some(Pane::Section(text)) => (text, true, format!(" {} ", app.tab().title())),
+        Some(Pane::Section { text, .. }) => (text, true, format!(" {} ", app.tab().title())),
         Some(Pane::Diagram {
             text,
             name,
             index,
             total,
+            ..
         }) => (
             text,
             false,
@@ -417,6 +418,7 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
     let inner = block.inner(area);
 
     let mut text = text.clone();
+    highlight_cursor_line(&mut text, app, focused);
     highlight_search_matches(&mut text, app);
 
     // Feed real geometry back so scrolling clamps to actual wrapped height.
@@ -441,6 +443,23 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
 /// Highlights the matched text itself on the visible tab — the occurrence,
 /// not the whole line, so the eye lands exactly on it. The current hit's
 /// occurrences pop in amber-on-black; other hits get a quieter steel tint.
+/// Tints the line under the content cursor while the pane is focused, so
+/// `y` (yank line) and j/k navigation have a visible anchor. Search
+/// highlights are applied afterwards and win on the same line.
+fn highlight_cursor_line(text: &mut Text<'static>, app: &App, focused: bool) {
+    if !focused {
+        return;
+    }
+    if let Some(line) = text.lines.get_mut(app.content_cursor()) {
+        let bg = Color::Rgb(48, 52, 70);
+        for span in &mut line.spans {
+            if span.style.bg.is_none() {
+                span.style = span.style.bg(bg);
+            }
+        }
+    }
+}
+
 fn highlight_search_matches(text: &mut Text<'static>, app: &App) {
     let Some(query) = app.content_search().map(|s| s.query.clone()) else {
         return;
@@ -588,7 +607,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 "  j/k select · enter open · ←/→ tabs · f filter · / search · T toolbox · R related · c copy · r reload · ? help · Q quit"
             }
             Focus::Content => {
-                "  j/k scroll · ←/→ tabs · / search · h/l pan · F follow · s sidebar · o links · c copy · b back · ? help · Q quit"
+                "  j/k line · y copy line · ←/→ tabs · / search · F follow · s sidebar · o links · c copy · b back · ? help · Q quit"
             }
         },
         Style::default().fg(Color::DarkGray),
