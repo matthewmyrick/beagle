@@ -73,6 +73,10 @@ pub struct App {
     diagram_index: usize,
     scroll: u16,
     hscroll: u16,
+    /// The content pane's line cursor: an index into the current pane's
+    /// lines, used while the content is focused for line navigation and
+    /// yank (`y`). Clamped to the content on every move/reload.
+    content_cursor: usize,
     show_help: bool,
     /// The `?` sheet's keybinding filter: `Some` while a query is being
     /// typed (empty string = filter active, no query yet), `None` when not
@@ -214,6 +218,7 @@ impl App {
             diagram_index: 0,
             scroll: 0,
             hscroll: 0,
+            content_cursor: 0,
             show_help: false,
             help_filter: None,
             status: None,

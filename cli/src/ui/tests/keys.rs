@@ -127,36 +127,84 @@ fn key_9_jumps_to_the_log_tab() {
     assert_eq!(Tab::Log.section(), Some(crate::model::SectionKind::Log));
 }
 
-#[test]
-fn switching_tab_resets_scroll() {
-    let mut app = app_with(1);
-    app.viewport = ViewportInfo {
-        content_lines: 100,
-        height: 10,
-        width: 80,
-    };
-    press(&mut app, KeyCode::Enter);
-    press(&mut app, KeyCode::Char(' '));
-    assert!(app.scroll_offsets().0 > 0);
-    press(&mut app, KeyCode::Tab);
-    assert_eq!(app.scroll_offsets().0, 0);
+/// Writes `body` as the selected incident's summary and reloads, so the
+/// content pane has real, long lines for cursor/scroll tests.
+fn set_summary(app: &mut crate::ui::App, body: &str) {
+    let id = app.selected_rca().expect("selected").id.clone();
+    std::fs::write(app.store.workspace_dir(&id).join("summary.md"), body).expect("write");
+    app.reload();
 }
 
 #[test]
-fn scroll_clamps_to_content_height() {
+fn switching_tab_resets_scroll() {
     let mut app = app_with(1);
+    let long: String = (0..40).fold(String::new(), |mut s, i| {
+        use std::fmt::Write as _;
+        let _ = writeln!(s, "line {i}");
+        s
+    });
+    set_summary(&mut app, &long);
+    app.viewport = ViewportInfo {
+        content_lines: 40,
+        height: 10,
+        width: 80,
+    };
+    app.ensure_pane();
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Char('G')); // cursor to bottom scrolls the view
+    assert!(app.scroll_offsets().0 > 0, "cursor at bottom scrolled");
+    press(&mut app, KeyCode::Tab);
+    assert_eq!(app.scroll_offsets().0, 0, "a new tab resets scroll");
+}
+
+#[test]
+fn cursor_to_bottom_clamps_scroll_to_content() {
+    let mut app = app_with(1);
+    let long: String = (0..30).fold(String::new(), |mut s, i| {
+        use std::fmt::Write as _;
+        let _ = writeln!(s, "line {i}");
+        s
+    });
+    set_summary(&mut app, &long);
     app.viewport = ViewportInfo {
         content_lines: 30,
         height: 10,
         width: 80,
     };
+    app.ensure_pane();
     press(&mut app, KeyCode::Enter);
     press(&mut app, KeyCode::Char('G'));
+    // Cursor on the last line (29); reveal scrolls to 29 - (10 - 1) = 20.
     assert_eq!(
         app.scroll_offsets().0,
         20,
         "bottom = content minus viewport"
     );
+}
+
+#[test]
+fn y_in_content_yanks_the_cursor_line() {
+    let mut app = app_with(1);
+    set_summary(&mut app, "alpha\nbravo\ncharlie\n");
+    app.viewport = ViewportInfo {
+        content_lines: 3,
+        height: 10,
+        width: 80,
+    };
+    app.ensure_pane();
+    press(&mut app, KeyCode::Enter); // focus content, cursor on line 0
+    press(&mut app, KeyCode::Char('j')); // → line 1 ("bravo")
+    assert_eq!(app.content_cursor(), 1);
+    press(&mut app, KeyCode::Char('y'));
+    assert!(
+        app.status_line().is_some_and(|s| s.contains("copied line")),
+        "y in content yanks the cursor line: {:?}",
+        app.status_line()
+    );
+    // In list focus, y still yanks the incident id.
+    press(&mut app, KeyCode::Char('b')); // back to the list
+    press(&mut app, KeyCode::Char('y'));
+    assert!(app.status_line().is_some_and(|s| s.contains("copied id")));
 }
 
 #[test]

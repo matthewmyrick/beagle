@@ -565,7 +565,10 @@ pub(super) fn draw_errors(frame: &mut Frame, app: &mut App, area: Rect) {
 /// Every keybinding row: `(keys, action)`. Kept as a const so the pane can
 /// size itself to the widest row and filter without re-listing.
 const HELP_ROWS: &[(&str, &str)] = &[
-    ("j / k, ↓ / ↑", "select incident or scroll content"),
+    (
+        "j / k, ↓ / ↑",
+        "select incident · move the content line cursor",
+    ),
     ("enter / l", "focus the content pane"),
     ("b / esc", "back to the incident list"),
     ("tab / [ / ], ← / →", "cycle tabs"),
@@ -586,7 +589,7 @@ const HELP_ROWS: &[(&str, &str)] = &[
     ("c / C", "copy this tab / whole RCA to clipboard"),
     (
         "y",
-        "copy / yank the incident id to clipboard (/beagle-review)",
+        "yank/copy: the incident id (list) · the cursor line (content)",
     ),
     (
         "e",

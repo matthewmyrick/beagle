@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Content **line cursor + copy-line** (vim-style). With the content pane
+  focused, `j`/`k` (and `g`/`G`, page keys) move a highlighted line cursor
+  and the view follows it; `y` yanks the line under the cursor — the raw
+  source text, so a command copies exactly as written. In the incident
+  list, `y` still yanks the id (#124).
 - Syntax highlighting for fenced code. Code blocks now render between dim
   delimiters — `╭─ python ─…` at the top (with the language) and `╰─…` at
   the bottom — so a block's extent is obvious, and the code is coloured by

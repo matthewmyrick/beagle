@@ -65,7 +65,15 @@ impl App {
             }
             KeyCode::Char('c') => self.copy_current_tab(),
             KeyCode::Char('C') => self.copy_workspace(),
-            KeyCode::Char('y') => self.copy_id(),
+            // `y` yanks: the incident id from the list, the cursor line
+            // from the content pane (vim-style).
+            KeyCode::Char('y') => {
+                if self.focus == Focus::Content {
+                    self.copy_current_line();
+                } else {
+                    self.copy_id();
+                }
+            }
             KeyCode::Char('e') => self.export_current(),
             KeyCode::Char('r') => {
                 let _ = self.reload();
@@ -332,7 +340,7 @@ impl App {
     }
 
     fn handle_content_key(&mut self, code: KeyCode) {
-        let page = self.viewport.height.saturating_sub(1).max(1);
+        let page = isize::try_from(self.viewport.height.saturating_sub(1).max(1)).unwrap_or(1);
         match code {
             // Esc peels one layer at a time: search highlights, then follow
             // mode, then back to the list.
@@ -344,14 +352,14 @@ impl App {
             KeyCode::Esc => {
                 self.focus = Focus::List;
             }
-            KeyCode::Char('j') | KeyCode::Down => self.scroll_to(self.scroll.saturating_add(1)),
-            KeyCode::Char('k') | KeyCode::Up => self.scroll_to(self.scroll.saturating_sub(1)),
-            KeyCode::Char(' ') | KeyCode::PageDown => {
-                self.scroll_to(self.scroll.saturating_add(page));
-            }
-            KeyCode::PageUp => self.scroll_to(self.scroll.saturating_sub(page)),
-            KeyCode::Char('g') | KeyCode::Home => self.scroll_to(0),
-            KeyCode::Char('G') | KeyCode::End => self.scroll_to(u16::MAX),
+            // j/k move a line cursor (vim-style); the view follows it. `y`
+            // (handled globally, in content focus) yanks the cursor line.
+            KeyCode::Char('j') | KeyCode::Down => self.move_cursor(1),
+            KeyCode::Char('k') | KeyCode::Up => self.move_cursor(-1),
+            KeyCode::Char(' ') | KeyCode::PageDown => self.move_cursor(page),
+            KeyCode::PageUp => self.move_cursor(-page),
+            KeyCode::Char('g') | KeyCode::Home => self.cursor_to_end(false),
+            KeyCode::Char('G') | KeyCode::End => self.cursor_to_end(true),
             // Arrows switch tabs (handled globally); h/l pan diagrams.
             KeyCode::Char('h') => self.hscroll = self.hscroll.saturating_sub(4),
             KeyCode::Char('l') => self.hscroll = self.hscroll.saturating_add(4),
@@ -421,6 +429,7 @@ impl App {
     pub(crate) fn reset_scroll(&mut self) {
         self.scroll = 0;
         self.hscroll = 0;
+        self.content_cursor = 0;
     }
 }
 
