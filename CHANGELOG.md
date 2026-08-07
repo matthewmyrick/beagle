@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Syntax highlighting for fenced code. Code blocks now render between dim
+  delimiters — `╭─ python ─…` at the top (with the language) and `╰─…` at
+  the bottom — so a block's extent is obvious, and the code is coloured by
+  a small dependency-free tokenizer: comments dim, strings green, numbers
+  yellow, and language keywords (python, bash/sh, rust; generic fallback)
+  magenta (#124).
+
 ## [0.24.0] - 2026-08-07
 
 ### Added

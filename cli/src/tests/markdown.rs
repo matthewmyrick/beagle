@@ -23,13 +23,51 @@ fn bullets_get_a_dot_and_keep_indent() {
 }
 
 #[test]
-fn fence_markers_are_hidden_and_code_gets_a_gutter() {
+fn fences_become_delimiters_and_code_gets_a_gutter() {
     let text = to_text("```text\nlet x = 1;\n```\nafter\n```\ndangling");
-    // Three fence lines vanish; three content lines remain.
-    assert_eq!(text.lines.len(), 3);
-    assert_eq!(line_text(&text.lines[0]), "▍ let x = 1;");
-    assert_eq!(line_text(&text.lines[1]), "after");
-    assert_eq!(line_text(&text.lines[2]), "▍ dangling");
+    // Open rule (labelled), code line, close rule, plain, open rule, code.
+    assert_eq!(text.lines.len(), 6);
+    assert!(
+        line_text(&text.lines[0]).starts_with("╭─ text "),
+        "open fence shows the language: {}",
+        line_text(&text.lines[0])
+    );
+    assert_eq!(line_text(&text.lines[1]), "│ let x = 1;");
+    assert!(line_text(&text.lines[2]).starts_with('╰'), "close rule");
+    assert_eq!(line_text(&text.lines[3]), "after");
+    assert!(line_text(&text.lines[4]).starts_with('╭'), "second open");
+    assert_eq!(line_text(&text.lines[5]), "│ dangling");
+}
+
+#[test]
+fn python_code_is_syntax_highlighted() {
+    let text = to_text("```python\ndef f():  # note\n    return \"hi\"\n```");
+    // Line 1 is the `def f():  # note` code line (after the open rule).
+    let code = &text.lines[1];
+    let find = |needle: &str| {
+        code.spans
+            .iter()
+            .find(|s| s.content.contains(needle))
+            .unwrap_or_else(|| panic!("span {needle:?} not found"))
+    };
+    assert_eq!(
+        find("def").style.fg,
+        Some(Color::Magenta),
+        "keyword coloured"
+    );
+    assert_eq!(
+        find("# note").style.fg,
+        Some(Color::DarkGray),
+        "comment dim"
+    );
+    let string_line = &text.lines[2];
+    assert!(
+        string_line
+            .spans
+            .iter()
+            .any(|s| s.content.contains("\"hi\"") && s.style.fg == Some(Color::Green)),
+        "string coloured green"
+    );
 }
 
 #[test]
