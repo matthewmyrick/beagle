@@ -941,3 +941,38 @@ fn s_facet_filters_to_security_tagged_incidents() {
     assert_eq!(app.visible_len(), total);
     assert_eq!(app.facet_label(), "");
 }
+
+#[test]
+fn shift_p_attaches_a_pr_via_the_prompt() {
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    // P opens the prompt; typing builds the URL.
+    press(&mut app, KeyCode::Char('P'));
+    assert!(app.pr_prompt().is_some(), "prompt open");
+    for c in "https://github.com/o/r/pull/7".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+
+    assert!(app.pr_prompt().is_none(), "prompt closes on attach");
+    assert_eq!(
+        app.store.read_meta(&id).expect("meta").prs,
+        vec!["https://github.com/o/r/pull/7".to_owned()],
+        "PR written to the manifest"
+    );
+    assert!(app.status_line().is_some_and(|s| s.contains("attached")));
+
+    // A bad URL keeps the prompt open with an error.
+    press(&mut app, KeyCode::Char('P'));
+    for c in "not-a-url".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+    assert!(
+        app.pr_prompt().is_some(),
+        "invalid URL keeps the prompt open"
+    );
+    press(&mut app, KeyCode::Esc);
+    assert!(app.pr_prompt().is_none(), "esc cancels");
+}

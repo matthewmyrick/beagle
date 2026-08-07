@@ -35,6 +35,18 @@ pub(crate) struct RelatedItem {
     pub shared: String,
 }
 
+/// State of the `P` attach-PR prompt: the workspace the URL will be
+/// attached to, and the URL being typed. Pinned by id at open time.
+#[derive(Debug)]
+pub(crate) struct PrPrompt {
+    /// The workspace the PR attaches to.
+    pub id: RcaId,
+    /// Its title, for the prompt header.
+    pub title: String,
+    /// The URL being typed.
+    pub input: String,
+}
+
 /// State of the `D` delete confirmation popup: the workspace it will
 /// delete if confirmed. Pinned by id at open time, so a selection change
 /// underneath (e.g. a reload) can never redirect the delete.
@@ -355,6 +367,67 @@ impl App {
     /// The tags editor, when open.
     pub(crate) fn tags_editor(&self) -> Option<&TagsEditor> {
         self.tags_editor.as_ref()
+    }
+
+    /// Opens the `P` attach-PR prompt for the selected incident.
+    pub(crate) fn open_pr_prompt(&mut self) {
+        let Some(rca) = self.selected_rca() else {
+            self.status = Some("no incident selected — nothing to attach a PR to".to_owned());
+            return;
+        };
+        self.pr_prompt = Some(PrPrompt {
+            id: rca.id.clone(),
+            title: rca.meta.title.clone(),
+            input: String::new(),
+        });
+    }
+
+    /// Keystrokes while the attach-PR prompt is open: type the URL, enter
+    /// attaches it (validated, idempotent — same as `beagle pr add`), esc
+    /// cancels. An invalid URL keeps the prompt open so it can be fixed.
+    pub(crate) fn handle_pr_prompt_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Esc => self.pr_prompt = None,
+            KeyCode::Backspace => {
+                if let Some(prompt) = self.pr_prompt.as_mut() {
+                    prompt.input.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let Some(prompt) = self.pr_prompt.as_mut() {
+                    prompt.input.push(c);
+                }
+            }
+            KeyCode::Enter => {
+                let Some(prompt) = self.pr_prompt.as_ref() else {
+                    return;
+                };
+                let (id, url) = (prompt.id.clone(), prompt.input.trim().to_owned());
+                if url.is_empty() {
+                    self.pr_prompt = None;
+                    return;
+                }
+                match self.store.add_pr(&id, &url) {
+                    Ok(true) => {
+                        self.pr_prompt = None;
+                        let _ = self.reload();
+                        self.status = Some(format!("attached {url} to {id}"));
+                    }
+                    Ok(false) => {
+                        self.pr_prompt = None;
+                        self.status = Some(format!("{url} is already attached"));
+                    }
+                    // Keep the prompt open so a bad URL can be corrected.
+                    Err(e) => self.status = Some(format!("{e}")),
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The attach-PR prompt, when open.
+    pub(crate) fn pr_prompt(&self) -> Option<&PrPrompt> {
+        self.pr_prompt.as_ref()
     }
 
     /// Opens the `D` delete confirmation for the selected incident. The

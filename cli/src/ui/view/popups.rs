@@ -438,6 +438,45 @@ pub(super) fn draw_tags_editor(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, rect, &mut state);
 }
 
+/// The `P` attach-PR prompt: an input box for a PR URL to attach to the
+/// selected incident.
+pub(super) fn draw_pr_prompt(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(prompt) = app.pr_prompt() else {
+        return;
+    };
+    let width = area.width.saturating_sub(6).clamp(40, 96);
+    let inner = usize::from(width.saturating_sub(4));
+
+    let lines = vec![
+        Line::from(""),
+        Line::styled(
+            truncate(&prompt.title, inner),
+            Style::default().fg(Color::DarkGray),
+        )
+        .centered(),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  PR URL: ", Style::default().fg(Color::Yellow)),
+            Span::raw(format!("{}▌", prompt.input)),
+        ]),
+    ];
+    let height = u16::try_from(lines.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(2)
+        .min(area.height.saturating_sub(2));
+    let rect = center(area, width, height);
+
+    let block = Block::default()
+        .title(" attach a PR ")
+        .title_alignment(Alignment::Center)
+        .title_bottom(Line::from(" enter attach · esc cancel ").centered())
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Yellow));
+    frame.render_widget(Clear, rect);
+    frame.render_widget(Paragraph::new(lines).block(block), rect);
+}
+
 /// The `D` delete confirmation: names the incident (title + slug) and
 /// waits for an explicit `y` or `n`. Red border — this one is destructive.
 pub(super) fn draw_confirm_delete(frame: &mut Frame, app: &App, area: Rect) {
@@ -606,6 +645,7 @@ const HELP_ROWS: &[(&str, &str)] = &[
     ("R", "related incidents (shared systems/tags); enter jumps"),
     ("V", "sign off final-review as verified \u{2192} finished"),
     ("t", "set status: pick the RCA's lifecycle stage"),
+    ("P", "attach a PR to this incident (paste the URL)"),
     ("#", "edit tags: add / remove, incl. skip-final-review"),
     ("!", "view load errors / warnings (broken workspaces)"),
     ("D", "delete the selected incident (y/n confirm popup)"),

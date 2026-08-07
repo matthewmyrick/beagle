@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `P` attaches a PR from inside the TUI: a floating prompt takes a PR
+  URL and attaches it to the selected incident via the same
+  `Store::add_pr` as `beagle pr add` (validated, idempotent). Enter
+  attaches, esc cancels; a bad URL keeps the prompt open to fix (#134).
+
 ## [0.26.1] - 2026-08-07
 
 ### Fixed

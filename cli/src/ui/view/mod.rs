@@ -24,8 +24,8 @@ use super::{App, Focus, Pane};
 
 use header::{banner_fits, draw_banner, flow_tabs, header_paragraph, BANNER_COLS};
 use popups::{
-    draw_confirm_delete, draw_errors, draw_finder, draw_help, draw_links, draw_related,
-    draw_settings, draw_status_picker, draw_tags_editor, draw_toolbox,
+    draw_confirm_delete, draw_errors, draw_finder, draw_help, draw_links, draw_pr_prompt,
+    draw_related, draw_settings, draw_status_picker, draw_tags_editor, draw_toolbox,
 };
 use style::{
     horizontal, inset, pane_block, severity_badge, status_symbol, truncate, vertical, SIDEBAR_WIDTH,
@@ -66,6 +66,7 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     draw_finder(frame, app, frame.area());
     draw_status_picker(frame, app, frame.area());
     draw_tags_editor(frame, app, frame.area());
+    draw_pr_prompt(frame, app, frame.area());
     draw_confirm_delete(frame, app, frame.area());
     if app.help_visible() {
         draw_help(frame, app, frame.area());

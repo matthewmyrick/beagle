@@ -41,6 +41,9 @@ impl App {
         } else {
             KeyCode::Down
         };
+        if self.pr_prompt.is_some() {
+            return; // typing a URL — the wheel must not touch the list
+        }
         if self.confirm_delete.is_some() {
             return; // y/n only — the wheel must not touch the list beneath
         }
@@ -112,6 +115,7 @@ impl App {
             || self.confirm_delete.is_some()
             || self.status_picker.is_some()
             || self.tags_editor.is_some()
+            || self.pr_prompt.is_some()
         {
             return;
         }
