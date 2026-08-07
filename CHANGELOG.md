@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-08-07
+
 ### Added
 
 - Content **line cursor + copy-line** (vim-style). With the content pane
