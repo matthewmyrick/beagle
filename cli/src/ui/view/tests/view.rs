@@ -258,3 +258,54 @@ fn pr_summary_reflects_review_pr_state() {
         "investigating + no PR is quiet"
     );
 }
+
+#[test]
+fn blank_line_under_cursor_stays_one_row_and_shows_the_bar() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = crate::store::Store::open(tmp.path()).expect("store");
+    let id = crate::model::RcaId::new("blank-row").expect("id");
+    store
+        .scaffold(
+            &id,
+            &crate::store::new_meta("Blank".to_owned(), Severity::Low),
+        )
+        .expect("scaffold");
+    // A blank line between two content lines.
+    std::fs::write(
+        store.workspace_dir(&id).join("summary.md"),
+        "AAAA\n\nBBBB\n",
+    )
+    .expect("write");
+    let mut app = App::new(store).expect("app");
+
+    let backend = ratatui::backend::TestBackend::new(120, 30);
+    let mut terminal = ratatui::Terminal::new(backend).expect("terminal");
+    app.ensure_pane(); // load the section pane (the event loop does this)
+                       // Focus content and move the cursor onto the blank middle line.
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    app.ensure_pane();
+    terminal.draw(|frame| draw(frame, &mut app)).expect("draw");
+
+    let buffer = terminal.backend().buffer();
+    let row_of = |needle: &str| -> Option<u16> {
+        (0..30u16).find(|&y| {
+            let row: String = (0..120u16).map(|x| buffer[(x, y)].symbol()).collect();
+            row.contains(needle)
+        })
+    };
+    let a = row_of("AAAA").expect("AAAA rendered");
+    let b = row_of("BBBB").expect("BBBB rendered");
+    assert_eq!(
+        b,
+        a + 2,
+        "one blank row between them (not doubled): AAAA@{a} BBBB@{b}"
+    );
+
+    // The blank row carries the cursor bar background across the content.
+    let blank_y = a + 1;
+    let painted = (0..120u16).any(|x| buffer[(x, blank_y)].bg == Color::Rgb(48, 52, 70));
+    assert!(painted, "the blank cursor row shows the highlight bar");
+}
