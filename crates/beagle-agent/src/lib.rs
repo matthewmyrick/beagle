@@ -6,7 +6,9 @@
 //! control-socket protocol shared with the TUI and desktop clients.
 //!
 //! It is the Rust-native successor to the Go `ai-pipelines/beagle` feature
-//! agent (tracked by epic #137). This P0 scaffold is intentionally empty —
-//! each subsystem lands in its own follow-up issue.
+//! agent (tracked by epic #137). Subsystems land module by module; see the
+//! epic's child issues.
 //!
 //! [`beagle-agentd`]: https://github.com/matthewmyrick/beagle
+
+pub mod config;
