@@ -8,6 +8,12 @@ license = "MIT"
 repository = "https://github.com/matthewmyrick/beagle"
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true
