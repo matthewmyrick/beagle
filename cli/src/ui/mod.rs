@@ -70,6 +70,9 @@ pub struct App {
     selected: usize,
     /// The top-level screen: the RCA browser or the agents monitor.
     screen: Screen,
+    /// Latest `beagle-agentd` status from the background poller, rendered on
+    /// the agents screen.
+    agents_status: crate::agentd::AgentsStatus,
     focus: Focus,
     tab: Tab,
     diagram_index: usize,
@@ -222,6 +225,7 @@ impl App {
             visible,
             selected: 0,
             screen: Screen::Rcas,
+            agents_status: crate::agentd::AgentsStatus::default(),
             focus: Focus::List,
             tab: Tab::Summary,
             diagram_index: 0,
@@ -491,6 +495,16 @@ impl App {
     /// The active top-level screen.
     pub(crate) fn screen(&self) -> Screen {
         self.screen
+    }
+
+    /// The latest daemon status for the agents screen.
+    pub(crate) fn agents_status(&self) -> &crate::agentd::AgentsStatus {
+        &self.agents_status
+    }
+
+    /// Records a daemon status update from the background poller.
+    pub(crate) fn set_agents_status(&mut self, status: crate::agentd::AgentsStatus) {
+        self.agents_status = status;
     }
 
     /// Toggles between the RCA browser and the agents screen. The RCA screen's
