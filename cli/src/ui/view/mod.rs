@@ -20,7 +20,7 @@ use ratatui::Frame;
 
 use crate::model::{RcaSummary, Status};
 
-use super::{App, Focus, Pane};
+use super::{App, Focus, Pane, Screen};
 
 use header::{banner_fits, draw_banner, flow_tabs, header_paragraph, BANNER_COLS};
 use popups::{
@@ -33,25 +33,13 @@ use style::{
 
 pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     let [main, status_bar] = vertical(frame.area(), &[Constraint::Min(0), Constraint::Length(1)]);
-    let sidebar_width = if app.sidebar_collapsed() {
-        0
-    } else {
-        SIDEBAR_WIDTH
-    };
-    let [sidebar, content] = horizontal(
-        main,
-        &[Constraint::Length(sidebar_width), Constraint::Min(0)],
-    );
-
-    app.mouse.sidebar = if app.sidebar_collapsed() {
-        Rect::default()
-    } else {
-        sidebar
-    };
-    if !app.sidebar_collapsed() {
-        draw_sidebar(frame, app, sidebar);
+    match app.screen() {
+        Screen::Agents => {
+            app.mouse.sidebar = Rect::default();
+            draw_agents(frame, main);
+        }
+        Screen::Rcas => draw_rcas(frame, app, main),
     }
-    draw_workspace(frame, app, content);
     draw_status_bar(frame, app, status_bar);
 
     if app.toolbox().is_some() {
@@ -71,6 +59,53 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     if app.help_visible() {
         draw_help(frame, app, frame.area());
     }
+}
+
+/// Draws the RCA browser: the workspace sidebar plus the tabbed content pane.
+fn draw_rcas(frame: &mut Frame, app: &mut App, area: Rect) {
+    let sidebar_width = if app.sidebar_collapsed() {
+        0
+    } else {
+        SIDEBAR_WIDTH
+    };
+    let [sidebar, content] = horizontal(
+        area,
+        &[Constraint::Length(sidebar_width), Constraint::Min(0)],
+    );
+
+    app.mouse.sidebar = if app.sidebar_collapsed() {
+        Rect::default()
+    } else {
+        sidebar
+    };
+    if !app.sidebar_collapsed() {
+        draw_sidebar(frame, app, sidebar);
+    }
+    draw_workspace(frame, app, content);
+}
+
+/// Draws the agents screen. A placeholder for now: later issues fill it with
+/// daemon status, live sessions, and config.
+fn draw_agents(frame: &mut Frame, area: Rect) {
+    let text = Text::from(vec![
+        Line::from(""),
+        Line::styled(
+            "  Agents monitor",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Line::from(""),
+        Line::from("  Configure and watch beagle-agentd here — daemon health,"),
+        Line::from("  live sessions, recent outcomes, and per-agent controls."),
+        Line::from(""),
+        Line::styled("  (coming soon)", Style::default().fg(Color::DarkGray)),
+        Line::from(""),
+        Line::styled(
+            "  A or Esc · back to RCAs",
+            Style::default().fg(Color::DarkGray),
+        ),
+    ]);
+    let block = pane_block(" agents ".to_owned(), false);
+    frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
 fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {

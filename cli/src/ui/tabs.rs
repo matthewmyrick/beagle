@@ -115,6 +115,18 @@ pub enum Focus {
     Content,
 }
 
+/// The top-level screen. The RCA browser is the default; the agents screen is a
+/// separate view for configuring and watching `beagle-agentd` (introduced as a
+/// placeholder, filled in by later issues).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Screen {
+    /// The RCA workspace browser (sidebar + tabbed content).
+    #[default]
+    Rcas,
+    /// The agents monitor.
+    Agents,
+}
+
 #[cfg(test)]
 #[path = "tests/tabs.rs"]
 mod tests;

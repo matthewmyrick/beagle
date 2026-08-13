@@ -24,7 +24,7 @@ mod tabs;
 mod view;
 
 pub use pane::Pane;
-pub use tabs::{Focus, Tab};
+pub use tabs::{Focus, Screen, Tab};
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
@@ -68,6 +68,8 @@ pub struct App {
     visible: Vec<usize>,
     /// Index into `visible` of the selected workspace, if any match.
     selected: usize,
+    /// The top-level screen: the RCA browser or the agents monitor.
+    screen: Screen,
     focus: Focus,
     tab: Tab,
     diagram_index: usize,
@@ -219,6 +221,7 @@ impl App {
             filter_input: FilterInput::Off,
             visible,
             selected: 0,
+            screen: Screen::Rcas,
             focus: Focus::List,
             tab: Tab::Summary,
             diagram_index: 0,
@@ -483,6 +486,21 @@ impl App {
 
     pub(crate) fn focus(&self) -> Focus {
         self.focus
+    }
+
+    /// The active top-level screen.
+    pub(crate) fn screen(&self) -> Screen {
+        self.screen
+    }
+
+    /// Toggles between the RCA browser and the agents screen. The RCA screen's
+    /// own state (selection, tab, focus, scroll) is left untouched, so
+    /// switching back lands exactly where it was.
+    pub(crate) fn toggle_screen(&mut self) {
+        self.screen = match self.screen {
+            Screen::Rcas => Screen::Agents,
+            Screen::Agents => Screen::Rcas,
+        };
     }
 
     pub(crate) fn tab(&self) -> Tab {

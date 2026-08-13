@@ -4,7 +4,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{App, Focus, Pane, Tab};
+use super::{App, Focus, Pane, Screen, Tab};
 
 /// What the key loop should do next. `Edit` carries the file to open —
 /// state transitions stay pure; the event loop owns the terminal and does
@@ -26,7 +26,15 @@ impl App {
         if self.route_modal_key(key) {
             return Flow::Continue;
         }
+        // The agents screen is a separate top-level view; while it owns the
+        // screen, only a small set of keys apply.
+        if self.screen() == Screen::Agents {
+            return self.handle_agents_key(key);
+        }
         match key.code {
+            // `A` switches to the agents screen; see `handle_agents_key` for the
+            // way back.
+            KeyCode::Char('A') => self.toggle_screen(),
             // Shift-Q only: a plain `q` next to tab/scroll keys quit the app
             // by accident too easily. Ctrl-C is handled above.
             KeyCode::Char('Q') => return Flow::Quit,
@@ -124,6 +132,22 @@ impl App {
         if self.focus == Focus::List {
             self.sidebar_collapsed = false;
             self.clear_visual_select();
+        }
+        Flow::Continue
+    }
+
+    /// Keys while the agents screen owns the view. It is a placeholder for now:
+    /// `A` or `Esc` returns to the RCA browser, `?` opens help, `Q` quits, and
+    /// everything else is ignored.
+    fn handle_agents_key(&mut self, key: KeyEvent) -> Flow {
+        match key.code {
+            KeyCode::Char('Q') => return Flow::Quit,
+            KeyCode::Char('A') | KeyCode::Esc => self.toggle_screen(),
+            KeyCode::Char('?') => {
+                self.show_help = true;
+                self.help_filter = None;
+            }
+            _ => {}
         }
         Flow::Continue
     }
