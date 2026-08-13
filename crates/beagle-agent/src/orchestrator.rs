@@ -409,8 +409,7 @@ fn tool_ok(bin: &str, args: &[&str]) -> bool {
     Command::new(bin)
         .args(args)
         .output()
-        .map(|out| out.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|out| out.status.success())
 }
 
 /// Runs `git -C <dir> <args...>`, mapping a non-zero exit to a [`PublishError`].
