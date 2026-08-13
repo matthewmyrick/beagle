@@ -57,9 +57,18 @@ impl App {
         let mut polled_urls = self.pr_urls();
         let _ = urls_tx.send(polled_urls.clone());
 
+        // Agents screen: a background thread polls the beagle-agentd control
+        // socket and reports the daemon status over a channel, so the UI never
+        // blocks on the socket. Harmless when the daemon isn't running.
+        let (agents_tx, agents_rx) = mpsc::channel();
+        crate::agentd::spawn_status_poller(agents_tx);
+
         loop {
             while let Ok(states) = states_rx.try_recv() {
                 self.pr_states.extend(states);
+            }
+            while let Ok(status) = agents_rx.try_recv() {
+                self.set_agents_status(status);
             }
             self.advance_merged_reviews();
             if drain(&rx) {

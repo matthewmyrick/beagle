@@ -36,7 +36,7 @@ pub(crate) fn draw(frame: &mut Frame, app: &mut App) {
     match app.screen() {
         Screen::Agents => {
             app.mouse.sidebar = Rect::default();
-            draw_agents(frame, main);
+            draw_agents(frame, app, main);
         }
         Screen::Rcas => draw_rcas(frame, app, main),
     }
@@ -84,28 +84,91 @@ fn draw_rcas(frame: &mut Frame, app: &mut App, area: Rect) {
     draw_workspace(frame, app, content);
 }
 
-/// Draws the agents screen. A placeholder for now: later issues fill it with
-/// daemon status, live sessions, and config.
-fn draw_agents(frame: &mut Frame, area: Rect) {
-    let text = Text::from(vec![
-        Line::from(""),
-        Line::styled(
-            "  Agents monitor",
+/// Draws the agents screen: the live daemon health and per-agent status fed by
+/// the background poller. Read-only for now; controls arrive in a later issue.
+fn draw_agents(frame: &mut Frame, app: &App, area: Rect) {
+    use crate::agentd::AgentsStatus;
+
+    let mut lines: Vec<Line> = vec![Line::from("")];
+    match app.agents_status() {
+        AgentsStatus::Connecting => {
+            lines.push(Line::styled(
+                "  connecting to beagle-agentd…",
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        AgentsStatus::Offline(reason) => {
+            lines.push(Line::styled(
+                "  ● daemon offline",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ));
+            lines.push(Line::from(""));
+            lines.push(Line::styled(
+                format!("  {reason}"),
+                Style::default().fg(Color::DarkGray),
+            ));
+            lines.push(Line::from(""));
+            lines.push(Line::styled(
+                "  start it with `beagle agent start`",
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        AgentsStatus::Connected(snapshot) => {
+            lines.push(Line::styled(
+                format!("  ● beagle-agentd {}", snapshot.version),
+                Style::default()
+                    .fg(Color::LightGreen)
+                    .add_modifier(Modifier::BOLD),
+            ));
+            lines.push(Line::from(""));
+            if snapshot.agents.is_empty() {
+                lines.push(Line::styled(
+                    "  (no agents configured)",
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            for agent in &snapshot.agents {
+                lines.push(agent_header_line(agent));
+                for result in &agent.last_results {
+                    lines.push(Line::styled(
+                        format!("      {result}"),
+                        Style::default().fg(Color::Gray),
+                    ));
+                }
+            }
+        }
+    }
+    let block = pane_block(" agents ".to_owned(), false);
+    frame.render_widget(Paragraph::new(Text::from(lines)).block(block), area);
+}
+
+/// The one-line header for an agent: id, running/paused, sessions, last tick.
+fn agent_header_line(agent: &crate::agentd::AgentSnapshot) -> Line<'static> {
+    let (state, color) = if agent.running {
+        ("running", Color::LightGreen)
+    } else {
+        ("paused", Color::Yellow)
+    };
+    let mut spans = vec![
+        Span::styled(
+            format!("  {}  ", agent.id),
             Style::default().add_modifier(Modifier::BOLD),
         ),
-        Line::from(""),
-        Line::from("  Configure and watch beagle-agentd here — daemon health,"),
-        Line::from("  live sessions, recent outcomes, and per-agent controls."),
-        Line::from(""),
-        Line::styled("  (coming soon)", Style::default().fg(Color::DarkGray)),
-        Line::from(""),
-        Line::styled(
-            "  A or Esc · back to RCAs",
+        Span::styled(format!("[{state}]"), Style::default().fg(color)),
+    ];
+    if agent.active_sessions > 0 {
+        spans.push(Span::styled(
+            format!("  {} session(s)", agent.active_sessions),
+            Style::default().fg(Color::LightBlue),
+        ));
+    }
+    if let Some(tick) = &agent.last_tick {
+        spans.push(Span::styled(
+            format!("  · last tick {tick}"),
             Style::default().fg(Color::DarkGray),
-        ),
-    ]);
-    let block = pane_block(" agents ".to_owned(), false);
-    frame.render_widget(Paragraph::new(text).block(block), area);
+        ));
+    }
+    Line::from(spans)
 }
 
 fn draw_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {

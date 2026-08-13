@@ -13,9 +13,57 @@ use std::io::{BufRead, BufReader, Write as _};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::mpsc::Sender;
+use std::thread;
+use std::time::Duration;
+
+use serde::Deserialize;
 
 /// The launchd label / service name.
 const LABEL: &str = "com.beagle.agentd";
+
+/// How often the TUI status poller re-queries the daemon.
+const POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+/// A snapshot of the whole daemon, decoded from a `get-status` response. Mirrors
+/// the daemon's `DaemonStatus` wire type (the CLI can't depend on the daemon
+/// crate, so it re-declares the shape it reads).
+#[derive(Debug, Clone, Deserialize)]
+pub struct DaemonSnapshot {
+    /// The daemon version.
+    pub version: String,
+    /// One entry per configured agent.
+    pub agents: Vec<AgentSnapshot>,
+}
+
+/// One agent's status within a [`DaemonSnapshot`].
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentSnapshot {
+    /// The agent id.
+    pub id: String,
+    /// Whether the config marks it enabled.
+    pub enabled: bool,
+    /// Whether the daemon is currently ticking it (not paused).
+    pub running: bool,
+    /// When it last ticked, if ever.
+    pub last_tick: Option<String>,
+    /// Sessions currently running for it.
+    pub active_sessions: u32,
+    /// Short summaries of the most recent job outcomes.
+    pub last_results: Vec<String>,
+}
+
+/// The live connection state the TUI shows for the daemon.
+#[derive(Debug, Clone, Default)]
+pub enum AgentsStatus {
+    /// No snapshot yet — the first poll is in flight.
+    #[default]
+    Connecting,
+    /// The daemon answered with a snapshot.
+    Connected(DaemonSnapshot),
+    /// The daemon could not be reached (with the reason).
+    Offline(String),
+}
 
 /// The inputs for a launchd plist.
 pub struct LaunchdConfig {
@@ -271,12 +319,21 @@ fn systemctl(args: &[&str]) -> Result<(), String> {
     }
 }
 
-/// Queries the running daemon over its control socket and formats the status.
+/// Queries the running daemon and formats its status for `beagle agent status`.
 ///
 /// # Errors
 /// Returns a message if the daemon is not reachable or its response is
 /// malformed.
 pub fn status() -> Result<String, String> {
+    Ok(format_snapshot(&fetch_status()?))
+}
+
+/// Connects to the control socket, sends `get-status`, and decodes the reply.
+///
+/// # Errors
+/// Returns a message if the daemon is not reachable or its response cannot be
+/// parsed.
+pub fn fetch_status() -> Result<DaemonSnapshot, String> {
     let path = socket_path();
     let stream = UnixStream::connect(&path).map_err(|err| {
         format!(
@@ -298,39 +355,61 @@ pub fn status() -> Result<String, String> {
     reader
         .read_line(&mut line)
         .map_err(|err| format!("socket read: {err}"))?;
-    format_status(&line)
+    parse_status(&line)
 }
 
-/// Formats a `get-status` JSON response into a human-readable summary.
-fn format_status(line: &str) -> Result<String, String> {
+/// Spawns a background thread that polls the daemon every couple of seconds and
+/// reports the connection state over `tx`. Exits when the receiver is dropped.
+pub fn spawn_status_poller(tx: Sender<AgentsStatus>) {
+    thread::spawn(move || loop {
+        let status = match fetch_status() {
+            Ok(snapshot) => AgentsStatus::Connected(snapshot),
+            Err(reason) => AgentsStatus::Offline(reason),
+        };
+        if tx.send(status).is_err() {
+            return; // the UI is gone
+        }
+        thread::sleep(POLL_INTERVAL);
+    });
+}
+
+/// Decodes a `get-status` response line into a [`DaemonSnapshot`], turning an
+/// `error` response into an `Err`.
+fn parse_status(line: &str) -> Result<DaemonSnapshot, String> {
     let value: serde_json::Value =
         serde_json::from_str(line.trim()).map_err(|err| format!("bad daemon response: {err}"))?;
-    let status = value
-        .get("status")
-        .ok_or("unexpected daemon response (no status)")?;
-    let version = status
-        .get("version")
-        .and_then(|v| v.as_str())
-        .unwrap_or("?");
-    let mut out = format!("beagle-agentd {version}");
-    match status.get("agents").and_then(|a| a.as_array()) {
-        Some(agents) if !agents.is_empty() => {
-            for agent in agents {
-                let id = agent.get("id").and_then(|v| v.as_str()).unwrap_or("?");
-                let running = agent
-                    .get("running")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
-                let state = if running { "running" } else { "paused" };
-                let _ = write!(out, "\n  {id}: {state}");
-                if let Some(tick) = agent.get("last_tick").and_then(|v| v.as_str()) {
-                    let _ = write!(out, " (last tick {tick})");
-                }
-            }
+    match value.get("type").and_then(serde_json::Value::as_str) {
+        Some("status") => {
+            let status = value
+                .get("status")
+                .ok_or("unexpected daemon response (no status)")?;
+            serde_json::from_value(status.clone())
+                .map_err(|err| format!("bad status payload: {err}"))
         }
-        _ => out.push_str("\n  (no agents)"),
+        Some("error") => Err(value
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("daemon error")
+            .to_string()),
+        _ => Err("unexpected daemon response".to_string()),
     }
-    Ok(out)
+}
+
+/// Formats a snapshot into a human-readable summary for the CLI.
+fn format_snapshot(snapshot: &DaemonSnapshot) -> String {
+    let mut out = format!("beagle-agentd {}", snapshot.version);
+    if snapshot.agents.is_empty() {
+        out.push_str("\n  (no agents)");
+        return out;
+    }
+    for agent in &snapshot.agents {
+        let state = if agent.running { "running" } else { "paused" };
+        let _ = write!(out, "\n  {}: {state}", agent.id);
+        if let Some(tick) = &agent.last_tick {
+            let _ = write!(out, " (last tick {tick})");
+        }
+    }
+    out
 }
 
 /// Resolves the `beagle-agentd` binary: `$BEAGLE_AGENTD`, else a `PATH` search.

@@ -39,26 +39,37 @@ fn unit_has_execstart_and_restart() {
 }
 
 #[test]
-fn format_status_summarizes_agents() {
+fn parse_and_format_status_summarizes_agents() {
     let line = r#"{"type":"status","status":{"version":"0.1.0","agents":[
-        {"id":"rca","enabled":true,"running":true,"last_tick":"1723550400","active_sessions":0,"last_results":[]},
+        {"id":"rca","enabled":true,"running":true,"last_tick":"1723550400","active_sessions":1,"last_results":["x -> published"]},
         {"id":"other","enabled":true,"running":false,"last_tick":null,"active_sessions":0,"last_results":[]}
     ]}}"#;
-    let out = format_status(line).expect("format");
+    let snapshot = parse_status(line).expect("parse");
+    assert_eq!(snapshot.version, "0.1.0");
+    assert_eq!(snapshot.agents.len(), 2);
+    assert!(snapshot.agents[0].running);
+    assert_eq!(snapshot.agents[0].active_sessions, 1);
+    assert_eq!(snapshot.agents[1].last_tick, None);
+
+    let out = format_snapshot(&snapshot);
     assert!(out.contains("beagle-agentd 0.1.0"));
     assert!(out.contains("rca: running (last tick 1723550400)"), "{out}");
     assert!(out.contains("other: paused"), "{out}");
 }
 
 #[test]
-fn format_status_handles_no_agents() {
-    let line = r#"{"type":"status","status":{"version":"0.1.0","agents":[]}}"#;
-    let out = format_status(line).expect("format");
-    assert!(out.contains("(no agents)"), "{out}");
+fn parse_status_handles_no_agents() {
+    let snapshot = parse_status(r#"{"type":"status","status":{"version":"0.1.0","agents":[]}}"#)
+        .expect("parse");
+    assert!(format_snapshot(&snapshot).contains("(no agents)"));
 }
 
 #[test]
-fn format_status_rejects_garbage() {
-    assert!(format_status("not json").is_err());
-    assert!(format_status(r#"{"type":"ok"}"#).is_err());
+fn parse_status_rejects_garbage_and_errors() {
+    assert!(parse_status("not json").is_err());
+    // An error response surfaces its message.
+    let err = parse_status(r#"{"type":"error","message":"boom"}"#).expect_err("error");
+    assert_eq!(err, "boom");
+    // An unexpected type is an error too.
+    assert!(parse_status(r#"{"type":"ok"}"#).is_err());
 }
