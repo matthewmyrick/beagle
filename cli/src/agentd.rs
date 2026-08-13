@@ -1,11 +1,12 @@
 //! Managing the `beagle-agentd` daemon from the CLI: install/uninstall it as an
 //! OS service, start/stop it, and query its status.
 //!
-//! On macOS the service is a launchd `LaunchAgent` (`KeepAlive` +
-//! `RunAtLoad`), so it starts on login and restarts on crash. Linux (systemd)
-//! support lands in a follow-up. Status talks to a running daemon directly over
-//! its loopback control socket (newline-JSON), so the CLI needs no dependency
-//! on the daemon crate — it just speaks the wire format.
+//! On macOS the service is a launchd `LaunchAgent` (`KeepAlive` + `RunAtLoad`);
+//! on Linux it is a `systemd --user` unit (`Restart=always`,
+//! `WantedBy=default.target`). Either way it starts on login and restarts on
+//! crash. Status talks to a running daemon directly over its loopback control
+//! socket (newline-JSON), so the CLI needs no dependency on the daemon crate —
+//! it just speaks the wire format.
 
 use std::fmt::Write as _;
 use std::io::{BufRead, BufReader, Write as _};
@@ -63,13 +64,62 @@ pub fn render_plist(config: &LaunchdConfig) -> String {
     )
 }
 
-/// Installs and loads the launchd agent so the daemon runs on login.
+/// Installs and enables the daemon as an OS service (launchd on macOS,
+/// `systemd --user` on Linux) so it runs on login and restarts on crash.
 ///
 /// # Errors
-/// Returns a message if not on macOS, if `beagle-agentd` cannot be found, or if
-/// writing the plist or `launchctl` fails.
+/// Returns a message on an unsupported platform, if `beagle-agentd` cannot be
+/// found, or if writing the unit / running the service manager fails.
 pub fn install() -> Result<String, String> {
-    require_macos("install")?;
+    dispatch("install", launchd_install, systemd_install)
+}
+
+/// Disables and removes the daemon service.
+///
+/// # Errors
+/// Returns a message on an unsupported platform or if removal fails.
+pub fn uninstall() -> Result<String, String> {
+    dispatch("uninstall", launchd_uninstall, systemd_uninstall)
+}
+
+/// (Re)starts the installed service.
+///
+/// # Errors
+/// Returns a message on an unsupported platform, if the service is not
+/// installed, or if the service manager fails.
+pub fn start() -> Result<String, String> {
+    dispatch("start", launchd_start, systemd_start)
+}
+
+/// Stops the service.
+///
+/// # Errors
+/// Returns a message on an unsupported platform or if the service manager fails.
+pub fn stop() -> Result<String, String> {
+    dispatch("stop", launchd_stop, systemd_stop)
+}
+
+/// Picks the macOS or Linux backend for an action, or errors on an unsupported
+/// platform.
+fn dispatch(
+    action: &str,
+    macos: fn() -> Result<String, String>,
+    linux: fn() -> Result<String, String>,
+) -> Result<String, String> {
+    if cfg!(target_os = "macos") {
+        macos()
+    } else if cfg!(target_os = "linux") {
+        linux()
+    } else {
+        Err(format!(
+            "`beagle agent {action}` is only supported on macOS and Linux"
+        ))
+    }
+}
+
+// ---- macOS (launchd) ----
+
+fn launchd_install() -> Result<String, String> {
     let program = find_agentd()?;
     let log_dir = state_dir()?.join("logs");
     std::fs::create_dir_all(&log_dir).map_err(|err| format!("creating log dir: {err}"))?;
@@ -96,12 +146,7 @@ pub fn install() -> Result<String, String> {
     ))
 }
 
-/// Unloads and removes the launchd agent.
-///
-/// # Errors
-/// Returns a message if not on macOS or if removing the plist fails.
-pub fn uninstall() -> Result<String, String> {
-    require_macos("uninstall")?;
+fn launchd_uninstall() -> Result<String, String> {
     let domain = gui_domain()?;
     let _ = launchctl(&["bootout", &format!("{domain}/{LABEL}")]);
     let path = plist_path()?;
@@ -113,13 +158,7 @@ pub fn uninstall() -> Result<String, String> {
     Ok(format!("uninstalled launchd agent {LABEL}"))
 }
 
-/// (Re)loads the agent so it runs now.
-///
-/// # Errors
-/// Returns a message if not on macOS, the agent is not installed, or
-/// `launchctl` fails.
-pub fn start() -> Result<String, String> {
-    require_macos("start")?;
+fn launchd_start() -> Result<String, String> {
     let path = plist_path()?;
     if !path.is_file() {
         return Err("agent is not installed; run `beagle agent install` first".to_string());
@@ -128,14 +167,108 @@ pub fn start() -> Result<String, String> {
     Ok(format!("started {LABEL}"))
 }
 
-/// Unloads the agent so it stops (and stays stopped until `start`/`install`).
-///
-/// # Errors
-/// Returns a message if not on macOS or `launchctl` fails.
-pub fn stop() -> Result<String, String> {
-    require_macos("stop")?;
+fn launchd_stop() -> Result<String, String> {
     launchctl(&["bootout", &format!("{}/{LABEL}", gui_domain()?)])?;
     Ok(format!("stopped {LABEL}"))
+}
+
+// ---- Linux (systemd --user) ----
+
+/// The systemd user unit name.
+const UNIT: &str = "beagle-agentd.service";
+
+fn systemd_install() -> Result<String, String> {
+    let program = find_agentd()?;
+    let path = unit_path()?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|err| format!("creating systemd user dir: {err}"))?;
+    }
+    std::fs::write(&path, render_unit(&program))
+        .map_err(|err| format!("writing unit {}: {err}", path.display()))?;
+    systemctl(&["daemon-reload"])?;
+    systemctl(&["enable", "--now", UNIT])?;
+    Ok(format!(
+        "installed systemd --user unit {UNIT}\n  unit: {}\n  starts on login, restarts on crash\n  tip: `loginctl enable-linger $USER` keeps it running without an active login",
+        path.display()
+    ))
+}
+
+fn systemd_uninstall() -> Result<String, String> {
+    let _ = systemctl(&["disable", "--now", UNIT]);
+    let path = unit_path()?;
+    match std::fs::remove_file(&path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(format!("removing unit {}: {err}", path.display())),
+    }
+    let _ = systemctl(&["daemon-reload"]);
+    Ok(format!("uninstalled systemd --user unit {UNIT}"))
+}
+
+fn systemd_start() -> Result<String, String> {
+    let path = unit_path()?;
+    if !path.is_file() {
+        return Err("agent is not installed; run `beagle agent install` first".to_string());
+    }
+    systemctl(&["start", UNIT])?;
+    Ok(format!("started {UNIT}"))
+}
+
+fn systemd_stop() -> Result<String, String> {
+    systemctl(&["stop", UNIT])?;
+    Ok(format!("stopped {UNIT}"))
+}
+
+/// Renders a `systemd --user` service unit that restarts the daemon on crash
+/// and starts it on login (`WantedBy=default.target`).
+#[must_use]
+pub fn render_unit(program: &std::path::Path) -> String {
+    format!(
+        "[Unit]\n\
+         Description=beagle agent daemon (beagle-agentd)\n\
+         After=default.target\n\
+         \n\
+         [Service]\n\
+         Type=simple\n\
+         ExecStart={program}\n\
+         Restart=always\n\
+         RestartSec=5\n\
+         \n\
+         [Install]\n\
+         WantedBy=default.target\n",
+        program = program.display()
+    )
+}
+
+/// The systemd user-unit path: `$XDG_CONFIG_HOME/systemd/user/<unit>`, else
+/// `~/.config/systemd/user/<unit>`.
+fn unit_path() -> Result<PathBuf, String> {
+    if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
+        if !xdg.is_empty() {
+            return Ok(PathBuf::from(xdg).join("systemd/user").join(UNIT));
+        }
+    }
+    let home = std::env::var_os("HOME").ok_or("HOME is not set")?;
+    Ok(PathBuf::from(home).join(".config/systemd/user").join(UNIT))
+}
+
+/// Runs `systemctl --user args...`, mapping a non-zero exit to an error.
+fn systemctl(args: &[&str]) -> Result<(), String> {
+    let output = Command::new("systemctl")
+        .arg("--user")
+        .args(args)
+        .output()
+        .map_err(|err| format!("running systemctl: {err}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "systemctl --user {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
 }
 
 /// Queries the running daemon over its control socket and formats the status.
@@ -198,17 +331,6 @@ fn format_status(line: &str) -> Result<String, String> {
         _ => out.push_str("\n  (no agents)"),
     }
     Ok(out)
-}
-
-/// Errors unless running on macOS.
-fn require_macos(action: &str) -> Result<(), String> {
-    if cfg!(target_os = "macos") {
-        Ok(())
-    } else {
-        Err(format!(
-            "`beagle agent {action}` currently supports macOS only (Linux/systemd support is tracked separately)"
-        ))
-    }
 }
 
 /// Resolves the `beagle-agentd` binary: `$BEAGLE_AGENTD`, else a `PATH` search.
