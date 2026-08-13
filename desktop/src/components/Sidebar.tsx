@@ -17,6 +17,7 @@ interface SidebarProps {
   filterRef: RefObject<HTMLInputElement | null>;
   hiddenArchived: number;
   onShowArchived: () => void;
+  onOpenAgents: () => void;
 }
 
 export function Sidebar({
@@ -28,10 +29,16 @@ export function Sidebar({
   filterRef,
   hiddenArchived,
   onShowArchived,
+  onOpenAgents,
 }: SidebarProps): JSX.Element {
   return (
     <nav className="sidebar" aria-label="Incidents">
-      <h2 className="sidebar-heading">Incidents ({workspaces.length})</h2>
+      <div className="sidebar-top">
+        <h2 className="sidebar-heading">Incidents ({workspaces.length})</h2>
+        <button type="button" className="agents-open" onClick={onOpenAgents}>
+          Agents
+        </button>
+      </div>
       <input
         ref={filterRef}
         className="filter-input"

@@ -13,6 +13,7 @@ const filterProps = {
   filterRef: createRef<HTMLInputElement>(),
   hiddenArchived: 0,
   onShowArchived: (): undefined => undefined,
+  onOpenAgents: (): undefined => undefined,
 };
 
 function workspace(overrides: Partial<Workspace>): Workspace {
