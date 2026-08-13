@@ -46,10 +46,11 @@ new workspaces announce themselves in the status bar as agents scaffold them.
 
 ```text
 cli/        the Rust TUI + CLI (everything documented below)
+crates/     the agent runtime: beagle-agent (engine) + beagle-agentd (daemon)
 desktop/    Tauri 2 + React desktop app (see desktop/README.md)
 web/        Astro static site: public postmortems (see web/README.md)
 deploy/     Helm chart for the web app (see web/DEPLOY.md)
-docs/       coding standards per component
+docs/       coding standards per component + the agent-runtime guide
 ```
 
 Each component releases independently: `v*` tags cut CLI binaries (this
@@ -200,6 +201,21 @@ finished`) does.
 
 No `gh` installed? PR links still show — just without live state or the
 auto-transition. Press `o` to open any attached PR or URL in your browser.
+
+## Automate the fix: the agent runtime
+
+An always-on daemon (`beagle-agentd`) can turn an RCA you mark ready into a
+remediation PR: move an RCA to `status = "agent"` and it implements
+`remediation.md` in an isolated git worktree via a headless `claude` session,
+opens a PR, attaches it, and advances the RCA — deterministic Rust owns
+git/GitHub, `claude` only edits code. Configure it in `~/.config/beagle/agents.toml`,
+autostart it with `beagle agent install` (launchd on macOS, `systemd --user` on
+Linux), and watch it from the **Agents screen** (`A` in the TUI, or the
+sidebar's **Agents** button in the desktop app).
+
+Full guide — config, custom prompts, commands, the control socket, and how it
+coexists with the Go `ai-pipelines/beagle` pipeline — in
+[docs/agent-runtime.md](docs/agent-runtime.md).
 
 ## Export
 
