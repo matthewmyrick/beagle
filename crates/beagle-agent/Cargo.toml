@@ -8,6 +8,7 @@ license = "MIT"
 repository = "https://github.com/matthewmyrick/beagle"
 
 [dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 toml = "0.8"
