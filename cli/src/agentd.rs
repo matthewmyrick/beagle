@@ -334,6 +334,52 @@ pub fn status() -> Result<String, String> {
 /// Returns a message if the daemon is not reachable or its response cannot be
 /// parsed.
 pub fn fetch_status() -> Result<DaemonSnapshot, String> {
+    parse_status(&send_line(&serde_json::json!({ "type": "get-status" }))?)
+}
+
+/// Resumes ticking `id`.
+///
+/// # Errors
+/// Returns a message if the daemon is unreachable or rejects the request.
+pub fn start_agent(id: &str) -> Result<(), String> {
+    request_ok(&serde_json::json!({ "type": "start-agent", "id": id }))
+}
+
+/// Pauses `id`.
+///
+/// # Errors
+/// Returns a message if the daemon is unreachable or rejects the request.
+pub fn stop_agent(id: &str) -> Result<(), String> {
+    request_ok(&serde_json::json!({ "type": "stop-agent", "id": id }))
+}
+
+/// Asks the daemon to re-read its config.
+///
+/// # Errors
+/// Returns a message if the daemon is unreachable or rejects the request.
+pub fn reload_config() -> Result<(), String> {
+    request_ok(&serde_json::json!({ "type": "reload-config" }))
+}
+
+/// Sends one request and requires an `ok` response.
+fn request_ok(payload: &serde_json::Value) -> Result<(), String> {
+    let line = send_line(payload)?;
+    let value: serde_json::Value =
+        serde_json::from_str(line.trim()).map_err(|err| format!("bad daemon response: {err}"))?;
+    match value.get("type").and_then(serde_json::Value::as_str) {
+        Some("ok") => Ok(()),
+        Some("error") => Err(value
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("daemon error")
+            .to_string()),
+        _ => Err("unexpected daemon response".to_string()),
+    }
+}
+
+/// Connects to the control socket, writes one JSON request line, and returns the
+/// single response line.
+fn send_line(payload: &serde_json::Value) -> Result<String, String> {
     let path = socket_path();
     let stream = UnixStream::connect(&path).map_err(|err| {
         format!(
@@ -345,8 +391,10 @@ pub fn fetch_status() -> Result<DaemonSnapshot, String> {
         .try_clone()
         .map_err(|err| format!("socket error: {err}"))?;
     let mut reader = BufReader::new(stream);
+    let mut request = payload.to_string();
+    request.push('\n');
     writer
-        .write_all(b"{\"type\":\"get-status\"}\n")
+        .write_all(request.as_bytes())
         .map_err(|err| format!("socket write: {err}"))?;
     writer
         .flush()
@@ -355,7 +403,54 @@ pub fn fetch_status() -> Result<DaemonSnapshot, String> {
     reader
         .read_line(&mut line)
         .map_err(|err| format!("socket read: {err}"))?;
-    parse_status(&line)
+    Ok(line)
+}
+
+/// The newest `.log` file for `agent_id` under the daemon's log dir, if any.
+#[must_use]
+pub fn latest_log(agent_id: &str) -> Option<PathBuf> {
+    let dir = state_dir().ok()?.join("logs").join(agent_id);
+    newest_log_in(&dir)
+}
+
+/// The path to the agents config file (`~/.config/beagle/agents.toml`, XDG-aware),
+/// matching what the daemon reads.
+#[must_use]
+pub fn config_path() -> Option<PathBuf> {
+    if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
+        if !xdg.is_empty() {
+            return Some(PathBuf::from(xdg).join("beagle").join("agents.toml"));
+        }
+    }
+    let home = std::env::var_os("HOME")?;
+    Some(
+        PathBuf::from(home)
+            .join(".config")
+            .join("beagle")
+            .join("agents.toml"),
+    )
+}
+
+/// The most recently modified `.log` in `dir`, or `None` if there are none.
+fn newest_log_in(dir: &std::path::Path) -> Option<PathBuf> {
+    let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+    for entry in std::fs::read_dir(dir).ok()?.flatten() {
+        let path = entry.path();
+        if path.extension() != Some(std::ffi::OsStr::new("log")) {
+            continue;
+        }
+        let Ok(modified) = entry.metadata().and_then(|meta| meta.modified()) else {
+            continue;
+        };
+        let replace = match &newest {
+            Some((newest_time, _)) => modified > *newest_time,
+            None => true,
+        };
+        if replace {
+            newest = Some((modified, path));
+        }
+    }
+    newest.map(|(_, path)| path)
 }
 
 /// Spawns a background thread that polls the daemon every couple of seconds and

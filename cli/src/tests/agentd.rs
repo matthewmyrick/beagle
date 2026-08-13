@@ -65,6 +65,27 @@ fn parse_status_handles_no_agents() {
 }
 
 #[test]
+fn newest_log_picks_the_latest_dot_log() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    // Empty dir → nothing.
+    assert!(newest_log_in(dir.path()).is_none());
+
+    std::fs::write(dir.path().join("old.log"), "a").expect("write old");
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::fs::write(dir.path().join("new.log"), "b").expect("write new");
+    std::fs::write(dir.path().join("notes.txt"), "c").expect("write txt");
+
+    let newest = newest_log_in(dir.path()).expect("a log");
+    assert_eq!(newest.file_name().expect("name"), "new.log");
+}
+
+#[test]
+fn newest_log_on_missing_dir_is_none() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    assert!(newest_log_in(&dir.path().join("nope")).is_none());
+}
+
+#[test]
 fn parse_status_rejects_garbage_and_errors() {
     assert!(parse_status("not json").is_err());
     // An error response surfaces its message.

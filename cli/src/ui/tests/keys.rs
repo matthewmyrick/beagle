@@ -8,6 +8,64 @@ use crate::ui::ViewportInfo;
 
 use super::*;
 
+use crate::agentd::{AgentSnapshot, AgentsStatus, DaemonSnapshot};
+
+/// A `Connected` daemon status with one running agent per id.
+fn connected(ids: &[&str]) -> AgentsStatus {
+    AgentsStatus::Connected(DaemonSnapshot {
+        version: "0.1.0".to_string(),
+        agents: ids
+            .iter()
+            .map(|id| AgentSnapshot {
+                id: (*id).to_string(),
+                enabled: true,
+                running: true,
+                last_tick: None,
+                active_sessions: 0,
+                last_results: Vec::new(),
+            })
+            .collect(),
+    })
+}
+
+#[test]
+fn agents_selection_moves_and_clamps() {
+    let mut app = app_with(1);
+    app.set_agents_status(connected(&["a", "b", "c"]));
+    press(&mut app, KeyCode::Char('A'));
+    assert_eq!(app.agents_selected(), 0);
+    press(&mut app, KeyCode::Char('j'));
+    assert_eq!(app.agents_selected(), 1);
+    press(&mut app, KeyCode::Char('j'));
+    press(&mut app, KeyCode::Char('j')); // clamps at the last agent
+    assert_eq!(app.agents_selected(), 2);
+    press(&mut app, KeyCode::Char('k'));
+    press(&mut app, KeyCode::Char('k'));
+    press(&mut app, KeyCode::Char('k')); // clamps at the first
+    assert_eq!(app.agents_selected(), 0);
+}
+
+#[test]
+fn agents_e_opens_config_for_edit() {
+    let mut app = app_with(1);
+    press(&mut app, KeyCode::Char('A'));
+    assert!(matches!(
+        press(&mut app, KeyCode::Char('e')),
+        Flow::EditAgentsConfig(_)
+    ));
+}
+
+#[test]
+fn agents_toggle_and_log_are_safe_without_a_selection() {
+    let mut app = app_with(1);
+    press(&mut app, KeyCode::Char('A'));
+    // Default status is Connecting → no agent selected → x and enter no-op
+    // (no socket call), and the screen stays put.
+    assert_eq!(press(&mut app, KeyCode::Char('x')), Flow::Continue);
+    assert_eq!(press(&mut app, KeyCode::Enter), Flow::Continue);
+    assert_eq!(app.screen(), Screen::Agents);
+}
+
 #[test]
 fn shift_a_toggles_the_agents_screen() {
     let mut app = app_with(1);
