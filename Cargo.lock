@@ -52,6 +52,7 @@ dependencies = [
 name = "beagle-agentd"
 version = "0.1.0"
 dependencies = [
+ "beagle",
  "beagle-agent",
 ]
 
