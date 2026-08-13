@@ -101,6 +101,13 @@ impl App {
                         match self.handle_key(key) {
                             Flow::Quit => return Ok(()),
                             Flow::Edit(path) => self.open_in_editor(terminal, &path),
+                            Flow::EditAgentsConfig(path) => {
+                                self.open_in_editor(terminal, &path);
+                                self.status = Some(match crate::agentd::reload_config() {
+                                    Ok(()) => "agents config reloaded".to_owned(),
+                                    Err(err) => format!("reload after edit failed: {err}"),
+                                });
+                            }
                             Flow::Continue => {}
                         }
                     }

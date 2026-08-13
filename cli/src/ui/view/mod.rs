@@ -127,8 +127,8 @@ fn draw_agents(frame: &mut Frame, app: &App, area: Rect) {
                     Style::default().fg(Color::DarkGray),
                 ));
             }
-            for agent in &snapshot.agents {
-                lines.push(agent_header_line(agent));
+            for (index, agent) in snapshot.agents.iter().enumerate() {
+                lines.push(agent_header_line(agent, index == app.agents_selected()));
                 for result in &agent.last_results {
                     lines.push(Line::styled(
                         format!("      {result}"),
@@ -138,22 +138,31 @@ fn draw_agents(frame: &mut Frame, app: &App, area: Rect) {
             }
         }
     }
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        "  j/k select · x start/stop · enter log · e edit config · A/esc back",
+        Style::default().fg(Color::DarkGray),
+    ));
     let block = pane_block(" agents ".to_owned(), false);
     frame.render_widget(Paragraph::new(Text::from(lines)).block(block), area);
 }
 
 /// The one-line header for an agent: id, running/paused, sessions, last tick.
-fn agent_header_line(agent: &crate::agentd::AgentSnapshot) -> Line<'static> {
+/// The selected row is marked and reverse-highlighted.
+fn agent_header_line(agent: &crate::agentd::AgentSnapshot, selected: bool) -> Line<'static> {
     let (state, color) = if agent.running {
         ("running", Color::LightGreen)
     } else {
         ("paused", Color::Yellow)
     };
+    let marker = if selected { "▸ " } else { "  " };
+    let id_style = if selected {
+        Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
+    } else {
+        Style::default().add_modifier(Modifier::BOLD)
+    };
     let mut spans = vec![
-        Span::styled(
-            format!("  {}  ", agent.id),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
+        Span::styled(format!("{marker}{}  ", agent.id), id_style),
         Span::styled(format!("[{state}]"), Style::default().fg(color)),
     ];
     if agent.active_sessions > 0 {

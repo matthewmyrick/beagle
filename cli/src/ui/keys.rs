@@ -15,6 +15,9 @@ pub(crate) enum Flow {
     Quit,
     /// Suspend the TUI and open this file in the user's editor.
     Edit(std::path::PathBuf),
+    /// Suspend, open the agents config in the editor, then ask the daemon to
+    /// reload it.
+    EditAgentsConfig(std::path::PathBuf),
 }
 
 impl App {
@@ -136,9 +139,10 @@ impl App {
         Flow::Continue
     }
 
-    /// Keys while the agents screen owns the view. It is a placeholder for now:
-    /// `A` or `Esc` returns to the RCA browser, `?` opens help, `Q` quits, and
-    /// everything else is ignored.
+    /// Keys while the agents screen owns the view: `j`/`k` select an agent,
+    /// `x` starts/stops it, `enter` opens its latest session log, `e` edits the
+    /// config (and reloads), `A`/`Esc` returns to the RCA browser, `?` opens
+    /// help, and `Q` quits.
     fn handle_agents_key(&mut self, key: KeyEvent) -> Flow {
         match key.code {
             KeyCode::Char('Q') => return Flow::Quit,
@@ -147,6 +151,18 @@ impl App {
                 self.show_help = true;
                 self.help_filter = None;
             }
+            KeyCode::Char('j') | KeyCode::Down => self.move_agent_selection(true),
+            KeyCode::Char('k') | KeyCode::Up => self.move_agent_selection(false),
+            KeyCode::Char('x') => self.toggle_selected_agent(),
+            KeyCode::Enter => {
+                if let Some(path) = self.selected_agent_log() {
+                    return Flow::Edit(path);
+                }
+            }
+            KeyCode::Char('e') => match crate::agentd::config_path() {
+                Some(path) => return Flow::EditAgentsConfig(path),
+                None => self.status = Some("could not resolve the agents.toml path".to_owned()),
+            },
             _ => {}
         }
         Flow::Continue
