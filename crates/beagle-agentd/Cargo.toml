@@ -12,6 +12,7 @@ name = "beagle-agentd"
 path = "src/main.rs"
 
 [dependencies]
+beagle = { path = "../../cli" }
 beagle-agent = { path = "../beagle-agent" }
 
 [lints]
