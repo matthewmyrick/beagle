@@ -84,6 +84,19 @@ fence so columns align.
   `perl -pi -e 's/BUG/\e[1;31mBUG\e[0m/' <file>`. Red = broken, green =
   healthy, yellow = degraded. Always close with `\e[0m`.
 
+## The agent runtime (`beagle-agentd`)
+
+Moving an RCA to `status = "agent"` (`beagle status <id> agent`) hands it to the
+in-repo **agent runtime**: an always-on daemon that implements the RCA's
+`remediation.md` in an isolated git worktree via a headless `claude` session,
+opens a PR, attaches it (`beagle pr add`), and advances the RCA to
+`final-review`. So write `remediation.md` to be *implementable* — concrete steps
+and the repo they target — before setting `agent`. Deterministic Rust owns
+git/GitHub; the session only edits code. Configure and watch it from the TUI's
+Agents screen (`A`) or the desktop's Agents view; full details in
+[docs/agent-runtime.md](docs/agent-runtime.md). It coexists with the Go
+`ai-pipelines/beagle` pipeline for now.
+
 ## Working on the TUI code itself
 
 Read `CONTRIBUTING.md` and `docs/CODING_STANDARDS.md` first. Non-negotiables:
