@@ -20,7 +20,7 @@ use beagle::{config, ui, update, Error};
 
 use beagle::skill::{self, Agent, Skill, SkillStatus};
 
-use cli::{Command, SkillAction, USAGE};
+use cli::{AgentAction, Command, SkillAction, USAGE};
 
 fn main() -> ExitCode {
     let command = match cli::parse_args(env::args().skip(1)) {
@@ -98,12 +98,7 @@ fn run(command: Command) -> Result<(), Error> {
             published,
         } => run_set_published(root, &id, published),
         Command::Handoff { root, id } => run_handoff(root, &id),
-        Command::SetStatus { root, id, status } => {
-            let store = Store::open(&effective_root(root)?)?;
-            store.set_status(&id, status)?;
-            println!("{id}: status → {status}");
-            Ok(())
-        }
+        Command::SetStatus { root, id, status } => run_set_status(root, &id, status),
         Command::Log { root, id, message } => {
             let store = Store::open(&effective_root(root)?)?;
             let path = store.append_log(&id, &message)?;
@@ -124,6 +119,7 @@ fn run(command: Command) -> Result<(), Error> {
         Command::Init { root } => run_init(root),
         Command::Config => run_config(),
         Command::Skill { action } => run_skill(action),
+        Command::Agent { action } => run_agent_service(action),
         Command::Update { version } => {
             let version = match version {
                 Some(version) => version,
@@ -600,6 +596,33 @@ fn install_version(version: update::Version) -> Result<(), Error> {
 
 /// `beagle skill`: report where each agent's copy of the skill stands, or
 /// write the bundled skill for each.
+fn run_set_status(root: Option<PathBuf>, id: &RcaId, status: Status) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    store.set_status(id, status)?;
+    println!("{id}: status → {status}");
+    Ok(())
+}
+
+fn run_agent_service(action: AgentAction) -> Result<(), Error> {
+    let outcome = match action {
+        AgentAction::Install => beagle::agentd::install(),
+        AgentAction::Uninstall => beagle::agentd::uninstall(),
+        AgentAction::Start => beagle::agentd::start(),
+        AgentAction::Stop => beagle::agentd::stop(),
+        AgentAction::Status => beagle::agentd::status(),
+    };
+    match outcome {
+        Ok(message) => {
+            println!("{message}");
+            Ok(())
+        }
+        Err(message) => Err(Error::Tool {
+            tool: "beagle agent",
+            message,
+        }),
+    }
+}
+
 fn run_skill(action: SkillAction) -> Result<(), Error> {
     let home = skill::home()?;
     match action {

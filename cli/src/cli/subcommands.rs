@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use beagle::model::{RcaId, Severity, Status};
 use beagle::update;
 
-use super::{take_value, Command, SkillAction};
+use super::{take_value, AgentAction, Command, SkillAction};
 
 pub(super) fn parse_skill(args: &mut impl Iterator<Item = String>) -> Result<Command, String> {
     let action = match args.next().as_deref() {
@@ -24,6 +24,33 @@ pub(super) fn parse_skill(args: &mut impl Iterator<Item = String>) -> Result<Com
         ));
     }
     Ok(Command::Skill { action })
+}
+
+pub(super) fn parse_agent(args: &mut impl Iterator<Item = String>) -> Result<Command, String> {
+    let action = match args.next().as_deref() {
+        Some("install") => AgentAction::Install,
+        Some("uninstall") => AgentAction::Uninstall,
+        Some("start") => AgentAction::Start,
+        Some("stop") => AgentAction::Stop,
+        Some("status") => AgentAction::Status,
+        None => {
+            return Err(
+                "`agent` requires a subcommand: install|uninstall|start|stop|status".to_string(),
+            )
+        }
+        Some(other) => {
+            return Err(format!(
+            "unknown `agent` subcommand `{other}` (expected install|uninstall|start|stop|status)"
+        ))
+        }
+    };
+    if let Some(extra) = args.next() {
+        return Err(format!(
+            "`agent {}` takes no further arguments (got `{extra}`)",
+            action.as_str()
+        ));
+    }
+    Ok(Command::Agent { action })
 }
 
 pub(super) fn parse_update(args: &mut impl Iterator<Item = String>) -> Result<Command, String> {
