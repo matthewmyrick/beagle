@@ -12,6 +12,7 @@
 //! [`beagle-agentd`]: https://github.com/matthewmyrick/beagle
 
 pub mod config;
+pub mod poller;
 pub mod runner;
 pub mod store;
 pub mod worktree;
