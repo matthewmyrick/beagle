@@ -5,13 +5,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 
-import { DiagramView } from "./components/DiagramView";
+import { AgentsView } from "./components/AgentsView";
 import { FinderOverlay } from "./components/FinderOverlay";
 import { HelpOverlay } from "./components/HelpOverlay";
-import { IncidentHeader } from "./components/IncidentHeader";
-import { SectionView } from "./components/SectionView";
+import { RcaContent } from "./components/RcaContent";
 import { Sidebar } from "./components/Sidebar";
-import { TabBar } from "./components/TabBar";
 import { useActions } from "./hooks/useActions";
 import { useIncidents } from "./hooks/useIncidents";
 import { useKeybindings } from "./hooks/useKeybindings";
@@ -19,7 +17,6 @@ import { usePrStates } from "./hooks/usePrStates";
 import { useTheme } from "./hooks/useTheme";
 import { filterWorkspaces } from "./lib/filter";
 import type { CorpusLine } from "./lib/finder";
-import { DIAGRAMS_TAB } from "./lib/sections";
 import "./App.css";
 
 export default function App(): JSX.Element {
@@ -29,6 +26,7 @@ export default function App(): JSX.Element {
   const [showArchived, setShowArchived] = useState(false);
   const [helpVisible, setHelpVisible] = useState(false);
   const [finderVisible, setFinderVisible] = useState(false);
+  const [showAgents, setShowAgents] = useState(false);
   const filterRef = useRef<HTMLInputElement | null>(null);
 
   const { listing } = incidents;
@@ -75,6 +73,17 @@ export default function App(): JSX.Element {
 
   const { selected } = incidents;
   const prStates = usePrStates(selected?.prs ?? []);
+  const openAgents = (): void => {
+    setShowAgents(true);
+  };
+  const closeAgents = (): void => {
+    setShowAgents(false);
+  };
+
+  if (showAgents) {
+    return <AgentsView onBack={closeAgents} />;
+  }
+
   return (
     <main className="app">
       <Sidebar
@@ -88,39 +97,15 @@ export default function App(): JSX.Element {
         onShowArchived={() => {
           setShowArchived(true);
         }}
+        onOpenAgents={openAgents}
       />
-      <section className="content">
-        {incidents.error !== null ? (
-          <div className="error-banner">{incidents.error}</div>
-        ) : null}
-        <IncidentHeader
-          selected={selected}
-          prStates={prStates}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onArchiveDone={incidents.reload}
-          onError={incidents.onError}
-        />
-        {selected !== null ? (
-          <>
-            <TabBar activeFile={incidents.activeFile} onSelect={incidents.selectTab} />
-            {incidents.activeFile === DIAGRAMS_TAB.file ? (
-              <DiagramView id={selected.id} onError={incidents.onError} />
-            ) : (
-              <SectionView
-                content={incidents.content}
-                loading={incidents.loading}
-                file={incidents.activeFile}
-              />
-            )}
-          </>
-        ) : (
-          <div className="section-hint">
-            No RCA workspaces under {incidents.listing?.root ?? "the current directory"} —
-            create one with `beagle new`.
-          </div>
-        )}
-      </section>
+      <RcaContent
+        incidents={incidents}
+        selected={selected}
+        prStates={prStates}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
       {helpVisible ? (
         <HelpOverlay
           onClose={() => {
