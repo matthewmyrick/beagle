@@ -62,6 +62,8 @@ USAGE:
                                             toolbox.md + systems/ templates
     beagle config                         edit the config file and validate it
     beagle skill [status|install]         show or install the /beagle skill
+    beagle agent <install|uninstall|start|stop|status>
+                                          manage the beagle-agentd daemon
                                             for Claude Code and Codex
     beagle update [--version <ver>]       install the latest release, or move
                                             to <ver> (upgrade or downgrade)
@@ -81,6 +83,35 @@ pub enum SkillAction {
     Status,
     /// Write the bundled skill for each agent.
     Install,
+}
+
+/// What `beagle agent` should do to the `beagle-agentd` daemon service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentAction {
+    /// Install and load the OS service (launchd on macOS).
+    Install,
+    /// Unload and remove the OS service.
+    Uninstall,
+    /// (Re)start the loaded service.
+    Start,
+    /// Stop the service.
+    Stop,
+    /// Query the running daemon's status over its control socket.
+    Status,
+}
+
+impl AgentAction {
+    /// The subcommand word, for error messages.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Install => "install",
+            Self::Uninstall => "uninstall",
+            Self::Start => "start",
+            Self::Stop => "stop",
+            Self::Status => "status",
+        }
+    }
 }
 
 /// A fully parsed invocation. Parsing happens once, here at the boundary;
@@ -222,6 +253,12 @@ pub enum Command {
         /// What to do: report status or install.
         action: SkillAction,
     },
+    /// `beagle agent`: install/uninstall/start/stop the daemon service, or
+    /// query its status.
+    Agent {
+        /// What to do to the daemon service.
+        action: AgentAction,
+    },
     /// `beagle update`: install a release over the running binary.
     Update {
         /// Target version (`--version`); latest when absent.
@@ -282,6 +319,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
         }
         Some("config") => no_arguments(&mut args, "config", Command::Config),
         Some("skill") => subcommands::parse_skill(&mut args),
+        Some("agent") => subcommands::parse_agent(&mut args),
         Some("update") => subcommands::parse_update(&mut args),
         Some("version") => match args.next().as_deref() {
             None => Ok(Command::Version),

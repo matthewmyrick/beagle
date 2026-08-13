@@ -8,6 +8,35 @@ fn parse(argv: &[&str]) -> Result<Command, String> {
 }
 
 #[test]
+fn agent_parses_each_action() {
+    assert!(matches!(
+        parse(&["agent", "install"]),
+        Ok(Command::Agent {
+            action: AgentAction::Install
+        })
+    ));
+    assert!(matches!(
+        parse(&["agent", "status"]),
+        Ok(Command::Agent {
+            action: AgentAction::Status
+        })
+    ));
+    assert!(matches!(
+        parse(&["agent", "uninstall"]),
+        Ok(Command::Agent {
+            action: AgentAction::Uninstall
+        })
+    ));
+}
+
+#[test]
+fn agent_requires_and_validates_the_action() {
+    assert!(parse(&["agent"]).is_err());
+    assert!(parse(&["agent", "bogus"]).is_err());
+    assert!(parse(&["agent", "status", "extra"]).is_err());
+}
+
+#[test]
 fn bare_invocation_is_tui_with_no_explicit_root() {
     assert!(matches!(parse(&[]), Ok(Command::Tui { root: None })));
     assert!(matches!(

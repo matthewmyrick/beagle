@@ -18,6 +18,7 @@
 //! releases) sit beside `ui` at the top of the stack; both depend only on
 //! `error`.
 
+pub mod agentd;
 pub mod ansi;
 pub mod banner;
 pub mod clipboard;
