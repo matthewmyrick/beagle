@@ -32,3 +32,28 @@ export interface Listing {
   broken: Broken[];
   warnings: string[];
 }
+
+// The agents control surface. Mirrors desktop/src-tauri/src/agents.rs.
+
+/** One agent's status. */
+export interface AgentStatus {
+  id: string;
+  enabled: boolean;
+  running: boolean;
+  last_tick: string | null;
+  active_sessions: number;
+  last_results: string[];
+}
+
+/** A snapshot of the whole beagle-agentd daemon. */
+export interface AgentsStatus {
+  version: string;
+  agents: AgentStatus[];
+}
+
+/** The `agents-status` event payload: a snapshot, or an offline reason. */
+export interface AgentsEvent {
+  connected: boolean;
+  status?: AgentsStatus;
+  error?: string;
+}

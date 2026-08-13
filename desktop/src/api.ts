@@ -3,10 +3,11 @@
 // so the IPC surface stays greppable in one file.
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 import type { CorpusLine } from "./lib/finder";
-import type { Listing } from "./types";
+import type { AgentsEvent, AgentsStatus, Listing } from "./types";
 
 /** Active + archived workspaces plus load problems, sidebar-sorted. */
 export async function listWorkspaces(): Promise<Listing> {
@@ -59,4 +60,38 @@ export async function prStates(urls: string[]): Promise<Record<string, string>> 
 /** Opens a URL in the system browser. */
 export async function openInBrowser(url: string): Promise<void> {
   return openUrl(url);
+}
+
+// The beagle-agentd control surface.
+
+/** One-shot daemon status snapshot; throws when the daemon isn't reachable. */
+export async function agentsStatus(): Promise<AgentsStatus> {
+  return invoke<AgentsStatus>("agents_status");
+}
+
+/** Resumes ticking an agent. */
+export async function startAgent(id: string): Promise<void> {
+  await invoke("start_agent", { id });
+}
+
+/** Pauses an agent. */
+export async function stopAgent(id: string): Promise<void> {
+  await invoke("stop_agent", { id });
+}
+
+/** Asks the daemon to re-read its config. */
+export async function reloadAgentsConfig(): Promise<void> {
+  await invoke("reload_agents_config");
+}
+
+/**
+ * Subscribes to live daemon status pushes. The callback fires on every update
+ * (and on disconnect, with `connected: false`). Returns an unlisten function.
+ */
+export async function onAgentsStatus(
+  handler: (event: AgentsEvent) => void,
+): Promise<() => void> {
+  return listen<AgentsEvent>("agents-status", (event) => {
+    handler(event.payload);
+  });
 }
