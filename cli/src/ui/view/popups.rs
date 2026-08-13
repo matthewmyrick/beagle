@@ -650,6 +650,7 @@ const HELP_ROWS: &[(&str, &str)] = &[
     ("!", "view load errors / warnings (broken workspaces)"),
     ("D", "delete the selected incident (y/n confirm popup)"),
     ("S", "settings: view + edit the config file"),
+    ("A", "agents: switch to the agents monitor (A / esc back)"),
     ("n / p", "next / previous diagram"),
     ("h / l, ← / →", "pan diagrams horizontally"),
     ("space / pgdn / pgup", "page through content"),

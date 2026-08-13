@@ -9,6 +9,43 @@ use crate::ui::ViewportInfo;
 use super::*;
 
 #[test]
+fn shift_a_toggles_the_agents_screen() {
+    let mut app = app_with(1);
+    assert_eq!(app.screen(), Screen::Rcas);
+    press(&mut app, KeyCode::Char('A'));
+    assert_eq!(app.screen(), Screen::Agents);
+    // `A` toggles back...
+    press(&mut app, KeyCode::Char('A'));
+    assert_eq!(app.screen(), Screen::Rcas);
+    // ...and so does Esc from the agents screen.
+    press(&mut app, KeyCode::Char('A'));
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(app.screen(), Screen::Rcas);
+}
+
+#[test]
+fn agents_screen_leaves_rca_state_untouched() {
+    let mut app = app_with(3);
+    let focus_before = app.focus();
+    let tab_before = app.tab();
+    press(&mut app, KeyCode::Char('A'));
+    press(&mut app, KeyCode::Char('A'));
+    assert_eq!(app.focus(), focus_before);
+    assert_eq!(app.tab(), tab_before);
+}
+
+#[test]
+fn agents_screen_ignores_rca_keys_but_still_quits() {
+    let mut app = app_with(1);
+    press(&mut app, KeyCode::Char('A'));
+    // A normal RCA key is a no-op here and the screen stays put.
+    assert_eq!(press(&mut app, KeyCode::Char('j')), Flow::Continue);
+    assert_eq!(app.screen(), Screen::Agents);
+    // Shift-Q still quits.
+    assert_eq!(press(&mut app, KeyCode::Char('Q')), Flow::Quit);
+}
+
+#[test]
 fn only_shift_q_and_ctrl_c_quit() {
     let mut app = app_with(1);
     assert_eq!(
