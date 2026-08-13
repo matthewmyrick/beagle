@@ -1,0 +1,13 @@
+[package]
+name = "beagle-agent"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.79"
+description = "Engine for beagle's native agent runtime: config, state, poller, worktree, runner, and IPC."
+license = "MIT"
+repository = "https://github.com/matthewmyrick/beagle"
+
+[dependencies]
+
+[lints]
+workspace = true

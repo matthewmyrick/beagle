@@ -8,12 +8,11 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-# The Rust CLI/TUI lives under cli/ (the repo is heading toward a
-# cli/ + web/ + desktop/ monorepo — see #41); every cargo invocation
-# runs there.
-defaults:
-  run:
-    working-directory: cli
+# The Rust crates live in a Cargo workspace at the repo root: `cli` (the
+# `beagle` domain layer + TUI) plus the native agent runtime `beagle-agent`
+# and `beagle-agentd` (epic #137). Every cargo invocation runs at the root
+# and covers the whole workspace. (`desktop/src-tauri` is excluded from the
+# workspace and checked separately in desktop.yml.)
 
 jobs:
   check:
@@ -24,15 +23,13 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: cli
       - name: Format
         run: cargo fmt --all -- --check
       - name: Lint (pedantic, zero warnings)
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
-        run: cargo test
+        run: cargo test --workspace
       - name: Docs build cleanly
-        run: cargo doc --no-deps
+        run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
