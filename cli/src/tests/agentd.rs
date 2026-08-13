@@ -27,6 +27,18 @@ fn plist_has_label_program_and_keepalive() {
 }
 
 #[test]
+fn unit_has_execstart_and_restart() {
+    let unit = render_unit(&PathBuf::from("/usr/local/bin/beagle-agentd"));
+    assert!(unit.contains("ExecStart=/usr/local/bin/beagle-agentd"));
+    assert!(unit.contains("Restart=always"));
+    // Starts on login.
+    assert!(unit.contains("WantedBy=default.target"));
+    assert!(unit.starts_with("[Unit]"));
+    assert!(unit.contains("[Service]"));
+    assert!(unit.contains("[Install]"));
+}
+
+#[test]
 fn format_status_summarizes_agents() {
     let line = r#"{"type":"status","status":{"version":"0.1.0","agents":[
         {"id":"rca","enabled":true,"running":true,"last_tick":"1723550400","active_sessions":0,"last_results":[]},
