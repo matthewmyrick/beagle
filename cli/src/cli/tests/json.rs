@@ -18,6 +18,7 @@ fn summary(id: &str, archived: bool) -> RcaSummary {
             systems: vec!["payments-api".to_owned(), "redis-sessions".to_owned()],
             tags: Vec::new(),
             prs: vec!["https://github.com/acme/infra/pull/4212".to_owned()],
+            tickets: Vec::new(),
             published: false,
             published_at: None,
         },

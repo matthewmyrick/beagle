@@ -41,7 +41,7 @@ impl App {
         } else {
             KeyCode::Down
         };
-        if self.pr_prompt.is_some() {
+        if self.attach_prompt.is_some() {
             return; // typing a URL — the wheel must not touch the list
         }
         if self.confirm_delete.is_some() {
@@ -115,7 +115,7 @@ impl App {
             || self.confirm_delete.is_some()
             || self.status_picker.is_some()
             || self.tags_editor.is_some()
-            || self.pr_prompt.is_some()
+            || self.attach_prompt.is_some()
         {
             return;
         }

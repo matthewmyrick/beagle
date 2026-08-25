@@ -438,10 +438,10 @@ pub(super) fn draw_tags_editor(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, rect, &mut state);
 }
 
-/// The `P` attach-PR prompt: an input box for a PR URL to attach to the
-/// selected incident.
-pub(super) fn draw_pr_prompt(frame: &mut Frame, app: &App, area: Rect) {
-    let Some(prompt) = app.pr_prompt() else {
+/// The `P`/`I` attach prompt: an input box for a PR URL or a ticket
+/// reference to attach to the selected incident.
+pub(super) fn draw_attach_prompt(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(prompt) = app.attach_prompt() else {
         return;
     };
     let width = area.width.saturating_sub(6).clamp(40, 96);
@@ -456,7 +456,7 @@ pub(super) fn draw_pr_prompt(frame: &mut Frame, app: &App, area: Rect) {
         .centered(),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  PR URL: ", Style::default().fg(Color::Yellow)),
+            Span::styled(prompt.kind.label(), Style::default().fg(Color::Yellow)),
             Span::raw(format!("{}▌", prompt.input)),
         ]),
     ];
@@ -467,7 +467,7 @@ pub(super) fn draw_pr_prompt(frame: &mut Frame, app: &App, area: Rect) {
     let rect = center(area, width, height);
 
     let block = Block::default()
-        .title(" attach a PR ")
+        .title(prompt.kind.title())
         .title_alignment(Alignment::Center)
         .title_bottom(Line::from(" enter attach · esc cancel ").centered())
         .borders(Borders::ALL)
@@ -646,6 +646,7 @@ const HELP_ROWS: &[(&str, &str)] = &[
     ("V", "sign off final-review as verified \u{2192} finished"),
     ("t", "set status: pick the RCA's lifecycle stage"),
     ("P", "attach a PR to this incident (paste the URL)"),
+    ("I", "attach a ticket (Linear / GitHub issue URL or id)"),
     ("#", "edit tags: add / remove, incl. skip-final-review"),
     ("!", "view load errors / warnings (broken workspaces)"),
     ("D", "delete the selected incident (y/n confirm popup)"),

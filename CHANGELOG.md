@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Tracking tickets**: attach a Linear or GitHub issue to an RCA with
+  `beagle ticket add <slug> <ref>` (URL or `ABC-123` id), or `I` in the
+  TUI. `beagle ticket list` shows them; a new `tickets` field holds them
+  in `rca.toml`.
+- **`beagle ticket sync [<slug>]`**: polls each attached ticket for its
+  linked PRs and auto-attaches any new ones to the RCA's `prs`
+  (idempotent — already-attached PRs are ignored), so the existing PR
+  indicator and merge-based lifecycle auto-advance light up. Access per
+  platform is config-driven: `[tickets.github]` / `[tickets.linear]` with
+  `mode = "cli"` (shell out to `gh` / `curl`) or `"api"` (HTTP with a
+  `token`). No new dependency — it shells out and parses with the
+  existing JSON support (#134-adjacent).
+
 ## [0.27.0] - 2026-08-07
 
 ### Added

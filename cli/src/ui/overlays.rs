@@ -35,15 +35,45 @@ pub(crate) struct RelatedItem {
     pub shared: String,
 }
 
-/// State of the `P` attach-PR prompt: the workspace the URL will be
-/// attached to, and the URL being typed. Pinned by id at open time.
+/// What an [`AttachPrompt`] attaches on enter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AttachKind {
+    /// A remediation PR (`P`).
+    Pr,
+    /// A tracking ticket (`I`).
+    Ticket,
+}
+
+impl AttachKind {
+    /// Prompt title.
+    pub(crate) fn title(self) -> &'static str {
+        match self {
+            Self::Pr => " attach a PR ",
+            Self::Ticket => " attach a ticket ",
+        }
+    }
+
+    /// Input-field label.
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Pr => "  PR URL: ",
+            Self::Ticket => "  ticket: ",
+        }
+    }
+}
+
+/// State of the `P`/`I` attach prompt: the workspace the reference will be
+/// attached to, what kind it is, and the text being typed. Pinned by id at
+/// open time.
 #[derive(Debug)]
-pub(crate) struct PrPrompt {
-    /// The workspace the PR attaches to.
+pub(crate) struct AttachPrompt {
+    /// What enter attaches.
+    pub kind: AttachKind,
+    /// The workspace the reference attaches to.
     pub id: RcaId,
     /// Its title, for the prompt header.
     pub title: String,
-    /// The URL being typed.
+    /// The URL/reference being typed.
     pub input: String,
 }
 
@@ -369,55 +399,66 @@ impl App {
         self.tags_editor.as_ref()
     }
 
-    /// Opens the `P` attach-PR prompt for the selected incident.
-    pub(crate) fn open_pr_prompt(&mut self) {
+    /// Opens the `P` (PR) or `I` (ticket) attach prompt for the selected
+    /// incident.
+    pub(crate) fn open_attach_prompt(&mut self, kind: AttachKind) {
         let Some(rca) = self.selected_rca() else {
-            self.status = Some("no incident selected — nothing to attach a PR to".to_owned());
+            self.status = Some("no incident selected — nothing to attach to".to_owned());
             return;
         };
-        self.pr_prompt = Some(PrPrompt {
+        self.attach_prompt = Some(AttachPrompt {
+            kind,
             id: rca.id.clone(),
             title: rca.meta.title.clone(),
             input: String::new(),
         });
     }
 
-    /// Keystrokes while the attach-PR prompt is open: type the URL, enter
-    /// attaches it (validated, idempotent — same as `beagle pr add`), esc
-    /// cancels. An invalid URL keeps the prompt open so it can be fixed.
-    pub(crate) fn handle_pr_prompt_key(&mut self, code: KeyCode) {
+    /// Keystrokes while the attach prompt is open: type the reference,
+    /// enter attaches it (validated, idempotent — the same `add_pr` /
+    /// `add_ticket` the CLI uses), esc cancels. An invalid reference keeps
+    /// the prompt open so it can be fixed.
+    pub(crate) fn handle_attach_prompt_key(&mut self, code: KeyCode) {
         match code {
-            KeyCode::Esc => self.pr_prompt = None,
+            KeyCode::Esc => self.attach_prompt = None,
             KeyCode::Backspace => {
-                if let Some(prompt) = self.pr_prompt.as_mut() {
+                if let Some(prompt) = self.attach_prompt.as_mut() {
                     prompt.input.pop();
                 }
             }
             KeyCode::Char(c) => {
-                if let Some(prompt) = self.pr_prompt.as_mut() {
+                if let Some(prompt) = self.attach_prompt.as_mut() {
                     prompt.input.push(c);
                 }
             }
             KeyCode::Enter => {
-                let Some(prompt) = self.pr_prompt.as_ref() else {
+                let Some(prompt) = self.attach_prompt.as_ref() else {
                     return;
                 };
-                let (id, url) = (prompt.id.clone(), prompt.input.trim().to_owned());
-                if url.is_empty() {
-                    self.pr_prompt = None;
+                let (kind, id, reference) = (
+                    prompt.kind,
+                    prompt.id.clone(),
+                    prompt.input.trim().to_owned(),
+                );
+                if reference.is_empty() {
+                    self.attach_prompt = None;
                     return;
                 }
-                match self.store.add_pr(&id, &url) {
+                let result = match kind {
+                    AttachKind::Pr => self.store.add_pr(&id, &reference),
+                    AttachKind::Ticket => self.store.add_ticket(&id, &reference),
+                };
+                match result {
                     Ok(true) => {
-                        self.pr_prompt = None;
+                        self.attach_prompt = None;
                         let _ = self.reload();
-                        self.status = Some(format!("attached {url} to {id}"));
+                        self.status = Some(format!("attached {reference} to {id}"));
                     }
                     Ok(false) => {
-                        self.pr_prompt = None;
-                        self.status = Some(format!("{url} is already attached"));
+                        self.attach_prompt = None;
+                        self.status = Some(format!("{reference} is already attached"));
                     }
-                    // Keep the prompt open so a bad URL can be corrected.
+                    // Keep the prompt open so a bad reference can be fixed.
                     Err(e) => self.status = Some(format!("{e}")),
                 }
             }
@@ -425,9 +466,9 @@ impl App {
         }
     }
 
-    /// The attach-PR prompt, when open.
-    pub(crate) fn pr_prompt(&self) -> Option<&PrPrompt> {
-        self.pr_prompt.as_ref()
+    /// The attach prompt, when open.
+    pub(crate) fn attach_prompt(&self) -> Option<&AttachPrompt> {
+        self.attach_prompt.as_ref()
     }
 
     /// Opens the `D` delete confirmation for the selected incident. The

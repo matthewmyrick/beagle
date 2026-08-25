@@ -47,6 +47,11 @@ USAGE:
                   [--root <dir>]            workspace's log.md (the Log tab)
     beagle pr add <id> <url>              attach a remediation PR to the RCA;
                   [--root <dir>]            the TUI tracks merge status via gh
+    beagle ticket add <id> <ref>          attach a Linear/GitHub issue
+                  [--root <dir>]            (URL or ABC-123 id)
+    beagle ticket list <id> [--root ..]   print attached tickets
+    beagle ticket sync [<id>] [--root ..] poll tickets, attach their PRs
+                                            (omit <id> to sync all)
     beagle pr list <id> [--root <dir>]    print attached PRs (live state
                                             included when gh is available)
     beagle similar <id> [--root <dir>]    print past RCAs related to this one
@@ -216,6 +221,30 @@ pub enum Command {
         /// The workspace slug.
         id: RcaId,
     },
+    /// `beagle ticket add`: attach a tracking ticket (Linear / GitHub).
+    TicketAdd {
+        /// Explicit `--root`, if given.
+        root: Option<PathBuf>,
+        /// The workspace slug.
+        id: RcaId,
+        /// The ticket URL or id.
+        reference: String,
+    },
+    /// `beagle ticket list`: print attached tickets.
+    TicketList {
+        /// Explicit `--root`, if given.
+        root: Option<PathBuf>,
+        /// The workspace slug.
+        id: RcaId,
+    },
+    /// `beagle ticket sync`: poll attached tickets and attach their
+    /// linked PRs. `id` is `None` to sync every workspace.
+    TicketSync {
+        /// Explicit `--root`, if given.
+        root: Option<PathBuf>,
+        /// The workspace slug, or `None` for all.
+        id: Option<RcaId>,
+    },
     /// `beagle similar`: print related workspaces, ranked.
     Similar {
         /// Explicit `--root`, if given.
@@ -309,6 +338,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, String>
         Some("status") => subcommands::parse_status(&mut args, root),
         Some("log") => subcommands::parse_log(&mut args, root),
         Some("pr") => subcommands::parse_pr(&mut args, root),
+        Some("ticket") => subcommands::parse_ticket(&mut args, root),
         Some("similar") => subcommands::parse_similar(&mut args, root),
         Some("context") => subcommands::parse_context(&mut args, root),
         Some("export") => subcommands::parse_export(&mut args, root),

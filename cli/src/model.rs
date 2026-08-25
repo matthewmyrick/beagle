@@ -247,6 +247,12 @@ pub struct RcaMeta {
     /// available. Omitted from the manifest while empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub prs: Vec<String>,
+    /// Tracking tickets for this incident, as URLs (Linear issues or
+    /// GitHub issues). Attach with `beagle ticket add`; `beagle ticket
+    /// sync` polls them and auto-attaches their linked PRs to `prs`.
+    /// Omitted from the manifest while empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tickets: Vec<String>,
     /// Whether this incident is published to the public web app. Opt-in
     /// per incident (`beagle publish`); the static site only includes
     /// flagged RCAs, and only their client-safe sections. Defaults to
@@ -273,6 +279,51 @@ pub const SKIP_FINAL_REVIEW_TAG: &str = "skip-final-review";
 /// Tag marking a security-relevant incident. The `s` filter facet narrows
 /// to workspaces carrying it.
 pub const SECURITY_TAG: &str = "security";
+
+/// A ticket-tracking platform beagle can attach and sync.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TicketPlatform {
+    /// A GitHub issue (`github.com/<owner>/<repo>/issues/<n>`).
+    GitHub,
+    /// A Linear issue (`linear.app/...` or a bare `ABC-123` id).
+    Linear,
+}
+
+impl TicketPlatform {
+    /// Classifies a ticket URL/id by platform. `None` when it matches
+    /// neither — the shape a `beagle ticket add` should reject.
+    #[must_use]
+    pub fn of(reference: &str) -> Option<Self> {
+        let r = reference.trim();
+        if r.contains("linear.app/") {
+            return Some(Self::Linear);
+        }
+        if r.contains("github.com/") && r.contains("/issues/") {
+            return Some(Self::GitHub);
+        }
+        // A bare Linear id like `ENG-123` (letters, dash, digits).
+        let mut parts = r.splitn(2, '-');
+        if let (Some(team), Some(num)) = (parts.next(), parts.next()) {
+            if !team.is_empty()
+                && team.chars().all(|c| c.is_ascii_alphabetic())
+                && !num.is_empty()
+                && num.chars().all(|c| c.is_ascii_digit())
+            {
+                return Some(Self::Linear);
+            }
+        }
+        None
+    }
+
+    /// Human-readable name.
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::GitHub => "github",
+            Self::Linear => "linear",
+        }
+    }
+}
 
 impl RcaMeta {
     /// Whether the [`SKIP_FINAL_REVIEW_TAG`] is set — merged fix PRs then

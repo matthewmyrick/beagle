@@ -34,6 +34,7 @@ pub mod prs;
 pub mod similar;
 pub mod skill;
 pub mod store;
+pub mod tickets;
 pub mod ui;
 pub mod update;
 

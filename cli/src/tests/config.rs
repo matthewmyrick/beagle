@@ -82,6 +82,7 @@ fn config_editor_wins_over_fallback() {
         notify: None,
         notify_events: None,
         handoff: None,
+        tickets: None,
     };
     assert_eq!(editor(Some(&config)), "hx");
 }

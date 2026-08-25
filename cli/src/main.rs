@@ -105,16 +105,15 @@ fn run(command: Command) -> Result<(), Error> {
             println!("logged to {}", path.display());
             Ok(())
         }
-        Command::PrAdd { root, id, url } => {
-            let store = Store::open(&effective_root(root)?)?;
-            if store.add_pr(&id, &url)? {
-                println!("attached {url} to {id}");
-            } else {
-                println!("{url} is already attached to {id}");
-            }
-            Ok(())
-        }
+        Command::PrAdd { root, id, url } => run_pr_add(root, &id, &url),
         Command::PrList { root, id } => run_pr_list(root, &id),
+        Command::TicketAdd {
+            root,
+            id,
+            reference,
+        } => run_ticket_add(root, &id, &reference),
+        Command::TicketList { root, id } => run_ticket_list(root, &id),
+        Command::TicketSync { root, id } => run_ticket_sync(root, id.as_ref()),
         Command::Similar { root, id } => run_similar(root, &id),
         Command::Init { root } => run_init(root),
         Command::Config => run_config(),
@@ -391,6 +390,86 @@ fn expand_tilde(path: &std::path::Path) -> PathBuf {
 }
 
 /// `beagle pr list`: attached PRs, with live state when `gh` works.
+/// `beagle pr add <id> <url>`: attach a remediation PR.
+fn run_pr_add(root: Option<PathBuf>, id: &RcaId, url: &str) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    if store.add_pr(id, url)? {
+        println!("attached {url} to {id}");
+    } else {
+        println!("{url} is already attached to {id}");
+    }
+    Ok(())
+}
+
+/// `beagle ticket add <id> <ref>`: attach a Linear/GitHub issue.
+fn run_ticket_add(root: Option<PathBuf>, id: &RcaId, reference: &str) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    if store.add_ticket(id, reference)? {
+        println!("attached {reference} to {id}");
+    } else {
+        println!("{reference} is already attached to {id}");
+    }
+    Ok(())
+}
+
+/// `beagle ticket list <id>`: the attached tickets, one per line.
+fn run_ticket_list(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    let tickets = store.read_meta(id)?.tickets;
+    if tickets.is_empty() {
+        println!("no tickets attached to {id} (use `beagle ticket add {id} <ref>`)");
+    } else {
+        for t in tickets {
+            println!("{t}");
+        }
+    }
+    Ok(())
+}
+
+/// `beagle ticket sync [<id>]`: for each attached ticket, discover its
+/// linked PRs and attach any new ones to the RCA (idempotent). With no id,
+/// syncs every workspace. Per-ticket failures are reported but don't abort
+/// the run.
+fn run_ticket_sync(root: Option<PathBuf>, id: Option<&RcaId>) -> Result<(), Error> {
+    let store = Store::open(&effective_root(root)?)?;
+    let tickets_cfg = effective_config()?.and_then(|c| c.tickets);
+    let ids: Vec<RcaId> = match id {
+        Some(id) => vec![id.clone()],
+        None => store
+            .list_all()?
+            .summaries
+            .into_iter()
+            .map(|s| s.id)
+            .collect(),
+    };
+    let mut attached = 0usize;
+    for id in &ids {
+        let meta = store.read_meta(id)?;
+        for ticket in &meta.tickets {
+            match beagle::tickets::linked_prs(ticket, tickets_cfg.as_ref()) {
+                Ok(prs) => {
+                    for pr in prs {
+                        match store.add_pr(id, &pr) {
+                            Ok(true) => {
+                                println!("{id}: attached {pr} (from {ticket})");
+                                attached += 1;
+                            }
+                            Ok(false) => {} // already attached — ignore
+                            Err(e) => eprintln!("{id}: could not attach {pr}: {e}"),
+                        }
+                    }
+                }
+                Err(e) => eprintln!("{id}: {ticket}: {e}"),
+            }
+        }
+    }
+    println!(
+        "done — {attached} PR(s) newly attached across {} workspace(s)",
+        ids.len()
+    );
+    Ok(())
+}
+
 fn run_pr_list(root: Option<PathBuf>, id: &RcaId) -> Result<(), Error> {
     let store = Store::open(&effective_root(root)?)?;
     let meta = store.read_meta(id)?;

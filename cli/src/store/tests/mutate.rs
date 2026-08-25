@@ -351,3 +351,34 @@ fn set_tags_trims_dedupes_and_drops_empties() {
     );
     assert!(meta.updated.is_some(), "updated stamped");
 }
+
+#[test]
+fn add_ticket_validates_and_is_idempotent() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(tmp.path()).expect("open store");
+    let id = test_id("ticketed");
+    store
+        .scaffold(&id, &test_meta("Ticketed", Severity::Low))
+        .expect("scaffold");
+
+    assert!(store
+        .add_ticket(&id, "https://linear.app/acme/issue/ENG-1/x")
+        .expect("add"));
+    // Idempotent: re-adding is a no-op.
+    assert!(!store
+        .add_ticket(&id, "https://linear.app/acme/issue/ENG-1/x")
+        .expect("re-add"));
+    assert!(store
+        .add_ticket(&id, "https://github.com/o/r/issues/5")
+        .expect("gh issue"));
+    // A non-ticket reference is rejected.
+    assert!(store.add_ticket(&id, "https://example.com/x").is_err());
+
+    assert_eq!(
+        store.read_meta(&id).expect("meta").tickets,
+        vec![
+            "https://linear.app/acme/issue/ENG-1/x".to_owned(),
+            "https://github.com/o/r/issues/5".to_owned()
+        ]
+    );
+}
