@@ -3,6 +3,8 @@
 #![allow(clippy::expect_used)] // panicking is the correct failure mode in tests
 
 use std::os::unix::fs::PermissionsExt as _;
+// Needed on older toolchains; newer stable flags them unused (see runner.rs).
+#[allow(unused_imports)]
 use std::os::unix::process::{CommandExt as _, ExitStatusExt as _};
 use std::process::Command;
 use std::time::{Duration, Instant};
