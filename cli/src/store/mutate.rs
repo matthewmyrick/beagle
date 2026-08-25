@@ -265,6 +265,34 @@ impl Store {
         Ok(dir)
     }
 
+    /// Attaches a tracking ticket URL/id (Linear or GitHub issue) to the
+    /// workspace manifest, stamping `updated`. Idempotent: re-attaching an
+    /// existing ticket is a no-op and returns `false`.
+    ///
+    /// # Errors
+    /// Rejects references that are neither a Linear nor a GitHub issue;
+    /// otherwise fails as manifest read/write does.
+    pub fn add_ticket(&self, id: &RcaId, reference: &str) -> Result<bool> {
+        let reference = reference.trim();
+        if crate::model::TicketPlatform::of(reference).is_none() {
+            return Err(Error::Tool {
+                tool: "ticket",
+                message: format!(
+                    "`{reference}` is not a Linear or GitHub issue (URL or `ABC-123` id)"
+                ),
+            });
+        }
+        let mut meta = self.read_meta(id)?;
+        if meta.tickets.iter().any(|existing| existing == reference) {
+            return Ok(false);
+        }
+        meta.tickets.push(reference.to_owned());
+        meta.updated = Some(OffsetDateTime::now_utc());
+        let manifest = toml::to_string_pretty(&meta)?;
+        write_atomic(&self.workspace_dir(id).join(MANIFEST_FILE), &manifest)?;
+        Ok(true)
+    }
+
     /// Publishes or unpublishes an incident: sets the `published` flag and,
     /// when publishing, stamps `published_at` with the current time (clears
     /// it when unpublishing). Stamps `updated` too. Returns the resulting
@@ -300,6 +328,7 @@ pub fn new_meta(title: String, severity: Severity) -> RcaMeta {
         systems: Vec::new(),
         tags: Vec::new(),
         prs: Vec::new(),
+        tickets: Vec::new(),
         published: false,
         published_at: None,
     }

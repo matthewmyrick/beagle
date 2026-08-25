@@ -13,6 +13,11 @@
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io;
+// `process_group` / `signal` need these unix ext traits on the repo's
+// older toolchains; newer stable exposes the methods without them and
+// flags the imports as unused. Keep them and allow the lint across
+// versions.
+#[allow(unused_imports)]
 use std::os::unix::process::{CommandExt as _, ExitStatusExt as _};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};

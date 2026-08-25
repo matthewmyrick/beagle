@@ -60,6 +60,16 @@ pub const TEMPLATE: &str = "\
 # command = [\"codex\", \"exec\"]      # or [\"claude\", \"-p\"], or any argv
 # prompt = \"~/.config/beagle/handoff-prompt.md\"
 
+# Ticket platforms (`beagle ticket sync`): how beagle finds the PRs
+# linked to an attached Linear / GitHub issue. Per platform, mode is
+# \"cli\" (shell out to `gh` / `linear`, no key) or \"api\" (HTTP with a
+# token). Omit a platform to default it to cli.
+# [tickets.github]
+# mode = \"cli\"                 # or \"api\" with token = \"ghp_...\"
+# [tickets.linear]
+# mode = \"api\"
+# token = \"lin_api_...\"
+
 # Per-project override: drop a `.beagle` file (same format as this file)
 # in a directory and beagle finds it git-style, walking up from wherever
 # it runs. Its fields win over this file; a relative `root` resolves
@@ -92,6 +102,47 @@ pub struct Config {
     /// The agent hand-off (`beagle handoff <slug>`): what to launch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff: Option<HandoffConfig>,
+    /// How beagle reaches GitHub / Linear to discover a ticket's linked
+    /// PRs (`beagle ticket sync`). Absent means "cli" for both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tickets: Option<TicketsConfig>,
+}
+
+/// Whether beagle talks to a ticket platform through its CLI or its API.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AccessMode {
+    /// Shell out to the platform CLI (`gh` for GitHub, `linear` for
+    /// Linear). No key needed; relies on the CLI being installed and
+    /// authenticated.
+    #[default]
+    Cli,
+    /// Call the platform's HTTP API directly, using `token`.
+    Api,
+}
+
+/// Per-platform access settings.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlatformConfig {
+    /// `cli` (default) or `api`.
+    #[serde(default)]
+    pub mode: AccessMode,
+    /// API token / key, used when `mode = "api"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+}
+
+/// How beagle reaches each ticket platform.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TicketsConfig {
+    /// GitHub access (issues + their linked PRs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github: Option<PlatformConfig>,
+    /// Linear access (issues + their linked PRs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub linear: Option<PlatformConfig>,
 }
 
 /// Per-event notification flags. Any omitted event defaults to off, so a
@@ -283,6 +334,7 @@ fn resolve_project(project_path: &Path, mut project: Config, global: Option<Conf
         project.notify = project.notify.or(global.notify);
         project.notify_events = project.notify_events.or(global.notify_events);
         project.handoff = project.handoff.or(global.handoff);
+        project.tickets = project.tickets.or(global.tickets);
     }
     project
 }

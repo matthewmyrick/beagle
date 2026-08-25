@@ -1044,13 +1044,13 @@ fn shift_p_attaches_a_pr_via_the_prompt() {
 
     // P opens the prompt; typing builds the URL.
     press(&mut app, KeyCode::Char('P'));
-    assert!(app.pr_prompt().is_some(), "prompt open");
+    assert!(app.attach_prompt().is_some(), "prompt open");
     for c in "https://github.com/o/r/pull/7".chars() {
         press(&mut app, KeyCode::Char(c));
     }
     press(&mut app, KeyCode::Enter);
 
-    assert!(app.pr_prompt().is_none(), "prompt closes on attach");
+    assert!(app.attach_prompt().is_none(), "prompt closes on attach");
     assert_eq!(
         app.store.read_meta(&id).expect("meta").prs,
         vec!["https://github.com/o/r/pull/7".to_owned()],
@@ -1065,9 +1065,36 @@ fn shift_p_attaches_a_pr_via_the_prompt() {
     }
     press(&mut app, KeyCode::Enter);
     assert!(
-        app.pr_prompt().is_some(),
+        app.attach_prompt().is_some(),
         "invalid URL keeps the prompt open"
     );
     press(&mut app, KeyCode::Esc);
-    assert!(app.pr_prompt().is_none(), "esc cancels");
+    assert!(app.attach_prompt().is_none(), "esc cancels");
+}
+
+#[test]
+fn shift_i_attaches_a_ticket_via_the_prompt() {
+    let mut app = app_with(1);
+    let id = app.selected_rca().expect("selected").id.clone();
+
+    press(&mut app, KeyCode::Char('I'));
+    assert!(app.attach_prompt().is_some(), "ticket prompt open");
+    for c in "https://linear.app/acme/issue/ENG-42/title".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+    assert!(app.attach_prompt().is_none(), "closes on attach");
+    assert_eq!(
+        app.store.read_meta(&id).expect("meta").tickets,
+        vec!["https://linear.app/acme/issue/ENG-42/title".to_owned()]
+    );
+
+    // A non-ticket reference keeps the prompt open (invalid).
+    press(&mut app, KeyCode::Char('I'));
+    for c in "just-text".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    press(&mut app, KeyCode::Enter);
+    assert!(app.attach_prompt().is_some(), "invalid ref stays open");
+    press(&mut app, KeyCode::Esc);
 }
