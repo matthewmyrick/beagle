@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-08-25
+
 ### Added
 
 - **Tracking tickets**: attach a Linear or GitHub issue to an RCA with
