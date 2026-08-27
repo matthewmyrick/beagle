@@ -67,8 +67,14 @@ pub const TEMPLATE: &str = "\
 # [tickets.github]
 # mode = \"cli\"                 # or \"api\" with token = \"ghp_...\"
 # [tickets.linear]
-# mode = \"api\"
-# token = \"lin_api_...\"
+# mode = \"cli\"                 # uses your `linear` CLI (v2.x). Default:
+#                               # linear issue view {id} --json --no-download
+#                               # --no-pager, scanned for linked PR URLs.
+# command = [\"linear\", \"issue\", \"view\", \"{id}\", \"--json\"]  # override if
+#                               # your CLI differs; {id} is the ticket id.
+# # or, API instead of the CLI:
+# # mode = \"api\"
+# # token = \"lin_api_...\"
 
 # Per-project override: drop a `.beagle` file (same format as this file)
 # in a directory and beagle finds it git-style, walking up from wherever
@@ -131,6 +137,14 @@ pub struct PlatformConfig {
     /// API token / key, used when `mode = "api"`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
+    /// The CLI command to run in `cli` mode, as argv with a `{id}`
+    /// placeholder for the ticket id (e.g.
+    /// `["linear", "issue", "view", "{id}", "--json"]`). Its output is
+    /// scanned for linked PR URLs, so any format works. Optional — each
+    /// platform has a sensible default (`gh` for GitHub, `linear` for
+    /// Linear).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub command: Vec<String>,
 }
 
 /// How beagle reaches each ticket platform.

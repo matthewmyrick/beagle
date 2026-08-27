@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Linear ticket sync now works through the **`linear` CLI** (`mode =
+  "cli"`), not just the API: beagle runs `linear issue view {id} --json`
+  (overridable via a `command` argv in `[tickets.linear]`) and scans the
+  output for linked PR URLs — shape-agnostic, so any CLI/format works.
+  The `/beagle` skill now tells agents to attach a ticket with
+  `beagle ticket add` and sync it.
+
 ## [0.28.0] - 2026-08-25
 
 ### Added

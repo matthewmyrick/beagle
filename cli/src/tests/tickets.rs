@@ -49,17 +49,26 @@ fn linear_id_from_url_or_bare() {
 }
 
 #[test]
-fn linear_attachments_keep_only_pr_links() {
+fn scan_pr_urls_finds_pr_links_in_any_output() {
+    // Works on the Linear API's JSON…
     let json = r#"{"data":{"issue":{"attachments":{"nodes":[
       {"url":"https://github.com/a/b/pull/5"},
       {"url":"https://docs.example.com/spec"},
       {"url":"https://gitlab.com/a/b/-/merge_requests/3"}
     ]}}}}"#;
     assert_eq!(
-        linear_attachment_prs(json),
+        scan_pr_urls(json),
         vec![
             "https://github.com/a/b/pull/5".to_owned(),
             "https://gitlab.com/a/b/-/merge_requests/3".to_owned()
         ]
+    );
+
+    // …and on a CLI's free-text/JSON output, de-duplicating.
+    let cli = "Attachments:\n  - https://github.com/a/b/pull/9 (PR)\n  \
+               - https://github.com/a/b/pull/9 (dup)\n  - https://linear.app/x/issue/ENG-1";
+    assert_eq!(
+        scan_pr_urls(cli),
+        vec!["https://github.com/a/b/pull/9".to_owned()]
     );
 }
