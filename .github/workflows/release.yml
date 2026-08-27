@@ -72,13 +72,15 @@ jobs:
       - name: Package
         # Asset names are version-less so
         # `releases/latest/download/beagle-<target>.tar.gz` always works.
-        # Runs at the repo root: the binary comes from cli/target, the
-        # docs from the root — the asset layout is unchanged, which the
-        # self-updater (`beagle update`) depends on.
+        # Runs at the repo root. Since the crate joined the Cargo
+        # workspace, `cargo build` (even from cli/) outputs to the
+        # workspace-root `target/`, not `cli/target/`. Docs come from the
+        # root — the asset layout is unchanged, which the self-updater
+        # (`beagle update`) depends on.
         run: |
           name="beagle-${{ matrix.target }}"
           mkdir "$name"
-          cp "cli/target/${{ matrix.target }}/release/beagle" "$name/"
+          cp "target/${{ matrix.target }}/release/beagle" "$name/"
           cp README.md LICENSE CHANGELOG.md "$name/"
           tar czf "$name.tar.gz" "$name"
           shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
