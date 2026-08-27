@@ -151,68 +151,83 @@ fn is_linear_id(s: &str) -> bool {
             && num.chars().all(|c| c.is_ascii_digit()))
 }
 
-/// Collects PR URLs from a Linear GraphQL `issue.attachments` response:
-/// attachment URLs that point at a GitHub (or GitLab) pull/merge request.
+/// Every PR/merge-request URL found anywhere in `text` — a shape-agnostic
+/// scan that works on any CLI's output (JSON or plain), so beagle doesn't
+/// need to know each Linear CLI's schema. De-duplicated, order preserved.
 #[must_use]
-pub fn linear_attachment_prs(json: &str) -> Vec<String> {
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
-        return Vec::new();
-    };
-    let nodes = value
-        .get("data")
-        .and_then(|d| d.get("issue"))
-        .and_then(|i| i.get("attachments"))
-        .and_then(|a| a.get("nodes"));
+pub fn scan_pr_urls(text: &str) -> Vec<String> {
     let mut prs = Vec::new();
-    for node in nodes
-        .and_then(serde_json::Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        if let Some(url) = node.get("url").and_then(serde_json::Value::as_str) {
-            if url.contains("/pull/") || url.contains("/merge_requests/") {
-                let url = url.to_owned();
-                if !prs.contains(&url) {
-                    prs.push(url);
-                }
-            }
+    for url in crate::links::extract_urls(text) {
+        if (url.contains("/pull/") || url.contains("/merge_requests/")) && !prs.contains(&url) {
+            prs.push(url);
         }
     }
     prs
 }
 
+/// The default Linear CLI invocation (the `linear` CLI, v2.x), as argv
+/// with a `{id}` placeholder. `--no-download` keeps attachment URLs as
+/// remote links (so PR URLs survive) and `--no-pager` keeps it
+/// non-interactive.
+const LINEAR_CLI_DEFAULT: &[&str] = &[
+    "linear",
+    "issue",
+    "view",
+    "{id}",
+    "--json",
+    "--no-download",
+    "--no-pager",
+];
+
 fn linear_linked_prs(reference: &str, cfg: PlatformConfig) -> Result<Vec<String>> {
     let id = linear_issue_id(reference)
         .ok_or_else(|| tool_err(format!("could not read a Linear id from `{reference}`")))?;
-    let query = format!(
-        r#"{{"query":"query {{ issue(id: \"{id}\") {{ attachments {{ nodes {{ url }} }} }} }}"}}"#
-    );
-    let token = match cfg.mode {
-        AccessMode::Api => cfg
-            .token
-            .ok_or_else(|| tool_err("linear api mode needs a `token` in [tickets.linear]"))?,
-        // The Linear CLI has no stable JSON contract for linked PRs; the
-        // API path is the supported one. A key is still required.
-        AccessMode::Cli => cfg.token.ok_or_else(|| {
-            tool_err("linear needs `mode = \"api\"` and a `token` in [tickets.linear]")
-        })?,
-    };
-    let json = run(
-        "curl",
-        &[
-            "-sS",
-            "-X",
-            "POST",
-            "https://api.linear.app/graphql",
-            "-H",
-            &format!("Authorization: {token}"),
-            "-H",
-            "Content-Type: application/json",
-            "-d",
-            &query,
-        ],
-    )?;
-    Ok(linear_attachment_prs(&json))
+    match cfg.mode {
+        AccessMode::Cli => {
+            // Run the configured CLI (or the default `linear` invocation)
+            // with `{id}` substituted, then scan its output for PR links —
+            // no dependency on the CLI's exact JSON shape.
+            let argv: Vec<String> = if cfg.command.is_empty() {
+                LINEAR_CLI_DEFAULT.iter().map(|s| (*s).to_owned()).collect()
+            } else {
+                cfg.command
+            };
+            let filled: Vec<String> = argv.iter().map(|a| a.replace("{id}", &id)).collect();
+            let (program, rest) = filled
+                .split_first()
+                .ok_or_else(|| tool_err("empty `command` in [tickets.linear]"))?;
+            let out = run(
+                program,
+                &rest.iter().map(String::as_str).collect::<Vec<_>>(),
+            )?;
+            Ok(scan_pr_urls(&out))
+        }
+        AccessMode::Api => {
+            let token = cfg
+                .token
+                .ok_or_else(|| tool_err("linear api mode needs a `token` in [tickets.linear]"))?;
+            let query = format!(
+                r#"{{"query":"query {{ issue(id: \"{id}\") {{ attachments {{ nodes {{ url }} }} }} }}"}}"#
+            );
+            let json = run(
+                "curl",
+                &[
+                    "-sS",
+                    "-X",
+                    "POST",
+                    "https://api.linear.app/graphql",
+                    "-H",
+                    &format!("Authorization: {token}"),
+                    "-H",
+                    "Content-Type: application/json",
+                    "-d",
+                    &query,
+                ],
+            )?;
+            // The API returns attachment URLs; the same scan finds the PRs.
+            Ok(scan_pr_urls(&json))
+        }
+    }
 }
 
 // ---- shell --------------------------------------------------------------

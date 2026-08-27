@@ -150,6 +150,11 @@ Edit `rca.toml` as the investigation progresses:
   (via `gh`) — the TUI in the header, the desktop app as clickable chips —
   and the merge of every attached PR is what advances the lifecycle.
   Attach every fix PR you open or find.
+- **When the incident has a tracking ticket** (a Linear issue or a GitHub
+  issue), attach it: `beagle ticket add <slug> <ref>` (the issue URL or a
+  bare `ABC-123` id). Then `beagle ticket sync <slug>` polls the ticket
+  and auto-attaches its linked PRs to `prs` for you — so you don't have to
+  hunt the PRs down by hand. Attach the ticket as soon as you know it.
 
 ## After sign-off: archiving
 
