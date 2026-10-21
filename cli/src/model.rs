@@ -141,6 +141,8 @@ impl fmt::Display for Severity {
 pub enum Status {
     /// Actively debugging; root cause unknown.
     Investigating,
+    /// Root cause found; the fix is actively being written.
+    Fixing,
     /// Root cause found; the fix (usually a PR) is out for review.
     #[serde(alias = "identified")]
     Review,
@@ -159,8 +161,9 @@ pub enum Status {
 
 impl Status {
     /// Every status, most active first.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Investigating,
+        Self::Fixing,
         Self::Review,
         Self::Agent,
         Self::FinalReview,
@@ -172,6 +175,7 @@ impl Status {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Investigating => "investigating",
+            Self::Fixing => "fixing",
             Self::Review => "review",
             Self::Agent => "agent",
             Self::FinalReview => "final-review",
@@ -183,7 +187,7 @@ impl Status {
     /// input for compatibility.
     fn legacy_alias(self) -> Option<&'static str> {
         match self {
-            Self::Investigating | Self::Agent => None,
+            Self::Investigating | Self::Fixing | Self::Agent => None,
             Self::Review => Some("identified"),
             Self::FinalReview => Some("monitoring"),
             Self::Finished => Some("resolved"),
@@ -200,7 +204,7 @@ impl FromStr for Status {
             .find(|st| st.as_str() == s || st.legacy_alias() == Some(s))
             .ok_or_else(|| {
                 format!(
-                    "unknown status `{s}` (expected one of: investigating, review, \
+                    "unknown status `{s}` (expected one of: investigating, fixing, review, \
                      agent, final-review, finished)"
                 )
             })

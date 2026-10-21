@@ -169,7 +169,7 @@ pub(super) fn header_paragraph(
         format!("{symbol} {}", rca.meta.status),
         symbol_style,
     )];
-    if rca.meta.status == Status::Investigating {
+    if matches!(rca.meta.status, Status::Investigating | Status::Fixing) {
         // Ticking "how long has this been open" — the redraw cadence that
         // drives the spinner keeps this current too.
         let elapsed = elapsed_label(rca.meta.created, time::OffsetDateTime::now_utc());

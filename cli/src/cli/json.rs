@@ -23,7 +23,7 @@ struct ListEntry<'a> {
     title: &'a str,
     /// `critical` | `high` | `medium` | `low` | `info`.
     severity: Severity,
-    /// `investigating` | `review` | `agent` | `final-review` | `finished`.
+    /// `investigating` | `fixing` | `review` | `agent` | `final-review` | `finished`.
     status: Status,
     /// When the investigation was opened, RFC 3339.
     #[serde(with = "time::serde::rfc3339")]

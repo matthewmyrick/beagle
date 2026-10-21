@@ -90,7 +90,7 @@ impl App {
             }
             self.ensure_pane();
             // The loop turns at least every 250 ms (the poll timeout below),
-            // so bumping the counter here animates the investigating spinner
+            // so bumping the counter here animates the investigating/fixing spinner
             // at ~4 fps without any extra wakeups.
             self.tick = self.tick.wrapping_add(1);
             terminal.draw(|frame| view::draw(frame, &mut self))?;
@@ -219,6 +219,7 @@ impl App {
         let e = &self.notify_events;
         match status {
             Status::Investigating => e.investigating,
+            Status::Fixing => e.fixing,
             Status::Review => e.review,
             Status::Agent => e.agent,
             Status::FinalReview => e.final_review,

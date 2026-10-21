@@ -14,6 +14,7 @@
   --error-bg: #4a1f24;
   --error-fg: #ffb3b3;
   --done: #6fbf73;
+  --fixing: #ff8c2e;
 }
 
 :root[data-theme="light"] {
@@ -30,6 +31,7 @@
   --error-bg: #fbe3e3;
   --error-fg: #a03030;
   --done: #2f7d34;
+  --fixing: #c25e00;
 }
 
 * {
@@ -136,6 +138,11 @@ body {
   display: inline-block;
   animation: pulse 1.6s ease-in-out infinite;
   color: var(--accent);
+}
+
+/* Same pulse as investigating, in orange: root cause found, fix underway. */
+.status-glyph.pulse.fixing {
+  color: var(--fixing);
 }
 
 @keyframes pulse {

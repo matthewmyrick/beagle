@@ -17,6 +17,7 @@ describe("severityColor", () => {
 describe("statusGlyph", () => {
   it("maps every lifecycle status", () => {
     expect(statusGlyph("investigating")).toBe("●");
+    expect(statusGlyph("fixing")).toBe("●");
     expect(statusGlyph("review")).toBe("◐");
     expect(statusGlyph("final-review")).toBe("◑");
     expect(statusGlyph("finished")).toBe("✔");

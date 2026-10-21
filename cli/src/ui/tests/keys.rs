@@ -735,16 +735,16 @@ fn t_opens_the_status_picker_and_enter_applies_the_stage() {
     assert_eq!(picker.current, Status::Investigating);
     assert_eq!(picker.selected, 0, "current stage highlighted");
 
-    // Move to `review` and apply; the manifest write reloads the list.
+    // Move to `fixing` and apply; the manifest write reloads the list.
     press(&mut app, KeyCode::Char('j'));
     press(&mut app, KeyCode::Enter);
     assert!(app.status_picker.is_none());
     assert_eq!(
         app.selected_rca().expect("selected").meta.status,
-        Status::Review
+        Status::Fixing
     );
     assert!(
-        app.status_line().is_some_and(|s| s.contains("review")),
+        app.status_line().is_some_and(|s| s.contains("fixing")),
         "status announces the change"
     );
 }

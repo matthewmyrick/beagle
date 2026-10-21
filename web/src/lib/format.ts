@@ -3,7 +3,8 @@
 // neutral rather than throwing.
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
-export type Status = "investigating" | "review" | "agent" | "final-review" | "finished";
+export type Status =
+  "investigating" | "fixing" | "review" | "agent" | "final-review" | "finished";
 
 const SEVERITY_COLORS: Readonly<Record<Severity, string>> = {
   critical: "#e5484d",

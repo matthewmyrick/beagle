@@ -37,7 +37,8 @@ Final Review · Diagrams · Notes · Log**. The Log tab is the live investigatio
 agent appends a timestamped line at every step (`beagle log <slug> "..."`),
 and `f` (follow mode) keeps the tab pinned to the newest line, tail-f style.
 Tabs whose files changed since you last looked get a `●` marker, workspaces
-in `investigating` status show a live spinner, ticking elapsed time, and a
+in `investigating` status show a live spinner (red; `fixing` shows the same
+spinner in orange), ticking elapsed time, and a
 liveness read — `active 2m ago`, turning yellow (`quiet 12m`) when the agent
 has gone silent — and
 new workspaces announce themselves in the status bar as agents scaffold them.
@@ -159,7 +160,7 @@ with `beagle skill status`.
 Keys: `j/k` navigate · `enter` open · `b` back to the list · `←/→` / `tab` /
 `1`–`9` switch tabs · `/` search the incident (all tabs, `n`/`N` between
 hits) · `\` find everywhere (fuzzy across every incident, tab, and line —
-enter jumps straight there) · `f` filter the list (i/r/a/v/f status ·
+enter jumps straight there) · `f` filter the list (i/x/r/a/v/f status ·
 c/h/m/l severity · `/` free text,
 stacking + toggling) · `F` follow (tail -f) · `s` collapse/expand the
 sidebar · `a` show/hide archived · `T` toolbox ·
@@ -177,10 +178,10 @@ Remediation lands as pull requests, and a merged PR isn't a verified fix.
 The lifecycle follows the fix all the way:
 
 ```text
-investigating ──▶ review ──▶ agent ──▶ final-review ──▶ finished
-   (digging)   (fix reviewed) (an agent  (PR merged —      (verified,
-                               polls +    verify it!)       signed off)
-                               remediates)
+investigating ──▶ fixing ──▶ review ──▶ agent ──▶ final-review ──▶ finished
+   (digging)    (root cause  (fix reviewed) (an agent  (PR merged —      (verified,
+                 found;                     polls +    verify it!)       signed off)
+                 writing fix)               remediates)
 ```
 
 `agent` is an optional hand-off: an automated agent polls
@@ -253,7 +254,7 @@ rcas/
 ```toml
 title = "Payments API p99 latency 40x regression"
 severity = "high"          # critical | high | medium | low | info
-status = "review"          # investigating | review | agent | final-review | finished
+status = "review"          # investigating | fixing | review | agent | final-review | finished
 created = "2026-07-05T14:32:00Z"   # RFC 3339, quoted
 systems = ["payments-api", "redis-sessions"]
 tags = ["latency"]
