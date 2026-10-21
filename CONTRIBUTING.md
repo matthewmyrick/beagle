@@ -98,17 +98,23 @@ tight — this is a tool people install with `cargo install`.
 
 ## Releasing (maintainers)
 
-Releases are cut from `main` by pushing a version tag; CI does the rest
-(`.github/workflows/release.yml` re-runs the full gate, cross-builds macOS
-arm64/x86_64 and Linux x86_64-musl binaries, and publishes them with sha256
-checksums to a GitHub Release).
+CLI releases are label-driven (`.github/workflows/auto-release.yml`):
 
-1. Bump `version` in `Cargo.toml` and move the `[Unreleased]` notes in
-   `CHANGELOG.md` under the new version heading.
-2. Commit: `chore(release): vX.Y.Z`.
-3. Tag and push: `git tag vX.Y.Z && git push origin main vX.Y.Z`.
+1. In the PR, bump `version` in `cli/Cargo.toml` (run `cargo check` so
+   `Cargo.lock` follows) and move the `[Unreleased]` notes in
+   `CHANGELOG.md` under a `## [X.Y.Z] - YYYY-MM-DD` heading.
+2. Label the PR with exactly one of `patch`, `minor`, or `major`. The
+   `validate` check fails unless the new version is the latest `v*` tag
+   bumped by that label and the CHANGELOG heading exists. An unlabeled PR
+   must leave the version alone, and merging it releases nothing.
+3. Merge. The workflow tags the merge commit `vX.Y.Z` and runs
+   `release.yml`, which re-runs the full gate, cross-builds macOS
+   arm64/x86_64 and Linux x86_64-musl binaries, and publishes them with
+   sha256 checksums to a GitHub Release.
 
-The workflow refuses to publish if the tag doesn't match `Cargo.toml`'s
+The bump rides in the PR because main only accepts PRs, so the workflow
+never commits. Pushing a `vX.Y.Z` tag by hand still works as a fallback.
+`release.yml` refuses to publish if the tag doesn't match `Cargo.toml`'s
 version, so a mismatched bump fails loudly instead of shipping a lie.
 
 ## Reporting bugs
