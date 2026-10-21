@@ -61,7 +61,10 @@ prompt = "/p.txt"
     // Omitted fields fall back to their defaults.
     let minimal = &config.agents[1];
     assert!(minimal.enabled);
-    assert!(minimal.allowed_tools.is_empty());
+    assert!(
+        minimal.allowed_tools.is_empty(),
+        "no tools allowed by default"
+    );
     assert_eq!(minimal.poll_interval, Duration::from_secs(60));
     assert_eq!(minimal.max_concurrent, 2);
 }

@@ -52,7 +52,10 @@ fn toolbox_and_system_docs_read_back() {
     let store = Store::open(tmp.path()).expect("open store");
 
     assert_eq!(store.read_toolbox().expect("absent ok"), None);
-    assert!(store.list_system_docs().expect("missing dir ok").is_empty());
+    assert!(
+        store.list_system_docs().expect("missing dir ok").is_empty(),
+        "no systems/ dir yet"
+    );
 
     store.init_context().expect("init");
     let toolbox = store.read_toolbox().expect("read").expect("present");

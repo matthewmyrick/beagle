@@ -102,8 +102,8 @@ fn manifest_parses_minimal_and_defaults_lists() {
     "#;
     let meta: RcaMeta = toml::from_str(toml_src).expect("minimal manifest parses");
     assert_eq!(meta.severity, Severity::High);
-    assert!(meta.systems.is_empty());
-    assert!(meta.tags.is_empty());
+    assert!(meta.systems.is_empty(), "systems default empty");
+    assert!(meta.tags.is_empty(), "tags default empty");
     assert!(meta.updated.is_none());
 }
 

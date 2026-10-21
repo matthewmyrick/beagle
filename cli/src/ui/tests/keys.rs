@@ -393,7 +393,7 @@ fn f_filter_narrows_the_list_and_esc_peels() {
 
     press(&mut app, KeyCode::Esc);
     assert!(!app.search_active());
-    assert!(app.filter().is_empty());
+    assert!(app.filter().is_empty(), "esc clears the text filter");
     assert_eq!(app.visible_len(), 3, "second esc restores the full list");
 }
 
@@ -815,7 +815,10 @@ fn hash_opens_the_tags_editor_and_edits_write_through() {
     // `d` on the tag deletes it from disk too.
     press(&mut app, KeyCode::Char('k'));
     press(&mut app, KeyCode::Char('d'));
-    assert!(app.store.read_meta(&id).expect("meta").tags.is_empty());
+    assert!(
+        app.store.read_meta(&id).expect("meta").tags.is_empty(),
+        "tag removed"
+    );
 
     // Esc closes; nothing selected on an empty store just reports.
     press(&mut app, KeyCode::Esc);

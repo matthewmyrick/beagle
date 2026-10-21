@@ -35,7 +35,10 @@ fn github_timeline_extracts_cross_referenced_prs() {
         github_timeline_prs(json),
         vec!["https://github.com/a/b/pull/10".to_owned()]
     );
-    assert!(github_timeline_prs("not json").is_empty());
+    assert!(
+        github_timeline_prs("not json").is_empty(),
+        "bad json yields no PRs"
+    );
 }
 
 #[test]

@@ -12,7 +12,7 @@ fn backslash_opens_quiet_and_fills_as_you_type() {
     let mut app = app_with(2);
     press(&mut app, KeyCode::Char('\\'));
     let finder = app.finder().expect("finder open");
-    assert!(finder.query.is_empty());
+    assert!(finder.query.is_empty(), "opens with an empty query");
     assert!(
         finder.matches.is_empty(),
         "an empty query matches nothing — the popup opens quiet"
@@ -26,7 +26,7 @@ fn backslash_opens_quiet_and_fills_as_you_type() {
     // Title entries exist in the corpus: a global jump-to. Which workspace
     // ranks first is scoring's business; assert shape on the top hit.
     let first = finder.entry(0).expect("entry");
-    assert!(!first.text.is_empty());
+    assert!(!first.text.is_empty(), "matches carry their line text");
     assert!(first.id.as_str().starts_with("rca-"));
 
     press(&mut app, KeyCode::Esc);

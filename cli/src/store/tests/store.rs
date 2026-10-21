@@ -81,7 +81,7 @@ fn unknown_status_lists_as_broken_and_beagle_status_repairs_it() {
     .expect("write");
 
     let listing = store.list().expect("list");
-    assert!(listing.summaries.is_empty());
+    assert!(listing.summaries.is_empty(), "nothing loads cleanly");
     assert_eq!(listing.broken.len(), 1, "visible as broken, not dropped");
 
     // `beagle status` can now repair exactly this: the bad value is what
@@ -93,7 +93,10 @@ fn unknown_status_lists_as_broken_and_beagle_status_repairs_it() {
     assert_eq!(meta.title, "Relapse", "everything else preserved");
     let listing = store.list().expect("list");
     assert_eq!(listing.summaries.len(), 1, "workspace is back");
-    assert!(listing.broken.is_empty());
+    assert!(
+        listing.broken.is_empty(),
+        "repaired workspace is no longer broken"
+    );
 
     // Corruption beyond the status is still not repairable.
     fs::write(&manifest, "title = unclosed").expect("corrupt");
@@ -165,7 +168,10 @@ fn diagrams_list_sorted_and_missing_dir_is_empty() {
 
     let no_dir = test_id("nodir");
     fs::create_dir_all(store.workspace_dir(&no_dir)).expect("mkdir");
-    assert!(store.list_diagrams(&no_dir).expect("empty").is_empty());
+    assert!(
+        store.list_diagrams(&no_dir).expect("empty").is_empty(),
+        "missing diagrams/ lists nothing"
+    );
 }
 
 #[test]

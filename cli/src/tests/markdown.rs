@@ -95,7 +95,7 @@ fn blockquote_and_rule_render() {
 
 #[test]
 fn empty_input_is_empty_output() {
-    assert!(to_text("").lines.is_empty());
+    assert!(to_text("").lines.is_empty(), "empty input renders nothing");
 }
 
 #[test]

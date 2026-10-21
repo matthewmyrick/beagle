@@ -300,7 +300,10 @@ fn delete_removes_active_and_archived_workspaces_permanently() {
         .expect("scaffold");
     let dir = store.delete(&active).expect("delete active");
     assert!(!dir.exists(), "directory gone: {dir:?}");
-    assert!(store.list_all().expect("list").summaries.is_empty());
+    assert!(
+        store.list_all().expect("list").summaries.is_empty(),
+        "workspace deleted"
+    );
 
     // Archived workspaces delete from rcas/archive/ transparently.
     let archived = test_id("old-news");

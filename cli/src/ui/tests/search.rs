@@ -15,7 +15,10 @@ fn match_lines_are_case_insensitive_and_empty_query_matches_nothing() {
     let text = Text::from("Redis pool exhausted\nall fine\nREDIS timeouts\n");
     assert_eq!(find_match_lines(&text, "redis"), [0, 2]);
     assert_eq!(find_match_lines(&text, "Fine"), [1]);
-    assert!(find_match_lines(&text, "grafana").is_empty());
+    assert!(
+        find_match_lines(&text, "grafana").is_empty(),
+        "absent term matches nothing"
+    );
     assert!(
         find_match_lines(&text, "").is_empty(),
         "empty query highlights nothing, not everything"
