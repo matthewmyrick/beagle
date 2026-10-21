@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-21
+
 ### Added
 
 - **`fixing` status** between `investigating` and `review`: root cause
