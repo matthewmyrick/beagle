@@ -10,10 +10,15 @@ use crate::model::{Severity, Status};
 /// Width of the incident list on the left.
 pub(super) const SIDEBAR_WIDTH: u16 = 34;
 
-/// Spinner frames for [`Status::Investigating`], advanced by the app tick.
+/// Spinner frames for [`Status::Investigating`] and [`Status::Fixing`],
+/// advanced by the app tick.
 /// Braille dots: distinct at 4 fps and exactly one cell wide, so the sidebar
 /// and header never shift as it animates.
 const INVESTIGATING_FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+/// Orange for [`Status::Fixing`]. The 16-color palette has no orange, so
+/// this is xterm-256 index 208 — near-universally supported.
+const FIXING_ORANGE: Color = Color::Indexed(208);
 
 pub(super) fn severity_badge(severity: Severity) -> (&'static str, Style) {
     let bold = Modifier::BOLD;
@@ -56,14 +61,19 @@ pub(super) fn severity_badge(severity: Severity) -> (&'static str, Style) {
     }
 }
 
-/// The one-cell status marker. `investigating` animates — a live spinner is
-/// the "we're on it" signal — driven by `tick`; every other status is a
-/// fixed glyph, so `tick` is ignored for them.
+/// The one-cell status marker. `investigating` and `fixing` animate — a live
+/// spinner is the "we're on it" signal — driven by `tick`, told apart by
+/// color (red = still debugging, orange = writing the fix); every other
+/// status is a fixed glyph, so `tick` is ignored for them.
 pub(super) fn status_symbol(status: Status, tick: usize) -> (&'static str, Style) {
     match status {
         Status::Investigating => (
             INVESTIGATING_FRAMES[tick % INVESTIGATING_FRAMES.len()],
             Style::default().fg(Color::LightRed),
+        ),
+        Status::Fixing => (
+            INVESTIGATING_FRAMES[tick % INVESTIGATING_FRAMES.len()],
+            Style::default().fg(FIXING_ORANGE),
         ),
         Status::Review => ("◐", Style::default().fg(Color::Yellow)),
         Status::Agent => ("⚙", Style::default().fg(Color::Magenta)),

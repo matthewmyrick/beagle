@@ -47,6 +47,7 @@ pub const TEMPLATE: &str = "\
 # [notify_events]
 # new_incident = true
 # investigating = true
+# fixing = true
 # review = false
 # agent = false
 # final_review = true
@@ -173,6 +174,9 @@ pub struct NotifyEvents {
     /// A workspace moved to `investigating`.
     #[serde(default)]
     pub investigating: bool,
+    /// A workspace moved to `fixing`.
+    #[serde(default)]
+    pub fixing: bool,
     /// A workspace moved to `review`.
     #[serde(default)]
     pub review: bool,
@@ -195,6 +199,7 @@ impl NotifyEvents {
         Self {
             new_incident: true,
             investigating: true,
+            fixing: true,
             review: true,
             agent: true,
             final_review: true,

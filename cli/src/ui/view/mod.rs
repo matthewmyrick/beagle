@@ -682,7 +682,7 @@ fn filter_prompt_line(app: &App) -> Line<'static> {
         ));
     } else {
         spans.push(Span::styled(
-            "   i/r/a/v/f status · c/h/m/l severity · p has-PR · s security · / type · esc clear",
+            "   i/x/r/a/v/f status · c/h/m/l severity · p has-PR · s security · / type · esc clear",
             Style::default().fg(Color::DarkGray),
         ));
     }

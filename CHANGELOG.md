@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`fixing` status** between `investigating` and `review`: root cause
+  found, fix being written. It shows the same animated spinner as
+  `investigating`, in orange (desktop: the same pulse, in orange), keeps the
+  elapsed/liveness read in the header, has its own `[notify_events]` flag
+  (`fixing`), and filters with `x` in the facet bar.
+
 ## [0.29.0] - 2026-08-27
 
 ### Added

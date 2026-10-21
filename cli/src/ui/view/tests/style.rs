@@ -11,7 +11,20 @@ fn investigating_symbol_animates_and_others_stay_fixed() {
     let (wrapped, _) = status_symbol(Status::Investigating, INVESTIGATING_FRAMES.len());
     assert_eq!(wrapped, frame0, "frames cycle");
 
-    for status in [Status::Review, Status::FinalReview, Status::Finished] {
+    let (fix0, fix_style) = status_symbol(Status::Fixing, 0);
+    let (fix1, _) = status_symbol(Status::Fixing, 1);
+    assert_ne!(fix0, fix1, "fixing must animate");
+    assert_eq!(fix0, frame0, "fixing reuses the investigating spinner");
+    let (_, inv_style) = status_symbol(Status::Investigating, 0);
+    assert_eq!(fix_style.fg, Some(FIXING_ORANGE), "fixing is orange");
+    assert_ne!(fix_style.fg, inv_style.fg, "fixing is told apart by color");
+
+    for status in [
+        Status::Review,
+        Status::Agent,
+        Status::FinalReview,
+        Status::Finished,
+    ] {
         let (a, _) = status_symbol(status, 0);
         let (b, _) = status_symbol(status, 7);
         assert_eq!(a, b, "{status} must not animate");

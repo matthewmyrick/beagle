@@ -72,6 +72,15 @@ fn pre_0_6_status_names_still_parse_but_are_never_written() {
 }
 
 #[test]
+fn fixing_round_trips_and_sorts_between_investigating_and_review() {
+    assert_eq!("fixing".parse::<Status>(), Ok(Status::Fixing));
+    assert_eq!(Status::Fixing.as_str(), "fixing");
+    let serialized = toml::Value::try_from(Status::Fixing).expect("serializes");
+    assert_eq!(serialized, toml::Value::String("fixing".to_owned()));
+    assert!(Status::Investigating < Status::Fixing && Status::Fixing < Status::Review);
+}
+
+#[test]
 fn manifest_rejects_unknown_fields() {
     let toml_src = r#"
         title = "t"
@@ -93,8 +102,8 @@ fn manifest_parses_minimal_and_defaults_lists() {
     "#;
     let meta: RcaMeta = toml::from_str(toml_src).expect("minimal manifest parses");
     assert_eq!(meta.severity, Severity::High);
-    assert!(meta.systems.is_empty());
-    assert!(meta.tags.is_empty());
+    assert!(meta.systems.is_empty(), "systems default empty");
+    assert!(meta.tags.is_empty(), "tags default empty");
     assert!(meta.updated.is_none());
 }
 
@@ -161,7 +170,7 @@ fn agent_status_sits_between_review_and_final_review() {
     use crate::model::Status;
     assert!(Status::Review < Status::Agent);
     assert!(Status::Agent < Status::FinalReview);
-    assert_eq!(Status::ALL[2], Status::Agent);
+    assert_eq!(Status::ALL[3], Status::Agent);
     assert_eq!(Status::Agent.as_str(), "agent");
     assert_eq!("agent".parse::<Status>().expect("parse"), Status::Agent);
 }

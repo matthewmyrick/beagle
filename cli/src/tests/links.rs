@@ -20,6 +20,9 @@ plus `https://github.com/org/repo/pull/7` — but not http:/broken.";
 
 #[test]
 fn bare_scheme_and_empty_text_yield_nothing() {
-    assert!(extract_urls("").is_empty());
-    assert!(extract_urls("https:// is not a url; httpx://nope").is_empty());
+    assert!(extract_urls("").is_empty(), "no text, no urls");
+    assert!(
+        extract_urls("https:// is not a url; httpx://nope").is_empty(),
+        "malformed urls are skipped"
+    );
 }

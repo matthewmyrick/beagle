@@ -60,7 +60,7 @@ fn reload_reports_status_transitions_observed_on_disk() {
     assert_eq!(title, "RCA 0");
     assert_eq!(*from, Status::Investigating);
     assert_eq!(*to, Status::Review);
-    assert!(delta.arrived.is_empty());
+    assert!(delta.arrived.is_empty(), "no new workspaces");
     assert!(app.reload().status_changes.is_empty(), "only reported once");
 }
 

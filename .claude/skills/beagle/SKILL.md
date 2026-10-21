@@ -125,7 +125,8 @@ Then the sections:
 
 Edit `rca.toml` as the investigation progresses:
 
-- `status`: `investigating` → `review` (fix reviewed) → `agent`
+- `status`: `investigating` → `fixing` (optional — root cause found,
+  fix being written; same spinner, in orange) → `review` (fix reviewed) → `agent`
   (optional — set it here and `beagle handoff <slug>` launches a
   configured agent to do remediation from a prompt; poll for work with
   `beagle list --status agent`) → `final-review` (beagle flips here

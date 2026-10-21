@@ -42,7 +42,7 @@ USAGE:
                                             reviewed RCA ([handoff] in config)
     beagle status <id> <status>           set a workspace's status; a running
                   [--root <dir>]            TUI picks the change up live
-                                            (investigating|review|final-review|finished)
+                                            (investigating|fixing|review|agent|final-review|finished)
     beagle log <id> <message...>          append a timestamped bullet to the
                   [--root <dir>]            workspace's log.md (the Log tab)
     beagle pr add <id> <url>              attach a remediation PR to the RCA;
