@@ -2,15 +2,25 @@ name: release
 
 # Pushing a tag like v0.1.0 runs the full CI gate, cross-builds release
 # binaries, and publishes them (with sha256 checksums) to a GitHub Release.
+# auto-release.yml also calls this directly after tagging a merged
+# `patch`/`minor`/`major` PR: a tag pushed with GITHUB_TOKEN can't trigger
+# workflows itself, so the tag arrives as an input instead.
 on:
   push:
     tags: ["v*"]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag, e.g. v0.31.0
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 env:
   CARGO_TERM_COLOR: always
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   gate:
@@ -20,6 +30,8 @@ jobs:
         working-directory: cli
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -34,7 +46,7 @@ jobs:
         run: cargo test
       - name: Tag must match Cargo.toml version
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${TAG#v}"
           version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
           if [ "$tag" != "$version" ]; then
             echo "::error::tag v$tag does not match cli/Cargo.toml version $version"
@@ -56,6 +68,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -87,6 +101,7 @@ jobs:
       - name: Publish to the GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
           files: |
             beagle-*.tar.gz
             beagle-*.tar.gz.sha256

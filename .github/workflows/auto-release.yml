@@ -1,0 +1,68 @@
+name: auto-release
+
+# Label-driven CLI releases. Put exactly one of `patch` / `minor` / `major`
+# on a PR and bump `cli/Cargo.toml` (+ the CHANGELOG heading) in that same
+# PR; merging it tags `v<version>` and publishes the release. No label, no
+# release.
+#
+# - `validate` runs on every PR: at most one release label, and the
+#   version in the PR must match the latest `v*` tag bumped by that label
+#   (or be unchanged when there's no label).
+# - `tag` + `release` run when a labeled PR merges into main. main only
+#   accepts PRs, so the bump has to ride in the PR — this job never commits.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Release label matches the version bump
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: .github/scripts/release-version.sh check
+
+  tag:
+    if: >-
+      github.event.action == 'closed' && github.event.pull_request.merged &&
+      (contains(github.event.pull_request.labels.*.name, 'patch') ||
+       contains(github.event.pull_request.labels.*.name, 'minor') ||
+       contains(github.event.pull_request.labels.*.name, 'major'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+      - name: Tag the merge commit
+        id: tag
+        run: |
+          tag="v$(.github/scripts/release-version.sh current)"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag already exists — did the PR bump cli/Cargo.toml?"
+            exit 1
+          fi
+          git tag "$tag"
+          git push origin "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: tag
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
