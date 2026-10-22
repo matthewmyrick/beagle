@@ -39,6 +39,29 @@ fn main() -> ExitCode {
     }
 }
 
+/// The TUI's config-driven settings, with defaults for anything unset.
+fn tui_settings(config: Option<config::Config>) -> ui::Settings {
+    let notify = config.as_ref().and_then(|c| c.notify).unwrap_or(false);
+    // A bad zone falls back to UTC with a status-line note rather than
+    // refusing to start.
+    let timezone = config
+        .as_ref()
+        .and_then(|c| c.timezone.as_deref())
+        .map_or_else(
+            || Ok(beagle::tz::TimeZone::utc()),
+            beagle::tz::TimeZone::parse,
+        );
+    // Absent `[notify_events]` means every event fires.
+    let notify_events = config
+        .and_then(|c| c.notify_events)
+        .unwrap_or_else(config::NotifyEvents::all);
+    ui::Settings {
+        notify,
+        notify_events,
+        timezone,
+    }
+}
+
 fn run(command: Command) -> Result<(), Error> {
     match command {
         Command::Help => {
@@ -53,15 +76,10 @@ fn run(command: Command) -> Result<(), Error> {
             );
             Ok(())
         }
-        Command::Tui { root } => {
-            let config = effective_config().ok().flatten();
-            let notify = config.as_ref().and_then(|c| c.notify).unwrap_or(false);
-            // Absent `[notify_events]` means every event fires.
-            let events = config
-                .and_then(|c| c.notify_events)
-                .unwrap_or_else(config::NotifyEvents::all);
-            ui::run(Store::open(&effective_root(root)?)?, notify, events)
-        }
+        Command::Tui { root } => ui::run(
+            Store::open(&effective_root(root)?)?,
+            tui_settings(effective_config().ok().flatten()),
+        ),
         Command::New {
             root,
             id,
@@ -596,6 +614,19 @@ fn run_config() -> Result<(), Error> {
             }
             if let Some(editor) = &config.editor {
                 println!("  editor = {editor}");
+            }
+            if let Some(zone) = &config.timezone {
+                match beagle::tz::TimeZone::parse(zone) {
+                    Ok(tz) => {
+                        let (now, abbr) = tz.localize(time::OffsetDateTime::now_utc());
+                        println!(
+                            "  timezone = {zone} (now {:02}:{:02} {abbr})",
+                            now.hour(),
+                            now.minute()
+                        );
+                    }
+                    Err(e) => eprintln!("⚠ {e}; the TUI will show UTC"),
+                }
             }
             Ok(())
         }

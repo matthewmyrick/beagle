@@ -38,6 +38,13 @@ pub const TEMPLATE: &str = "\
 # Falls back to $VISUAL, then $EDITOR, then vim.
 # editor = \"vim\"
 
+# Time zone for timestamps shown in the TUI (e.g. when an RCA was opened).
+# Files on disk stay UTC. An IANA name (America/New_York, America/Chicago,
+# America/Denver, America/Los_Angeles, Europe/London, Europe/Berlin), an
+# abbreviation (EST, PST, ... — DST-aware), UTC, or a POSIX rule
+# (EST5EDT,M3.2.0,M11.1.0). Default: UTC.
+# timezone = \"America/New_York\"
+
 # Desktop notifications while the TUI runs: new incidents and status
 # changes (osascript on macOS, notify-send on Linux). Off by default.
 # notify = true
@@ -96,6 +103,10 @@ pub struct Config {
     /// Editor command for `beagle config`, possibly with arguments.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editor: Option<String>,
+    /// Display time zone for TUI timestamps (see [`crate::tz::TimeZone::parse`]).
+    /// Absent means UTC; files on disk are always UTC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
     /// Desktop notifications from the TUI (new incidents, status changes).
     /// Off unless explicitly enabled. The master switch — see
     /// `notify_events` to pick which events fire.
@@ -350,6 +361,7 @@ fn resolve_project(project_path: &Path, mut project: Config, global: Option<Conf
     });
     if let Some(global) = global {
         project.editor = project.editor.or(global.editor);
+        project.timezone = project.timezone.or(global.timezone);
         project.notify = project.notify.or(global.notify);
         project.notify_events = project.notify_events.or(global.notify_events);
         project.handoff = project.handoff.or(global.handoff);

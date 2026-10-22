@@ -153,17 +153,18 @@ pub(super) fn header_paragraph(
     prs: &[(String, Option<crate::prs::PrState>)],
     activity: Option<std::time::Duration>,
     progress: Option<(usize, usize)>,
+    timezone: &crate::tz::TimeZone,
 ) -> Paragraph<'static> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
     let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
 
-    let opened = rca
-        .meta
-        .created
-        .format(format_description!(
-            "[year]-[month]-[day] [hour]:[minute] UTC"
-        ))
-        .unwrap_or_else(|_| rca.meta.created.to_string());
+    let (created, zone) = timezone.localize(rca.meta.created);
+    let opened = created
+        .format(format_description!("[year]-[month]-[day] [hour]:[minute]"))
+        .map_or_else(
+            |_| rca.meta.created.to_string(),
+            |at| format!("{at} {zone}"),
+        );
 
     let mut meta_spans = vec![Span::styled(
         format!("{symbol} {}", rca.meta.status),

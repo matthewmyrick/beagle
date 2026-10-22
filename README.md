@@ -135,6 +135,8 @@ notify = true              # desktop pings: new incidents, status changes
 final_review = true        # e.g. only ping me when a fix merges to verify
 investigating = true
 editor = "code -w"         # editor for `beagle config`
+timezone = "America/New_York"  # TUI timestamps (DST-aware; EST, PST, UTC,
+                               # Europe/London, or a POSIX rule). Files stay UTC.
 
 [handoff]                   # `beagle handoff <slug>`: the agent to launch
 command = ["codex", "exec"] # argv; the prompt + write-up go to its stdin

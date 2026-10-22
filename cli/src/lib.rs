@@ -35,6 +35,7 @@ pub mod similar;
 pub mod skill;
 pub mod store;
 pub mod tickets;
+pub mod tz;
 pub mod ui;
 pub mod update;
 
