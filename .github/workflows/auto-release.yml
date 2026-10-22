@@ -5,9 +5,11 @@ name: auto-release
 # PR; merging it tags `v<version>` and publishes the release. No label, no
 # release.
 #
-# - `validate` runs on every PR: at most one release label, and the
-#   version in the PR must match the latest `v*` tag bumped by that label
-#   (or be unchanged when there's no label).
+# - `validate` runs on every PR: at most one release label; a labeled PR
+#   must change application code (cli/src, cli/assets, the embedded skills,
+#   or dependencies — never docs/CI/tests alone); and the version in the PR
+#   must match the latest `v*` tag bumped by that label (or be unchanged
+#   when there's no label). See .github/scripts/release-version.sh.
 # - `tag` + `release` run when a labeled PR merges into main. main only
 #   accepts PRs, so the bump has to ride in the PR — this job never commits.
 on:
@@ -26,9 +28,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Release label matches the version bump
+      - name: Release label matches the changes and the version bump
         env:
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: .github/scripts/release-version.sh check
 
   tag:
@@ -49,7 +53,16 @@ jobs:
           fetch-depth: 0
       - name: Tag the merge commit
         id: tag
+        env:
+          BASE_SHA: ${{ github.event.pull_request.merge_commit_sha }}^1
+          HEAD_SHA: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
+          # Belt and braces: `validate` already refuses this, but it isn't a
+          # required check, so never release a merge with no app changes.
+          if [ -z "$(.github/scripts/release-version.sh changes)" ]; then
+            echo "::notice::no application code changed — not releasing"
+            exit 0
+          fi
           tag="v$(.github/scripts/release-version.sh current)"
           if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
             echo "::error::$tag already exists — did the PR bump cli/Cargo.toml?"
@@ -61,6 +74,7 @@ jobs:
 
   release:
     needs: tag
+    if: needs.tag.outputs.tag != ''
     permissions:
       contents: write
     uses: ./.github/workflows/release.yml
