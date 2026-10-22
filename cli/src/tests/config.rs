@@ -80,6 +80,7 @@ fn config_editor_wins_over_fallback() {
         root: None,
         editor: Some("hx".to_owned()),
         timezone: None,
+        clock: None,
         notify: None,
         notify_events: None,
         handoff: None,

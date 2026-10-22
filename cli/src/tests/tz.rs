@@ -86,3 +86,35 @@ fn garbage_is_rejected_with_the_input_named() {
         assert!(err.contains("unknown timezone"), "{bad}: {err}");
     }
 }
+
+#[test]
+fn twelve_hour_clock_has_no_leading_zero_and_handles_noon_and_midnight() {
+    let at = |t: OffsetDateTime| Clock::H12.time_of_day(t);
+    assert_eq!(at(datetime!(2026-10-22 15:08 UTC)), "3:08 PM");
+    assert_eq!(at(datetime!(2026-10-22 00:05 UTC)), "12:05 AM");
+    assert_eq!(at(datetime!(2026-10-22 12:00 UTC)), "12:00 PM");
+    assert_eq!(
+        Clock::H24.time_of_day(datetime!(2026-10-22 03:08 UTC)),
+        "03:08"
+    );
+}
+
+#[test]
+fn stamp_combines_date_clock_and_zone() {
+    let eastern = TimeZone::parse("America/New_York").expect("zone");
+    let t = datetime!(2026-10-22 19:08 UTC);
+    assert_eq!(stamp(t, &eastern, Clock::H12), "2026-10-22 3:08 PM EDT");
+    assert_eq!(stamp(t, &eastern, Clock::H24), "2026-10-22 15:08 EDT");
+}
+
+#[test]
+fn clock_config_values_are_12h_and_24h() {
+    #[derive(serde::Deserialize)]
+    struct C {
+        clock: Clock,
+    }
+    let parse = |v: &str| toml::from_str::<C>(&format!("clock = \"{v}\"")).map(|c| c.clock);
+    assert_eq!(parse("12h").expect("12h"), Clock::H12);
+    assert_eq!(parse("24h").expect("24h"), Clock::H24);
+    assert!(parse("noon").is_err(), "unknown clock styles are rejected");
+}

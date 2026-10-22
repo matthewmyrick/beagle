@@ -44,6 +44,9 @@ pub const TEMPLATE: &str = "\
 # abbreviation (EST, PST, ... — DST-aware), UTC, or a POSIX rule
 # (EST5EDT,M3.2.0,M11.1.0). Default: UTC.
 # timezone = \"America/New_York\"
+# 12- or 24-hour clock for those timestamps: \"12h\" (3:08 PM) or \"24h\"
+# (15:08, the default).
+# clock = \"12h\"
 
 # Desktop notifications while the TUI runs: new incidents and status
 # changes (osascript on macOS, notify-send on Linux). Off by default.
@@ -107,6 +110,9 @@ pub struct Config {
     /// Absent means UTC; files on disk are always UTC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    /// 12- or 24-hour clock for TUI timestamps. Absent means 24-hour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clock: Option<crate::tz::Clock>,
     /// Desktop notifications from the TUI (new incidents, status changes).
     /// Off unless explicitly enabled. The master switch — see
     /// `notify_events` to pick which events fire.
@@ -362,6 +368,7 @@ fn resolve_project(project_path: &Path, mut project: Config, global: Option<Conf
     if let Some(global) = global {
         project.editor = project.editor.or(global.editor);
         project.timezone = project.timezone.or(global.timezone);
+        project.clock = project.clock.or(global.clock);
         project.notify = project.notify.or(global.notify);
         project.notify_events = project.notify_events.or(global.notify_events);
         project.handoff = project.handoff.or(global.handoff);

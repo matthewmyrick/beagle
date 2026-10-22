@@ -6,7 +6,46 @@
 //! — the same rule tzdata itself uses for current and future transitions —
 //! plus a short table of common IANA names that map onto them.
 
+use serde::{Deserialize, Serialize};
+use time::macros::format_description;
 use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset, Weekday};
+
+/// How clock times render: `15:08` or `3:08 PM`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Clock {
+    /// `15:08` — the default.
+    #[default]
+    #[serde(rename = "24h")]
+    H24,
+    /// `3:08 PM`.
+    #[serde(rename = "12h")]
+    H12,
+}
+
+impl Clock {
+    /// `t`'s time of day in this style, e.g. `15:08` or `3:08 PM`.
+    #[must_use]
+    pub fn time_of_day(self, t: OffsetDateTime) -> String {
+        let formatted = match self {
+            Self::H24 => t.format(format_description!("[hour]:[minute]")),
+            Self::H12 => t.format(format_description!(
+                "[hour repr:12 padding:none]:[minute] [period]"
+            )),
+        };
+        formatted.unwrap_or_else(|_| t.time().to_string())
+    }
+}
+
+/// `t` as `2026-10-22 3:08 PM EDT`: date, time of day, and zone, in
+/// `zone` and `clock` style.
+#[must_use]
+pub fn stamp(t: OffsetDateTime, zone: &TimeZone, clock: Clock) -> String {
+    let (local, abbr) = zone.localize(t);
+    let date = local
+        .format(format_description!("[year]-[month]-[day]"))
+        .unwrap_or_else(|_| local.date().to_string());
+    format!("{date} {} {abbr}", clock.time_of_day(local))
+}
 
 /// Common IANA names (and colloquial abbreviations) → POSIX TZ rules.
 /// Anything else must be a POSIX rule string itself.

@@ -52,6 +52,7 @@ fn tui_settings(config: Option<config::Config>) -> ui::Settings {
             beagle::tz::TimeZone::parse,
         );
     // Absent `[notify_events]` means every event fires.
+    let clock = config.as_ref().and_then(|c| c.clock).unwrap_or_default();
     let notify_events = config
         .and_then(|c| c.notify_events)
         .unwrap_or_else(config::NotifyEvents::all);
@@ -59,6 +60,7 @@ fn tui_settings(config: Option<config::Config>) -> ui::Settings {
         notify,
         notify_events,
         timezone,
+        clock,
     }
 }
 
@@ -618,11 +620,11 @@ fn run_config() -> Result<(), Error> {
             if let Some(zone) = &config.timezone {
                 match beagle::tz::TimeZone::parse(zone) {
                     Ok(tz) => {
+                        let clock = config.clock.unwrap_or_default();
                         let (now, abbr) = tz.localize(time::OffsetDateTime::now_utc());
                         println!(
-                            "  timezone = {zone} (now {:02}:{:02} {abbr})",
-                            now.hour(),
-                            now.minute()
+                            "  timezone = {zone} (now {} {abbr})",
+                            clock.time_of_day(now)
                         );
                     }
                     Err(e) => eprintln!("⚠ {e}; the TUI will show UTC"),

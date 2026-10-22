@@ -117,6 +117,8 @@ pub struct App {
     notify_events: crate::config::NotifyEvents,
     /// Display zone for timestamps (config `timezone`; UTC by default).
     timezone: crate::tz::TimeZone,
+    /// 12- or 24-hour clock for timestamps (config `clock`; 24h by default).
+    clock: crate::tz::Clock,
     /// Last-seen modification time per section file, for change detection.
     mtimes: HashMap<(RcaId, SectionKind), std::time::SystemTime>,
     /// Checkbox counts per section, `(checked, total)`, re-scanned only
@@ -249,6 +251,7 @@ impl App {
             notify_enabled: false,
             notify_events: crate::config::NotifyEvents::all(),
             timezone: crate::tz::TimeZone::utc(),
+            clock: crate::tz::Clock::default(),
             mtimes: HashMap::new(),
             checklists: HashMap::new(),
             unread: HashSet::new(),
@@ -757,6 +760,8 @@ pub struct Settings {
     /// Display zone (config `timezone`); an `Err` names a zone that didn't
     /// parse, shown on the status line while timestamps fall back to UTC.
     pub timezone: std::result::Result<crate::tz::TimeZone, String>,
+    /// 12- or 24-hour clock (config `clock`).
+    pub clock: crate::tz::Clock,
 }
 
 /// Sets up the terminal, runs the app, and unconditionally restores the
@@ -780,6 +785,7 @@ pub fn run(store: Store, settings: Settings) -> Result<()> {
     let result = App::new(store).and_then(|mut app| {
         app.notify_enabled = settings.notify;
         app.notify_events = settings.notify_events;
+        app.clock = settings.clock;
         match settings.timezone {
             Ok(zone) => app.timezone = zone,
             Err(e) => app.status = Some(format!("config: {e}; showing UTC")),

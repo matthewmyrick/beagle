@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-22
+
+### Added
+
+- **`clock` config**: `clock = "12h"` shows TUI timestamps as `3:08 PM`
+  instead of `15:08` (`"24h"`, the default). Pairs with `timezone`, e.g.
+  `opened 2026-10-22 3:08 PM EDT`; `beagle config` echoes it too.
+
 ## [0.31.0] - 2026-10-22
 
 ### Added
