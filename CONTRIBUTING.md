@@ -98,24 +98,11 @@ tight — this is a tool people install with `cargo install`.
 
 ## Releasing (maintainers)
 
-CLI releases are label-driven (`.github/workflows/auto-release.yml`):
-
-1. In the PR, bump `version` in `cli/Cargo.toml` (run `cargo check` so
-   `Cargo.lock` follows) and move the `[Unreleased]` notes in
-   `CHANGELOG.md` under a `## [X.Y.Z] - YYYY-MM-DD` heading.
-2. Label the PR with exactly one of `patch`, `minor`, or `major`. The
-   `validate` check fails unless the new version is the latest `v*` tag
-   bumped by that label and the CHANGELOG heading exists. An unlabeled PR
-   must leave the version alone, and merging it releases nothing.
-3. Merge. The workflow tags the merge commit `vX.Y.Z` and runs
-   `release.yml`, which re-runs the full gate, cross-builds macOS
-   arm64/x86_64 and Linux x86_64-musl binaries, and publishes them with
-   sha256 checksums to a GitHub Release.
-
-The bump rides in the PR because main only accepts PRs, so the workflow
-never commits. Pushing a `vX.Y.Z` tag by hand still works as a fallback.
-`release.yml` refuses to publish if the tag doesn't match `Cargo.toml`'s
-version, so a mismatched bump fails loudly instead of shipping a lie.
+Label a PR `patch`, `minor`, or `major`, bump `cli/Cargo.toml` and the
+CHANGELOG heading in it, and merge. The release tags and publishes itself.
+Only PRs that change application code can release; docs, CI, and test-only
+PRs can't. The full process, the rules, and the fallback are in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## Reporting bugs
 
