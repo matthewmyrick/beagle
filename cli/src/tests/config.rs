@@ -79,6 +79,7 @@ fn config_editor_wins_over_fallback() {
     let config = Config {
         root: None,
         editor: Some("hx".to_owned()),
+        timezone: None,
         notify: None,
         notify_events: None,
         handoff: None,

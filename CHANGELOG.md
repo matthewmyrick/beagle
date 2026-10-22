@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-22
+
+### Added
+
+- **`timezone` config**: show TUI timestamps (the header's "opened" time)
+  in your zone instead of UTC — e.g. `timezone = "America/New_York"`
+  renders `2026-10-22 09:05 EDT`. DST-aware; accepts common IANA names,
+  abbreviations (`EST`, `PST`, ...), `UTC`, or any POSIX TZ rule. No new
+  dependency. Files on disk stay UTC. `beagle config` echoes the current
+  time in the configured zone, and an unknown zone falls back to UTC with
+  a status-line note.
+
 ## [0.30.0] - 2026-10-21
 
 ### Added

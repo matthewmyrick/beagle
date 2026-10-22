@@ -129,3 +129,28 @@ fn elapsed_label_formats_minutes_hours_days() {
         "clock skew clamps to 0"
     );
 }
+
+#[test]
+fn opened_time_shows_in_the_configured_zone() {
+    let meta: crate::model::RcaMeta = toml::from_str(
+        r#"
+        title = "t"
+        severity = "high"
+        status = "review"
+        created = "2026-10-22T13:05:00Z"
+        "#,
+    )
+    .expect("manifest");
+    let rca = RcaSummary {
+        id: crate::model::RcaId::new("2026-10-22-t").expect("id"),
+        meta,
+        archived: false,
+    };
+    let text = |zone: &str| -> String {
+        let tz = crate::tz::TimeZone::parse(zone).expect("zone");
+        let para = header_paragraph(&rca, 0, &[], None, None, &tz);
+        format!("{para:?}")
+    };
+    assert!(text("UTC").contains("2026-10-22 13:05 UTC"));
+    assert!(text("America/New_York").contains("2026-10-22 09:05 EDT"));
+}

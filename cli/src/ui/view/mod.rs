@@ -431,6 +431,7 @@ fn draw_workspace(frame: &mut Frame, app: &mut App, area: Rect) {
         &prs,
         activity,
         app.checklist_progress(&rca.id),
+        &app.timezone,
     );
     let header_width = head_width.saturating_sub(1).max(1); // inset by 1 below
     let header_height = u16::try_from(header.line_count(header_width))
