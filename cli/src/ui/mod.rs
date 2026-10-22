@@ -115,6 +115,8 @@ pub struct App {
     /// Which lifecycle events fire a notification when `notify_enabled`
     /// (config `[notify_events]`; all events by default).
     notify_events: crate::config::NotifyEvents,
+    /// Display zone for timestamps (config `timezone`; UTC by default).
+    timezone: crate::tz::TimeZone,
     /// Last-seen modification time per section file, for change detection.
     mtimes: HashMap<(RcaId, SectionKind), std::time::SystemTime>,
     /// Checkbox counts per section, `(checked, total)`, re-scanned only
@@ -246,6 +248,7 @@ impl App {
             show_archived: false,
             notify_enabled: false,
             notify_events: crate::config::NotifyEvents::all(),
+            timezone: crate::tz::TimeZone::utc(),
             mtimes: HashMap::new(),
             checklists: HashMap::new(),
             unread: HashSet::new(),
@@ -744,13 +747,25 @@ impl App {
     }
 }
 
+/// Config-driven TUI settings, resolved by the caller.
+#[derive(Debug, Clone)]
+pub struct Settings {
+    /// Desktop notifications on (config `notify`).
+    pub notify: bool,
+    /// Which events notify (config `[notify_events]`).
+    pub notify_events: crate::config::NotifyEvents,
+    /// Display zone (config `timezone`); an `Err` names a zone that didn't
+    /// parse, shown on the status line while timestamps fall back to UTC.
+    pub timezone: std::result::Result<crate::tz::TimeZone, String>,
+}
+
 /// Sets up the terminal, runs the app, and unconditionally restores the
 /// terminal — including on error paths.
 ///
 /// # Errors
 /// Propagates any [`Error`](crate::Error) from app construction or the
 /// event loop.
-pub fn run(store: Store, notify: bool, notify_events: crate::config::NotifyEvents) -> Result<()> {
+pub fn run(store: Store, settings: Settings) -> Result<()> {
     let mut terminal = ratatui::init();
     // Mouse capture must be torn down on every exit path — left on, it
     // garbles the user's shell (scrolling emits escape codes). The panic
@@ -763,8 +778,12 @@ pub fn run(store: Store, notify: bool, notify_events: crate::config::NotifyEvent
         previous_hook(info);
     }));
     let result = App::new(store).and_then(|mut app| {
-        app.notify_enabled = notify;
-        app.notify_events = notify_events;
+        app.notify_enabled = settings.notify;
+        app.notify_events = settings.notify_events;
+        match settings.timezone {
+            Ok(zone) => app.timezone = zone,
+            Err(e) => app.status = Some(format!("config: {e}; showing UTC")),
+        }
         app.run(&mut terminal)
     });
     let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
