@@ -146,11 +146,14 @@ fn opened_time_shows_in_the_configured_zone() {
         meta,
         archived: false,
     };
-    let text = |zone: &str| -> String {
+    let text = |zone: &str, clock: crate::tz::Clock| -> String {
         let tz = crate::tz::TimeZone::parse(zone).expect("zone");
-        let para = header_paragraph(&rca, 0, &[], None, None, &tz);
+        let para = header_paragraph(&rca, 0, &[], None, None, &tz, clock);
         format!("{para:?}")
     };
-    assert!(text("UTC").contains("2026-10-22 13:05 UTC"));
-    assert!(text("America/New_York").contains("2026-10-22 09:05 EDT"));
+    let (h24, h12) = (crate::tz::Clock::H24, crate::tz::Clock::H12);
+    assert!(text("UTC", h24).contains("2026-10-22 13:05 UTC"));
+    assert!(text("America/New_York", h24).contains("2026-10-22 09:05 EDT"));
+    assert!(text("UTC", h12).contains("2026-10-22 1:05 PM UTC"));
+    assert!(text("America/New_York", h12).contains("2026-10-22 9:05 AM EDT"));
 }

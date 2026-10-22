@@ -6,7 +6,6 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::Frame;
-use time::macros::format_description;
 
 use crate::model::{RcaSummary, Status};
 use crate::ui::Tab;
@@ -154,17 +153,12 @@ pub(super) fn header_paragraph(
     activity: Option<std::time::Duration>,
     progress: Option<(usize, usize)>,
     timezone: &crate::tz::TimeZone,
+    clock: crate::tz::Clock,
 ) -> Paragraph<'static> {
     let (badge, badge_style) = severity_badge(rca.meta.severity);
     let (symbol, symbol_style) = status_symbol(rca.meta.status, tick);
 
-    let (created, zone) = timezone.localize(rca.meta.created);
-    let opened = created
-        .format(format_description!("[year]-[month]-[day] [hour]:[minute]"))
-        .map_or_else(
-            |_| rca.meta.created.to_string(),
-            |at| format!("{at} {zone}"),
-        );
+    let opened = crate::tz::stamp(rca.meta.created, timezone, clock);
 
     let mut meta_spans = vec![Span::styled(
         format!("{symbol} {}", rca.meta.status),

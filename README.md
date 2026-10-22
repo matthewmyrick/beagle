@@ -137,6 +137,7 @@ investigating = true
 editor = "code -w"         # editor for `beagle config`
 timezone = "America/New_York"  # TUI timestamps (DST-aware; EST, PST, UTC,
                                # Europe/London, or a POSIX rule). Files stay UTC.
+clock = "12h"              # 3:08 PM instead of 15:08 (default "24h")
 
 [handoff]                   # `beagle handoff <slug>`: the agent to launch
 command = ["codex", "exec"] # argv; the prompt + write-up go to its stdin
